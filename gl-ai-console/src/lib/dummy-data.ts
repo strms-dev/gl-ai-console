@@ -1,0 +1,92 @@
+export interface Lead {
+  id: string
+  company: string
+  contact: string
+  email: string
+  stage: "new" | "demo" | "readiness" | "decision" | "scoping" | "scoping-prep" | "dev-overview" | "workflow-docs" | "proposal" | "ea" | "setup" | "kickoff"
+  lastActivity: string
+  readinessScore?: number
+  estimatedValue?: number
+  nextAction?: string
+}
+
+export const dummyLeads: Lead[] = [
+  {
+    id: "lead-1",
+    company: "Acme Corp",
+    contact: "John Smith",
+    email: "john@acmecorp.com",
+    stage: "demo", // Brand new lead at Demo Call stage
+    lastActivity: "2 hours ago"
+  },
+  {
+    id: "lead-2",
+    company: "TechStart Inc",
+    contact: "Sarah Johnson",
+    email: "sarah@techstart.io",
+    stage: "decision", // At Decision Point with 85% readiness
+    lastActivity: "5 hours ago"
+  },
+  {
+    id: "lead-3",
+    company: "DataFlow Solutions",
+    contact: "Mike Chen",
+    email: "mike@dataflow.com",
+    stage: "dev-overview", // In progress with Developer Audio Overview
+    lastActivity: "1 day ago"
+  },
+  {
+    id: "lead-4",
+    company: "AutoBot Industries",
+    contact: "Lisa Rodriguez",
+    email: "lisa@autobot.com",
+    stage: "decision", // Rejected at Decision Point (45% score)
+    lastActivity: "3 hours ago"
+  },
+  {
+    id: "lead-5",
+    company: "CloudSync Pro",
+    contact: "David Wilson",
+    email: "david@cloudsync.pro",
+    stage: "kickoff", // Fully completed through Kickoff
+    lastActivity: "6 hours ago"
+  },
+  {
+    id: "lead-6",
+    company: "InnovateTech",
+    contact: "Emma Thompson",
+    email: "emma@innovatetech.com",
+    stage: "new", // Fresh lead, everything pending
+    lastActivity: "2 days ago"
+  }
+]
+
+export const stageLabels = {
+  new: "New Lead",
+  demo: "Demo Call",
+  readiness: "Readiness Assessment",
+  decision: "Scoping Decision",
+  scoping: "Scoping Call",
+  "scoping-prep": "Scoping Prep",
+  "dev-overview": "Developer Overview",
+  "workflow-docs": "Workflow Documentation",
+  proposal: "Proposal Sent",
+  ea: "Engagement Agreement",
+  setup: "Project Setup",
+  kickoff: "Project Kickoff"
+}
+
+export const stageColors = {
+  new: "bg-slate-100 text-slate-800",
+  demo: "bg-blue-100 text-blue-800",
+  readiness: "bg-yellow-100 text-yellow-800",
+  decision: "bg-amber-100 text-amber-800",
+  scoping: "bg-purple-100 text-purple-800",
+  "scoping-prep": "bg-indigo-100 text-indigo-800",
+  "dev-overview": "bg-cyan-100 text-cyan-800",
+  "workflow-docs": "bg-teal-100 text-teal-800",
+  proposal: "bg-orange-100 text-orange-800",
+  ea: "bg-green-100 text-green-800",
+  setup: "bg-lime-100 text-lime-800",
+  kickoff: "bg-gray-100 text-gray-800"
+}

@@ -1,0 +1,47 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+
+interface ComingSoonProps {
+  departmentName: string
+  departmentIcon: string
+  description: string
+  features: string[]
+}
+
+export function ComingSoon({ departmentName, departmentIcon, description, features }: ComingSoonProps) {
+  return (
+    <div className="p-8 bg-muted/30">
+      <div className="max-w-2xl mx-auto text-center">
+        <div className="mb-8">
+          <div className="text-6xl mb-4">{departmentIcon}</div>
+          <h1 className="text-4xl font-bold text-foreground mb-4">
+            {departmentName} Console
+          </h1>
+          <p className="text-xl text-muted-foreground mb-8">
+            {description}
+          </p>
+        </div>
+
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-2xl">Coming Soon</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-6">
+              We're building an AI-powered console for {departmentName} that will revolutionize how you work.
+              Here's what's coming:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {features.map((feature, index) => (
+                <div key={index} className="flex items-center space-x-2 text-left">
+                  <span className="text-green-500">✓</span>
+                  <span className="text-sm">{feature}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
