@@ -95,6 +95,14 @@ export const fileTypes: FileType[] = [
     acceptedTypes: ['.pdf', '.doc', '.docx'],
     icon: '🚀',
     category: 'planning'
+  },
+  {
+    id: 'ea-wording',
+    label: 'EA Wording File',
+    description: 'Project-specific engagement agreement wording',
+    acceptedTypes: ['.txt', '.doc', '.docx', '.pdf'],
+    icon: '📝',
+    category: 'document'
   }
 ]
 

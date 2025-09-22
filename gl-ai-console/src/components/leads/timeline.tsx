@@ -7,6 +7,15 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { getFileTypeById, UploadedFile } from "@/lib/file-types"
 import { FileUpload } from "@/components/leads/file-upload"
+import { SprintPricingForm } from "@/components/leads/sprint-pricing-form"
+
+// Import SPRINT_OPTIONS for display purposes
+const SPRINT_OPTIONS = [
+  { value: "0.5", label: "1/2 Sprint (2.5 Days)", price: 2000 },
+  { value: "1", label: "1x Sprint (5 Days)", price: 4000 },
+  { value: "1.5", label: "1.5x Sprint (7.5 Days)", price: 6000 },
+  { value: "2", label: "2x Sprint (10 Days)", price: 8000 }
+]
 
 interface TimelineProps {
   events: TimelineEvent[]
@@ -79,7 +88,7 @@ const LoadingSpinner = () => (
   </div>
 )
 
-const ActionZone = ({ event, onAction, onFileUploaded, onFileCleared, existingFile, showDeveloperSelection, showEmailDraft, selectedDeveloper, showNotAFitEmail, decisionMade }: {
+const ActionZone = ({ event, onAction, onFileUploaded, onFileCleared, existingFile, showDeveloperSelection, showEmailDraft, selectedDeveloper, showNotAFitEmail, decisionMade, onSprintPricingConfirm, sprintPricingData, proposalDeclined, showProposalAdjustment, proposalWasAdjusted, onProposalAdjustmentConfirm, anchorContactCreated, anchorProposalCreated, anchorContactLoading, anchorProposalLoading, eaWordingGenerated, eaWordingGenerating, eaConfirmed }: {
   event: TimelineEvent,
   onAction: (action: string) => void,
   onFileUploaded?: (file: UploadedFile) => void,
@@ -89,7 +98,20 @@ const ActionZone = ({ event, onAction, onFileUploaded, onFileCleared, existingFi
   showEmailDraft?: boolean,
   selectedDeveloper?: string | null,
   showNotAFitEmail?: boolean,
-  decisionMade?: string | null
+  decisionMade?: string | null,
+  onSprintPricingConfirm?: (data: { sprintLength: string; price: number; explanation: string }) => void,
+  sprintPricingData?: { sprintLength: string; price: number; explanation: string } | null,
+  proposalDeclined?: boolean,
+  showProposalAdjustment?: boolean,
+  proposalWasAdjusted?: boolean,
+  onProposalAdjustmentConfirm?: (data: { sprintLength: string; price: number; explanation: string }) => void,
+  anchorContactCreated?: boolean,
+  anchorProposalCreated?: boolean,
+  anchorContactLoading?: boolean,
+  anchorProposalLoading?: boolean,
+  eaWordingGenerated?: boolean,
+  eaWordingGenerating?: boolean,
+  eaConfirmed?: boolean
 }) => {
   const [emailCopied, setEmailCopied] = useState(false)
 
@@ -277,39 +299,217 @@ const ActionZone = ({ event, onAction, onFileUploaded, onFileCleared, existingFi
 
   // Special handling for Sprint Length & Price Estimate stage
   if (event.type === "sprint-pricing") {
-    const sprintPricingFileType = getFileTypeById('sprint-pricing-estimate')
-    if (sprintPricingFileType) {
-      return (
-        <div className="mt-4 p-3 bg-muted/30 rounded-lg border">
-          {/* AI Generation Button */}
-          {event.actions.automated && (
-            <div className="mb-4">
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => onAction('automated')}
-                className="w-full sm:w-auto"
-              >
-                {event.actions.automated.label}
-              </Button>
-              <p className="text-xs text-muted-foreground mt-1">
-                AI will generate sprint planning and pricing estimates based on project requirements
-              </p>
-            </div>
-          )}
+    // Show recap for completed stage when expanded
+    if (event.status === "completed" && sprintPricingData) {
+      const sprintOptions = {
+        "0.5": "1/2 Sprint (2.5 Days)",
+        "1": "1x Sprint (5 Days)",
+        "1.5": "1.5x Sprint (7.5 Days)",
+        "2": "2x Sprint (10 Days)"
+      }
 
-          {/* Manual Upload Option */}
-          <div>
-            <div className="mb-2">
-              <p className="text-sm font-medium text-foreground">Or upload manually:</p>
+      return (
+        <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">✅</span>
+              <h3 className="font-bold text-lg text-gray-800">Sprint Estimate Complete - Recap</h3>
             </div>
-            <FileUpload
-              fileType={sprintPricingFileType}
-              existingFile={existingFile}
-              onFileUploaded={onFileUploaded}
-              onFileCleared={() => onFileCleared?.('sprint-pricing-estimate')}
-            />
           </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-600">Sprint Length:</span>
+                <span className="font-medium">{sprintOptions[sprintPricingData.sprintLength as keyof typeof sprintOptions] || `${sprintPricingData.sprintLength}x Sprint`}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-600">Total Price:</span>
+                <span className="font-medium text-green-600">${sprintPricingData.price.toLocaleString()}</span>
+              </div>
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  <strong>Explanation:</strong> {sprintPricingData.explanation}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <Button
+              onClick={() => onAction('clear_sprint_pricing')}
+              variant="outline"
+              size="sm"
+              className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+            >
+              🔄 Revise Estimate
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    // Show the custom pricing form for pending/in-progress stage
+    if (onSprintPricingConfirm) {
+      return (
+        <div className="mt-4">
+          <SprintPricingForm
+            onConfirm={onSprintPricingConfirm}
+          />
+        </div>
+      )
+    }
+  }
+
+  // Special handling for Generate & Send Proposal Email stage
+  if (event.type === "proposal") {
+    // Show recap for completed stage when expanded
+    if (event.status === "completed" && sprintPricingData) {
+      const sprintOptions = {
+        "0.5": "2.5 days",
+        "1": "5 days",
+        "1.5": "7.5 days",
+        "2": "10 days"
+      }
+
+      const sprintDuration = sprintOptions[sprintPricingData.sprintLength as keyof typeof sprintOptions] || `${sprintPricingData.sprintLength} sprint days`
+
+      return (
+        <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">✅</span>
+              <h3 className="font-bold text-lg text-gray-800">Proposal Email Sent - Complete</h3>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📧</span>
+                <span className="font-medium text-gray-800">Proposal email sent to client</span>
+              </div>
+              <div className="text-sm text-gray-600">
+                <p>• Sprint Duration: {sprintDuration}</p>
+                <p>• Total Investment: ${sprintPricingData.price.toLocaleString()}</p>
+                <p>• Email included project overview, timeline, and next steps</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <Button
+              onClick={() => onAction('resend_proposal')}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+            >
+              📧 Resend Proposal
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    // Show proposal email draft for pending/in-progress stage
+    if (sprintPricingData) {
+      const sprintOptions = {
+        "0.5": "2.5 days",
+        "1": "5 days",
+        "1.5": "7.5 days",
+        "2": "10 days"
+      }
+
+      const sprintDuration = sprintOptions[sprintPricingData.sprintLength as keyof typeof sprintOptions] || `${sprintPricingData.sprintLength} sprint days`
+
+      const proposalEmailContent = `Subject: Your Automation Project Proposal - Ready to Get Started!
+
+Hi there!
+
+Thank you for taking the time to discuss your automation needs with us. Based on our scoping session and analysis, I'm excited to present our proposal for your project.
+
+## Project Overview
+We've carefully reviewed your requirements and believe we can deliver an excellent automation solution that will streamline your operations and save you valuable time.
+
+## Proposed Timeline & Investment
+
+**Sprint Duration:** ${sprintDuration}
+**Total Investment:** $${sprintPricingData.price.toLocaleString()}
+
+${sprintPricingData.explanation}
+
+## What's Included
+• Complete automation development and implementation
+• Thorough testing across all use cases
+• Documentation and handover training
+• 30 days of post-launch support and adjustments
+
+## Next Steps
+If you're ready to move forward, simply reply to this email and we'll send over the engagement agreement to get started. We're excited to help transform your business processes!
+
+Looking forward to working with you!
+
+Best regards,
+The GrowthLab Team`
+
+      return (
+        <div className="mt-4 p-6 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">📧</span>
+              <h3 className="font-bold text-lg text-gray-800">Proposal Email Draft Ready</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              📋 Based on your sprint estimate: {sprintDuration} for ${sprintPricingData.price.toLocaleString()}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border">
+{proposalEmailContent}
+            </pre>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(proposalEmailContent)
+                setEmailCopied(true)
+                setTimeout(() => setEmailCopied(false), 2000)
+              }}
+              variant="outline"
+              className={`flex-1 transition-all duration-200 ${
+                emailCopied
+                  ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                  : "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              }`}
+            >
+              {emailCopied ? "✅ Email Copied!" : "📋 Copy Email"}
+            </Button>
+            <Button
+              onClick={() => onAction('proposal_email_sent')}
+              className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0"
+            >
+              ✅ Email Sent
+            </Button>
+          </div>
+
+          <p className="text-xs text-gray-500 text-center mt-3">
+            Click "Copy Email" to copy the proposal, then "Email Sent" when you've sent it to the client
+          </p>
+        </div>
+      )
+    } else {
+      // If no sprint pricing data available, show placeholder
+      return (
+        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">⚠️</span>
+            <h3 className="font-medium text-yellow-800">Sprint Pricing Required</h3>
+          </div>
+          <p className="text-sm text-yellow-700">
+            Please complete the Sprint Length & Price Estimate stage first to generate the proposal email.
+          </p>
         </div>
       )
     }
@@ -506,6 +706,336 @@ The GrowthLab Team`
       </div>
     )
   }
+
+  // Proposal Adjustment Form - show when adjusting proposal
+  if (event.type === "proposal-decision" && showProposalAdjustment && onProposalAdjustmentConfirm) {
+    // If no sprint pricing data, create default data
+    const defaultData = sprintPricingData || {
+      sprintLength: "1",
+      price: 4000,
+      explanation: "A full sprint is recommended for this project due to moderate complexity requirements."
+    }
+    return (
+      <div className="mt-4">
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">🔄</span>
+            <h3 className="font-medium text-blue-800">Adjust Proposal Terms</h3>
+          </div>
+          <p className="text-sm text-blue-700">
+            Client requested adjustments. Please review and update the sprint length and pricing as needed.
+          </p>
+        </div>
+        <SprintPricingForm
+          onConfirm={onProposalAdjustmentConfirm}
+          onCancel={() => onAction('cancel_proposal_adjustment')}
+          initialData={defaultData}
+          isAdjustmentMode={true}
+        />
+      </div>
+    )
+  }
+
+  // Proposal Decision Recap - show for completed proposal-decision stage when expanded
+  if (event.type === "proposal-decision" && event.status === "completed") {
+    console.log('Proposal decision completed stage - proposalDeclined:', proposalDeclined)
+
+    if (proposalDeclined) {
+    return (
+      <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg">
+        <div className="mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">❌</span>
+            <h3 className="font-bold text-lg text-gray-800">Proposal Declined - Complete</h3>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-red-200 p-4 mb-4">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-2xl">📋</span>
+            <div>
+              <h4 className="font-semibold text-gray-800">HubSpot Deal Closed Lost</h4>
+              <p className="text-sm text-gray-600">Client declined the proposal - deal automatically moved to closed lost</p>
+            </div>
+          </div>
+          <div className="text-sm text-gray-700">
+            <p>• Proposal was declined by the client</p>
+            <p>• HubSpot deal status updated to "Closed Lost"</p>
+            <p>• All remaining onboarding stages have been marked as not applicable</p>
+          </div>
+        </div>
+
+        <div className="flex justify-center">
+          <Button
+            onClick={() => onAction('restart_proposal_decision')}
+            variant="outline"
+            size="sm"
+            className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+          >
+            🔄 Restart Proposal Decision
+          </Button>
+        </div>
+      </div>
+    )
+    }
+
+    // Show recap for adjusted & accepted proposal
+    if (sprintPricingData && proposalWasAdjusted) {
+      return (
+        <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">🔄</span>
+              <h3 className="font-bold text-lg text-gray-800">Proposal Adjusted & Accepted - Complete</h3>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-blue-200 p-4 mb-4">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl">💰</span>
+              <div>
+                <h4 className="font-semibold text-gray-800">Adjusted Sprint & Pricing</h4>
+                <p className="text-sm text-gray-600">Client requested adjustments to the original proposal</p>
+              </div>
+            </div>
+            <div className="space-y-2 text-sm text-gray-700">
+              <div className="flex justify-between">
+                <span className="font-medium">Sprint Length:</span>
+                <span>{SPRINT_OPTIONS.find(opt => opt.value === sprintPricingData.sprintLength)?.label}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium">Final Price:</span>
+                <span className="font-semibold text-green-600">${sprintPricingData.price.toLocaleString()}</span>
+              </div>
+              <div className="mt-3">
+                <span className="font-medium">Adjustment Reasoning:</span>
+                <p className="mt-1 text-gray-600 italic">"{sprintPricingData.explanation}"</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <Button
+              onClick={() => onAction('restart_proposal_decision')}
+              variant="outline"
+              size="sm"
+              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+            >
+              🔄 Restart Proposal Decision
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    // Show recap for regular accepted proposal (not adjusted)
+    if (sprintPricingData && !proposalWasAdjusted) {
+      return (
+        <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">✅</span>
+              <h3 className="font-bold text-lg text-gray-800">Proposal Accepted - Complete</h3>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-green-200 p-4 mb-4">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl">💰</span>
+              <div>
+                <h4 className="font-semibold text-gray-800">Original Proposal Accepted</h4>
+                <p className="text-sm text-gray-600">Client accepted the proposal as originally presented</p>
+              </div>
+            </div>
+            <div className="space-y-2 text-sm text-gray-700">
+              <div className="flex justify-between">
+                <span className="font-medium">Sprint Length:</span>
+                <span>{SPRINT_OPTIONS.find(opt => opt.value === sprintPricingData.sprintLength)?.label}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium">Agreed Price:</span>
+                <span className="font-semibold text-green-600">${sprintPricingData.price.toLocaleString()}</span>
+              </div>
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800">✅ Ready to proceed to next stage</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <Button
+              onClick={() => onAction('restart_proposal_decision')}
+              variant="outline"
+              size="sm"
+              className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+            >
+              🔄 Restart Proposal Decision
+            </Button>
+          </div>
+        </div>
+      )
+    }
+  }
+
+  // Engagement Agreement Actions - Create Contact and Proposal in Anchor
+  if (event.type === "ea") {
+    return (
+      <div className="mt-4 space-y-4">
+        <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">📝</span>
+            <h3 className="font-semibold text-gray-800">Engagement Agreement Setup</h3>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Complete these steps to set up the engagement agreement in Anchor
+          </p>
+
+          <div className="space-y-3">
+            {/* Create Contact In Anchor */}
+            <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">👤</span>
+                <div>
+                  <h4 className="font-medium text-gray-800">Create Contact In Anchor</h4>
+                  <p className="text-sm text-gray-500">Set up client contact in Anchor system</p>
+                </div>
+              </div>
+              <div className="flex items-center">
+                {anchorContactCreated ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <span className="text-lg">✅</span>
+                    <span className="text-sm font-medium">Complete</span>
+                  </div>
+                ) : anchorContactLoading ? (
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm">Creating...</span>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => onAction('create_anchor_contact')}
+                    size="sm"
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    Create Contact
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Create Proposal Draft In Anchor */}
+            <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">📄</span>
+                <div>
+                  <h4 className="font-medium text-gray-800">Create Proposal Draft In Anchor</h4>
+                  <p className="text-sm text-gray-500">Generate proposal draft in Anchor system</p>
+                </div>
+              </div>
+              <div className="flex items-center">
+                {anchorProposalCreated ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <span className="text-lg">✅</span>
+                    <span className="text-sm font-medium">Complete</span>
+                  </div>
+                ) : anchorProposalLoading ? (
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm">Creating...</span>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => onAction('create_anchor_proposal')}
+                    size="sm"
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    Create Proposal Draft
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Generate EA Wording with AI */}
+            <div className="p-3 bg-white border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-xl">📝</span>
+                <div>
+                  <h4 className="font-medium text-gray-800">Project-Specific EA Wording</h4>
+                  <p className="text-sm text-gray-500">AI will generate comprehensive project-specific engagement agreement wording</p>
+                </div>
+              </div>
+              {eaWordingGenerated ? (
+                <div className="flex items-center gap-2 text-green-600 p-2 bg-green-50 border border-green-200 rounded">
+                  <span className="text-lg">✅</span>
+                  <span className="text-sm font-medium">EA wording generated successfully</span>
+                </div>
+              ) : eaWordingGenerating ? (
+                <div className="flex items-center gap-2 text-blue-600 p-2 bg-blue-50 border border-blue-200 rounded">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-sm">Generating EA wording...</span>
+                </div>
+              ) : (
+                <Button
+                  onClick={() => {}}
+                  size="sm"
+                  className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2"
+                >
+                  <span>⚡</span>
+                  Generate with AI
+                </Button>
+              )}
+
+              <div className="mt-3">
+                <p className="text-sm font-medium text-foreground mb-2">Or upload manually:</p>
+                {(() => {
+                  const eaWordingFileType = getFileTypeById('ea-wording')
+                  if (eaWordingFileType) {
+                    return (
+                      <FileUpload
+                        fileType={eaWordingFileType}
+                        onFileUploaded={onFileUploaded}
+                        onFileCleared={() => onFileCleared?.('ea-wording')}
+                        existingFile={existingFile}
+                      />
+                    )
+                  }
+                  return <p className="text-red-500 text-sm">File type not found</p>
+                })()}
+              </div>
+            </div>
+
+            {/* Confirm EA Completed */}
+            <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">✅</span>
+                <div>
+                  <h4 className="font-medium text-gray-800">Confirm EA Completed</h4>
+                  <p className="text-sm text-gray-500">Confirm that the EA was completed in Anchor and sent to the customer</p>
+                </div>
+              </div>
+              <div className="flex items-center">
+                {eaConfirmed ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <span className="text-lg">✅</span>
+                    <span className="text-sm font-medium">Confirmed</span>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => onAction('confirm_ea_completed')}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    Confirm Completed
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
 
   // Decision Recap - show for completed decision stage when expanded
   if (event.type === "decision" && event.status === "completed" && decisionMade) {
@@ -772,7 +1302,20 @@ const StageCard = ({
   showEmailDraft,
   selectedDeveloper,
   showNotAFitEmail,
-  decisionMade
+  decisionMade,
+  onSprintPricingConfirm,
+  sprintPricingData,
+  proposalDeclined,
+  showProposalAdjustment,
+  proposalWasAdjusted,
+  onProposalAdjustmentConfirm,
+  anchorContactCreated,
+  anchorProposalCreated,
+  anchorContactLoading,
+  anchorProposalLoading,
+  eaWordingGenerated,
+  eaWordingGenerating,
+  eaConfirmed
 }: {
   event: TimelineEvent
   index: number
@@ -788,6 +1331,19 @@ const StageCard = ({
   selectedDeveloper?: string | null
   showNotAFitEmail?: boolean
   decisionMade?: string | null
+  onSprintPricingConfirm?: (data: { sprintLength: string; price: number; explanation: string }) => void
+  sprintPricingData?: { sprintLength: string; price: number; explanation: string } | null
+  proposalDeclined?: boolean
+  showProposalAdjustment?: boolean
+  proposalWasAdjusted?: boolean
+  onProposalAdjustmentConfirm?: (data: { sprintLength: string; price: number; explanation: string }) => void
+  anchorContactCreated?: boolean
+  anchorProposalCreated?: boolean
+  anchorContactLoading?: boolean
+  anchorProposalLoading?: boolean
+  eaWordingGenerated?: boolean
+  eaWordingGenerating?: boolean
+  eaConfirmed?: boolean
 }) => {
   const isActive = event.status === "in_progress" || event.status === "action-required"
 
@@ -889,10 +1445,11 @@ const StageCard = ({
                   </div>
                 )}
 
-                {/* Action Zone - Show for non-completed stages OR for demo/readiness/scoping-prep/scoping/dev-overview/workflow-docs/sprint-pricing/internal-client-docs stages with uploaded files OR for completed decision/proposal-decision stages */}
+                {/* Action Zone - Show for non-completed stages OR for demo/readiness/scoping-prep/scoping/dev-overview/workflow-docs/sprint-pricing/internal-client-docs stages with uploaded files OR for completed decision/proposal-decision stages OR for proposal-decision adjustment mode */}
                 {(event.status !== "completed" && event.status !== "skipped") ||
                  ((event.id === "demo" || event.id === "readiness" || event.id === "scoping-prep" || event.id === "scoping" || event.id === "dev-overview" || event.id === "workflow-docs" || event.id === "sprint-pricing" || event.id === "internal-client-docs") && event.status === "completed") ||
-                 ((event.id === "decision" || event.id === "proposal-decision") && event.status === "completed") ? (
+                 ((event.id === "decision" || event.id === "proposal-decision") && event.status === "completed") ||
+                 (event.id === "proposal-decision" && showProposalAdjustment) ? (
                   <ActionZone
                     event={event}
                     onAction={(action) => onAction(event.id, action)}
@@ -904,8 +1461,121 @@ const StageCard = ({
                     selectedDeveloper={selectedDeveloper}
                     showNotAFitEmail={event.id === "decision" ? showNotAFitEmail : false}
                     decisionMade={event.id === "decision" ? decisionMade : null}
+                    onSprintPricingConfirm={event.id === "sprint-pricing" ? onSprintPricingConfirm : undefined}
+                    sprintPricingData={(event.id === "sprint-pricing" || event.id === "proposal" || event.id === "proposal-decision") ? sprintPricingData : null}
+                    proposalDeclined={event.id === "proposal-decision" ? proposalDeclined : false}
+                    showProposalAdjustment={event.id === "proposal-decision" ? showProposalAdjustment : false}
+                    proposalWasAdjusted={event.id === "proposal-decision" ? proposalWasAdjusted : false}
+                    onProposalAdjustmentConfirm={event.id === "proposal-decision" ? onProposalAdjustmentConfirm : undefined}
+                    anchorContactCreated={event.id === "ea" ? anchorContactCreated : false}
+                    anchorProposalCreated={event.id === "ea" ? anchorProposalCreated : false}
+                    anchorContactLoading={event.id === "ea" ? anchorContactLoading : false}
+                    anchorProposalLoading={event.id === "ea" ? anchorProposalLoading : false}
+                    eaWordingGenerated={event.id === "ea" ? eaWordingGenerated : false}
+                    eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
                   />
                 ) : null}
+
+                {/* EA Recap - show for completed EA stage when expanded */}
+                {event.type === "ea" && event.status === "completed" && eaConfirmed && (
+                  <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">✅</span>
+                        <h3 className="font-bold text-lg text-gray-800">Engagement Agreement Complete - Recap</h3>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Contact Creation Status */}
+                      <div className="flex items-center justify-between p-3 bg-white/60 border border-purple-100 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">👤</span>
+                          <span className="font-medium text-gray-700">Contact Created in Anchor</span>
+                        </div>
+                        {anchorContactCreated ? (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <span className="text-lg">✅</span>
+                            <span className="text-sm font-medium">Complete</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <span className="text-lg">⭕</span>
+                            <span className="text-sm font-medium">Not Created</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Proposal Draft Status */}
+                      <div className="flex items-center justify-between p-3 bg-white/60 border border-purple-100 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">📄</span>
+                          <span className="font-medium text-gray-700">Proposal Draft Created in Anchor</span>
+                        </div>
+                        {anchorProposalCreated ? (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <span className="text-lg">✅</span>
+                            <span className="text-sm font-medium">Complete</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <span className="text-lg">⭕</span>
+                            <span className="text-sm font-medium">Not Created</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* EA Wording Status */}
+                      <div className="p-3 bg-white/60 border border-purple-100 rounded-lg">
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className="text-lg">📝</span>
+                          <span className="font-medium text-gray-700">Project-Specific EA Wording</span>
+                        </div>
+                        {eaWordingGenerated ? (
+                          <div className="flex items-center gap-2 text-green-600 text-sm">
+                            <span>✅</span>
+                            <span>Generated with AI</span>
+                          </div>
+                        ) : (
+                          <div>
+                            {(() => {
+                              const eaWordingFileType = getFileTypeById('ea-wording')
+                              if (eaWordingFileType) {
+                                return (
+                                  <FileUpload
+                                    fileType={eaWordingFileType}
+                                    onFileUploaded={onFileUploaded}
+                                    onFileCleared={() => onFileCleared?.('ea-wording')}
+                                    existingFile={existingFile}
+                                  />
+                                )
+                              }
+                              return (
+                                <div className="flex items-center gap-2 text-red-500 text-sm">
+                                  <span>⚠️</span>
+                                  <span>File type not found</span>
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Confirmation Status */}
+                      <div className="flex items-center justify-between p-3 bg-white/60 border border-purple-100 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">✅</span>
+                          <span className="font-medium text-gray-700">EA Completed and Sent to Customer</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-green-600">
+                          <span className="text-lg">✅</span>
+                          <span className="text-sm font-medium">Confirmed</span>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
 
                 {/* Artifacts */}
                 <ArtifactsSection event={event} />
@@ -932,6 +1602,22 @@ export function Timeline({ events }: TimelineProps) {
   const [showNotAFitEmail, setShowNotAFitEmail] = useState(false)
   const [leadRejected, setLeadRejected] = useState(false)
   const [decisionMade, setDecisionMade] = useState<string | null>(null)
+  const [proposalDeclined, setProposalDeclined] = useState(false)
+  const [showProposalAdjustment, setShowProposalAdjustment] = useState(false)
+  const [proposalWasAdjusted, setProposalWasAdjusted] = useState(false)
+  const [anchorContactCreated, setAnchorContactCreated] = useState(false)
+  const [anchorProposalCreated, setAnchorProposalCreated] = useState(false)
+  const [anchorContactLoading, setAnchorContactLoading] = useState(false)
+  const [anchorProposalLoading, setAnchorProposalLoading] = useState(false)
+  const [eaWordingGenerated, setEaWordingGenerated] = useState(false)
+  const [eaWordingGenerating, setEaWordingGenerating] = useState(false)
+  const [eaConfirmed, setEaConfirmed] = useState(false)
+  // Sprint pricing form is always shown for sprint-pricing stage
+  const [sprintPricingData, setSprintPricingData] = useState<{
+    sprintLength: string
+    price: number
+    explanation: string
+  } | null>(null)
 
   const completedCount = completedStages.size
   const totalCount = events.length
@@ -951,6 +1637,8 @@ export function Timeline({ events }: TimelineProps) {
 
   const handleAction = (eventId: string, action: string) => {
     console.log(`Action triggered: ${action} for event ${eventId}`)
+    console.log('HandleAction function entered')
+
 
     // Handle scoping decision - show developer selection
     if (action === 'proceed' && eventId === 'decision') {
@@ -1020,6 +1708,48 @@ export function Timeline({ events }: TimelineProps) {
       return
     }
 
+    // Handle restart proposal decision (must come before general proposal-decision handler)
+    if (action === 'restart_proposal_decision' && eventId === 'proposal-decision') {
+      console.log('Restarting proposal decision stage - action handler called')
+      setProposalDeclined(false)
+
+      // Mark proposal-decision stage as not completed
+      setCompletedStages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('proposal-decision')
+        return newSet
+      })
+
+      // Expand the proposal-decision stage
+      setCollapsedItems(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('proposal-decision') // Expand proposal-decision stage
+        return newSet
+      })
+      return
+    }
+
+    // Handle cancel proposal adjustment (must come before general proposal-decision handler)
+    if (action === 'cancel_proposal_adjustment' && eventId === 'proposal-decision') {
+      console.log('Cancelling proposal adjustment')
+      console.log('Current showProposalAdjustment:', showProposalAdjustment)
+      setShowProposalAdjustment(false)
+      console.log('Set showProposalAdjustment to false')
+      // Mark proposal-decision as pending (not completed) since they cancelled the adjustment
+      setCompletedStages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('proposal-decision') // Remove from completed stages
+        return newSet
+      })
+      // Expand the proposal-decision stage to show the decision options again
+      setCollapsedItems(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('proposal-decision') // Expand proposal-decision stage
+        return newSet
+      })
+      return
+    }
+
     // Handle proposal decision actions
     if (eventId === 'proposal-decision') {
       console.log(`Proposal decision: ${action}`)
@@ -1038,18 +1768,81 @@ export function Timeline({ events }: TimelineProps) {
         })
       } else if (action === 'decline') {
         console.log('Proposal declined - marking remaining stages as skipped')
-        // Mark all remaining stages as skipped
-        // This would typically end the onboarding process
+        setProposalDeclined(true)
+        // All remaining stages will be marked as skipped in the updatedEvents logic
       } else if (action === 'adjust') {
-        console.log('Proposal adjusted and accepted - proceeding to Internal & Client Scoping Document')
-        // Advance to Internal & Client Scoping Document
-        setCollapsedItems(prev => {
+        console.log('Proposal adjustment requested - showing adjustment form')
+        setShowProposalAdjustment(true)
+        console.log('Set showProposalAdjustment to true')
+        // Don't complete the stage yet - wait for adjustment confirmation
+        // Remove the stage from completed stages temporarily
+        setCompletedStages(prev => {
           const newSet = new Set(prev)
-          newSet.add('proposal-decision') // Collapse proposal-decision stage
-          newSet.delete('internal-client-docs') // Expand internal-client-docs stage
+          newSet.delete('proposal-decision')
           return newSet
         })
       }
+      return
+    }
+
+
+    // Handle sprint pricing clear action
+    if (eventId === 'sprint-pricing' && action === 'clear_sprint_pricing') {
+      console.log('Clearing sprint pricing data - resetting to pending')
+      setSprintPricingData(null)
+
+      // Mark sprint-pricing stage as pending
+      setCompletedStages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('sprint-pricing')
+        return newSet
+      })
+
+      // Expand the sprint-pricing stage and collapse the proposal stage
+      setCollapsedItems(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('sprint-pricing') // Expand sprint-pricing stage
+        newSet.add('proposal') // Collapse proposal stage
+        return newSet
+      })
+      return
+    }
+
+    // Handle proposal email sent
+    if (eventId === 'proposal' && action === 'proposal_email_sent') {
+      console.log('Proposal email sent - completing proposal stage')
+
+      // Mark proposal stage as completed
+      setCompletedStages(prev => new Set(prev).add('proposal'))
+
+      // Collapse the proposal stage and expand the next stage (proposal-decision)
+      setCollapsedItems(prev => {
+        const newSet = new Set(prev)
+        newSet.add('proposal') // Collapse proposal stage
+        newSet.delete('proposal-decision') // Expand proposal-decision stage
+        return newSet
+      })
+      return
+    }
+
+    // Handle resend proposal
+    if (eventId === 'proposal' && action === 'resend_proposal') {
+      console.log('Resending proposal - setting stage back to pending')
+
+      // Mark proposal stage as pending
+      setCompletedStages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('proposal')
+        return newSet
+      })
+
+      // Expand the proposal stage and collapse the proposal-decision stage
+      setCollapsedItems(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('proposal') // Expand proposal stage
+        newSet.add('proposal-decision') // Collapse proposal-decision stage
+        return newSet
+      })
       return
     }
 
@@ -1058,6 +1851,13 @@ export function Timeline({ events }: TimelineProps) {
       setTimeout(() => {
         console.log(`Automation completed for ${eventId}`)
       }, 2000)
+    }
+
+    // Handle engagement agreement actions
+    if (eventId === 'ea') {
+      console.log('EA handler matched!')
+      handleAnchorAction(action)
+      return
     }
   }
 
@@ -1194,6 +1994,83 @@ export function Timeline({ events }: TimelineProps) {
         const newSet = new Set(prev)
         newSet.add('internal-client-docs') // Collapse internal-client-docs stage
         newSet.delete('ea') // Expand ea stage
+        return newSet
+      })
+    }
+  }
+
+  const handleSprintPricingConfirm = (data: { sprintLength: string; price: number; explanation: string }) => {
+    console.log('Sprint pricing confirmed:', data)
+    setSprintPricingData(data)
+
+    // Mark sprint-pricing stage as completed
+    setCompletedStages(prev => new Set(prev).add('sprint-pricing'))
+
+    // Collapse the sprint-pricing stage and expand the next stage (proposal)
+    setCollapsedItems(prev => {
+      const newSet = new Set(prev)
+      newSet.add('sprint-pricing') // Collapse sprint-pricing stage
+      newSet.delete('proposal') // Expand proposal stage
+      return newSet
+    })
+  }
+
+  const handleProposalAdjustmentConfirm = (data: { sprintLength: string; price: number; explanation: string }) => {
+    console.log('Proposal adjustment confirmed:', data)
+    setSprintPricingData(data)
+    setShowProposalAdjustment(false)
+    setProposalWasAdjusted(true) // Mark that an adjustment was made
+
+    // Mark proposal-decision stage as completed
+    setCompletedStages(prev => new Set(prev).add('proposal-decision'))
+
+    // Collapse the proposal-decision stage and expand the next stage (internal-client-docs)
+    setCollapsedItems(prev => {
+      const newSet = new Set(prev)
+      newSet.add('proposal-decision') // Collapse proposal-decision stage
+      newSet.delete('internal-client-docs') // Expand internal-client-docs stage
+      return newSet
+    })
+  }
+
+  // Handle anchor actions
+  const handleAnchorAction = (action: string) => {
+    if (action === 'create_anchor_contact') {
+      setAnchorContactLoading(true)
+      // Simulate 3 second loading
+      setTimeout(() => {
+        setAnchorContactLoading(false)
+        setAnchorContactCreated(true)
+        console.log('Contact created in Anchor')
+      }, 3000)
+    } else if (action === 'create_anchor_proposal') {
+      setAnchorProposalLoading(true)
+      // Simulate 3 second loading
+      setTimeout(() => {
+        setAnchorProposalLoading(false)
+        setAnchorProposalCreated(true)
+        console.log('Proposal draft created in Anchor')
+      }, 3000)
+    } else if (action === 'generate_ea_wording') {
+      setEaWordingGenerating(true)
+      // Simulate 4 second AI generation
+      setTimeout(() => {
+        setEaWordingGenerating(false)
+        setEaWordingGenerated(true)
+        console.log('EA wording generated with AI')
+      }, 4000)
+    } else if (action === 'confirm_ea_completed') {
+      setEaConfirmed(true)
+      console.log('EA confirmed as completed and sent to customer')
+
+      // Mark the engagement agreement stage as completed
+      setCompletedStages(prev => new Set(prev).add('ea'))
+
+      // Collapse the EA stage and expand the next stage
+      setCollapsedItems(prev => {
+        const newSet = new Set(prev)
+        newSet.add('ea') // Collapse EA stage
+        // Find and expand the next stage after EA if it exists
         return newSet
       })
     }
@@ -1382,6 +2259,19 @@ export function Timeline({ events }: TimelineProps) {
       }
     }
 
+    // If proposal is declined and this is a stage after proposal-decision, mark as not applicable
+    if (proposalDeclined && event.id !== "demo" && event.id !== "readiness" && event.id !== "decision" &&
+        event.id !== "scoping-prep" && event.id !== "scoping" && event.id !== "dev-overview" &&
+        event.id !== "workflow-docs" && event.id !== "sprint-pricing" && event.id !== "proposal" &&
+        event.id !== "proposal-decision") {
+      return {
+        ...event,
+        isCollapsed: true,
+        status: "skipped" as const,
+        description: "Not applicable - Proposal declined by client"
+      }
+    }
+
     return {
       ...event,
       isCollapsed: collapsedItems.has(event.id),
@@ -1421,6 +2311,8 @@ export function Timeline({ events }: TimelineProps) {
               existingFile = uploadedFiles['sprint-pricing-estimate']
             } else if (event.type === "internal-client-docs") {
               existingFile = uploadedFiles['internal-client-documentation']
+            } else if (event.type === "ea") {
+              existingFile = uploadedFiles['ea-wording']
             }
 
             return (
@@ -1440,6 +2332,19 @@ export function Timeline({ events }: TimelineProps) {
                 selectedDeveloper={selectedDeveloper}
                 showNotAFitEmail={event.id === "decision" ? showNotAFitEmail : false}
                 decisionMade={decisionMade}
+                onSprintPricingConfirm={event.id === "sprint-pricing" ? handleSprintPricingConfirm : undefined}
+                sprintPricingData={(event.id === "sprint-pricing" || event.id === "proposal" || event.id === "proposal-decision") ? sprintPricingData : null}
+                proposalDeclined={event.id === "proposal-decision" ? proposalDeclined : false}
+                showProposalAdjustment={event.id === "proposal-decision" ? showProposalAdjustment : false}
+                proposalWasAdjusted={event.id === "proposal-decision" ? proposalWasAdjusted : false}
+                onProposalAdjustmentConfirm={event.id === "proposal-decision" ? handleProposalAdjustmentConfirm : undefined}
+                anchorContactCreated={event.id === "ea" ? anchorContactCreated : false}
+                anchorProposalCreated={event.id === "ea" ? anchorProposalCreated : false}
+                anchorContactLoading={event.id === "ea" ? anchorContactLoading : false}
+                anchorProposalLoading={event.id === "ea" ? anchorProposalLoading : false}
+                eaWordingGenerated={event.id === "ea" ? eaWordingGenerated : false}
+                eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
+                eaConfirmed={event.id === "ea" ? eaConfirmed : false}
               />
             )
           })}
