@@ -4,13 +4,13 @@ import Link from "next/link"
 import { Timeline } from "@/components/leads/timeline"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { stageLabels, stageColors } from "@/lib/dummy-data"
+import { stageLabels, stageColors, Lead } from "@/lib/dummy-data"
 import { getTimelineForLead } from "@/lib/timeline-data"
 import { cn } from "@/lib/utils"
 import { FileUpload } from "@/components/leads/file-upload"
 import { fileTypes, getFilesByCategory, UploadedFile } from "@/lib/file-types"
 import { getLeadById } from "@/lib/leads-store"
-import { use, useState } from "react"
+import { use, useState, useEffect } from "react"
 
 interface LeadDetailPageProps {
   params: Promise<{
@@ -22,12 +22,28 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
   // Use React's use hook for client components
   const { id } = use(params)
 
-  // Find the lead by ID using the leads store
-  const lead = getLeadById(id)
+  // Reactive lead state that updates when lead data changes
+  const [lead, setLead] = useState<Lead | undefined>(() => getLeadById(id))
   const timeline = getTimelineForLead(id)
 
   // State to track uploaded files
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedFile>>({})
+
+  // Monitor for lead data changes
+  useEffect(() => {
+    const checkForLeadUpdates = () => {
+      const updatedLead = getLeadById(id)
+      setLead(updatedLead)
+    }
+
+    // Check immediately
+    checkForLeadUpdates()
+
+    // Set up an interval to check for updates
+    const interval = setInterval(checkForLeadUpdates, 100)
+
+    return () => clearInterval(interval)
+  }, [id])
 
   const handleFileUploaded = (file: UploadedFile) => {
     setUploadedFiles(prev => ({
@@ -112,7 +128,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
           </CardContent>
         </Card>
 
-        <Timeline events={timeline} />
+        <Timeline events={timeline} leadId={id} />
 
         <Card>
           <CardHeader>

@@ -32,6 +32,30 @@ export interface TimelineEvent {
   isCollapsed?: boolean
 }
 
+export const determineCurrentStage = (events: TimelineEvent[]): string => {
+  // Find the current stage based on timeline progress
+  // Logic: Return the first pending/in_progress/action-required stage,
+  // or the last completed stage if all are done
+
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i]
+    if (event.status === "pending" || event.status === "in_progress" || event.status === "action-required") {
+      return event.type
+    }
+    if (event.status === "skipped") {
+      // If skipped, continue to next stage
+      continue
+    }
+  }
+
+  // If all stages are completed, return the last stage
+  const lastCompletedStage = events
+    .filter(e => e.status === "completed")
+    .pop()
+
+  return lastCompletedStage?.type || "new"
+}
+
 export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
   const baseTimeline: TimelineEvent[] = [
     {
@@ -50,7 +74,7 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
       id: "readiness",
       type: "readiness",
       title: "Readiness Assessment",
-      description: "Generate automation readiness assessment using AI or upload manually",
+      description: "The readiness assessment should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
       timestamp: "",
       status: "pending",
       icon: "🎯",
@@ -79,8 +103,8 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
     {
       id: "scoping-prep",
       type: "scoping-prep",
-      title: "Scoping Prep Document",
-      description: "Preparation document with demo insights and readiness summary",
+      title: "Scoping Prep",
+      description: "The scoping prep document should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
       timestamp: "",
       status: "pending",
       icon: "📄",
@@ -105,7 +129,7 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
       id: "dev-overview",
       type: "dev-overview",
       title: "Developer Overview",
-      description: "Developer creates detailed overview of the lead's automation (audio recording or written document)",
+      description: "Developer creates detailed overview of the lead's automation (audio recording or written document) and uploads it manually",
       timestamp: "",
       status: "pending",
       icon: "🎧",
@@ -117,7 +141,7 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
       id: "workflow-docs",
       type: "workflow-docs",
       title: "N8N Workflow Description",
-      description: "Natural language description of the n8n workflow",
+      description: "The n8n workflow description should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
       timestamp: "",
       status: "pending",
       icon: "📚",
@@ -174,7 +198,7 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
       id: "internal-client-docs",
       type: "internal-client-docs",
       title: "Internal & Client Scoping Document",
-      description: "Comprehensive scoping document for both internal team and client reference",
+      description: "The internal & client scoping document should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
       timestamp: "",
       status: "pending",
       icon: "📋",
@@ -187,7 +211,7 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
       id: "ea",
       type: "ea",
       title: "Engagement Agreement",
-      description: "Finalize engagement agreement and project terms",
+      description: "The contact and proposal draft, as well as the project specific EA wording should automatically be completed and attached, then you just must make the final touches in the Anchor proposal and send to the client, then click the confirm completed button. If any of those items are not done automatically you have the option to trigger the creation of the contact and proposal draft in Anchor and can also manually trigger the generation of the project specific EA wording or can manually upload your own file",
       timestamp: "",
       status: "pending",
       icon: "📝",
@@ -205,21 +229,21 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
       status: "pending",
       icon: "⚙️",
       actions: {
-        automated: { label: "⚡ Auto-setup Project" },
-        manual: { label: "🔧 Setup Manually" }
+        automated: { label: "⚡ Create ClickUp Task" },
+        manual: { label: "📊 Create Airtable Inventory Record" }
       }
     },
     {
       id: "kickoff",
       type: "kickoff",
       title: "Kickoff Brief",
-      description: "Project kickoff meeting and team introductions",
+      description: "Kickoff brief document for project introduction and team alignment",
       timestamp: "",
       status: "pending",
       icon: "🚀",
       actions: {
-        automated: { label: "⚡ Auto-schedule Kickoff" },
-        manual: { label: "📅 Schedule Manually" }
+        automated: { label: "⚡ Generate with AI" },
+        manual: { label: "📝 Upload Manually" }
       }
     }
   ]

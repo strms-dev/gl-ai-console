@@ -15,9 +15,9 @@ interface SprintPricingFormProps {
 }
 
 const SPRINT_OPTIONS = [
-  { value: "0.5", label: "1/2 Sprint (2.5 Days)", price: 2000 },
-  { value: "1", label: "1x Sprint (5 Days)", price: 4000 },
-  { value: "1.5", label: "1.5x Sprint (7.5 Days)", price: 6000 },
+  { value: "0.5", label: "1/2 Sprint (2.5 Days)", price: 3000 },
+  { value: "1", label: "1x Sprint (5 Days)", price: 5000 },
+  { value: "1.5", label: "1.5x Sprint (7.5 Days)", price: 6500 },
   { value: "2", label: "2x Sprint (10 Days)", price: 8000 }
 ]
 

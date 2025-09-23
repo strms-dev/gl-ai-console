@@ -3,7 +3,7 @@ export interface Lead {
   company: string
   contact: string
   email: string
-  stage: "new" | "demo" | "readiness" | "decision" | "scoping" | "scoping-prep" | "dev-overview" | "workflow-docs" | "proposal" | "ea" | "setup" | "kickoff"
+  stage: "new" | "demo" | "readiness" | "decision" | "scoping" | "scoping-prep" | "dev-overview" | "workflow-docs" | "sprint-pricing" | "proposal" | "proposal-decision" | "internal-client-docs" | "ea" | "setup" | "kickoff"
   lastActivity: string
   readinessScore?: number
   estimatedValue?: number
@@ -70,7 +70,10 @@ export const stageLabels = {
   "scoping-prep": "Scoping Prep",
   "dev-overview": "Developer Overview",
   "workflow-docs": "Workflow Documentation",
+  "sprint-pricing": "Sprint Pricing",
   proposal: "Proposal Sent",
+  "proposal-decision": "Proposal Decision",
+  "internal-client-docs": "Internal & Client Docs",
   ea: "Engagement Agreement",
   setup: "Project Setup",
   kickoff: "Project Kickoff"
@@ -85,7 +88,10 @@ export const stageColors = {
   "scoping-prep": "bg-indigo-100 text-indigo-800",
   "dev-overview": "bg-cyan-100 text-cyan-800",
   "workflow-docs": "bg-teal-100 text-teal-800",
+  "sprint-pricing": "bg-violet-100 text-violet-800",
   proposal: "bg-orange-100 text-orange-800",
+  "proposal-decision": "bg-red-100 text-red-800",
+  "internal-client-docs": "bg-emerald-100 text-emerald-800",
   ea: "bg-green-100 text-green-800",
   setup: "bg-lime-100 text-lime-800",
   kickoff: "bg-gray-100 text-gray-800"

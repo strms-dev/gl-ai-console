@@ -26,7 +26,7 @@ export const fileTypes: FileType[] = [
   },
   {
     id: 'scoping-prep-doc',
-    label: 'Scoping Prep Doc',
+    label: 'Scoping Prep',
     description: 'Preparation document for scoping call',
     acceptedTypes: ['.pdf', '.doc', '.docx'],
     icon: '📋',

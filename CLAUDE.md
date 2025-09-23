@@ -17,7 +17,8 @@ This is the **GrowthLab AI Console** - a Next.js 15 application that provides AI
 ### Development Server Notes
 - All commands should be run from the `gl-ai-console/` subdirectory
 - Development server automatically handles port conflicts and will use next available port
-- User will handle running the development server in their own terminal - no need to start it automatically
+- **IMPORTANT**: User always handles running the development server in their own terminal - NEVER start npm run dev or any development server commands
+- Only make code adjustments, do not run terminal commands unless specifically requested
 
 ### File Structure
 - Working directory: `gl-ai-console/` (the actual Next.js app is in this subdirectory)
@@ -68,3 +69,94 @@ The project has MCP (Model Context Protocol) configuration in `.mcp.json` with:
 - Turbopack is enabled for faster development builds
 - Path aliases configured: `@/*` maps to `./src/*`
 - ESLint configuration for code quality
+
+## Timeline Component Development Patterns
+
+### Adding New Interactive Actions (Buttons) to Timeline Stages
+
+When adding new interactive buttons to timeline stages in `src/components/leads/timeline.tsx`, follow this **exact pattern** used by existing stages like Engagement Agreement:
+
+#### Critical Architecture Understanding
+- **TWO ActionZone calls exist**: One inside StageCard component (~line 1585) and one in Timeline component (~line 2489)
+- **BOTH must be updated** with new props for any new stage functionality
+- **StageCard component** handles the UI rendering, **Timeline component** manages state
+
+#### Step-by-Step Implementation Pattern:
+
+1. **Add State Variables** (Timeline component):
+   ```typescript
+   // Add to Timeline component state declarations
+   const [newFeatureCreated, setNewFeatureCreated] = useState(false)
+   const [newFeatureLoading, setNewFeatureLoading] = useState(false)
+   ```
+
+2. **Add Props to ActionZone Function** (ActionZone component):
+   ```typescript
+   // Add to ActionZone function parameters (line ~91)
+   newFeatureCreated,
+   newFeatureLoading,
+
+   // Add to ActionZone type definition (line ~115)
+   newFeatureCreated?: boolean,
+   newFeatureLoading?: boolean,
+   ```
+
+3. **Add Props to StageCard Component** (StageCard component):
+   ```typescript
+   // Add to StageCard function parameters (line ~1427)
+   newFeatureCreated,
+   newFeatureLoading,
+
+   // Add to StageCard type definition (line ~1465)
+   newFeatureCreated?: boolean,
+   newFeatureLoading?: boolean,
+   ```
+
+4. **Pass Props in BOTH ActionZone Calls**:
+   ```typescript
+   // Inside StageCard (~line 1585):
+   newFeatureCreated={event.id === "stage-id" ? newFeatureCreated : false}
+   newFeatureLoading={event.id === "stage-id" ? newFeatureLoading : false}
+
+   // Inside Timeline (~line 2489):
+   newFeatureCreated={event.id === "stage-id" ? newFeatureCreated : false}
+   newFeatureLoading={event.id === "stage-id" ? newFeatureLoading : false}
+   ```
+
+5. **Add Custom UI in ActionZone**:
+   ```typescript
+   // Add to ActionZone component (~line 1072)
+   if (event.type === "stage-id") {
+     return (
+       // Copy exact structure from EA stage
+       // Use props: newFeatureCreated, newFeatureLoading
+     )
+   }
+   ```
+
+6. **Add Action Handlers**:
+   ```typescript
+   // Add to handleAnchorAction function (~line 2175)
+   else if (action === 'new_action') {
+     setNewFeatureLoading(true)
+     setTimeout(() => {
+       setNewFeatureLoading(false)
+       setNewFeatureCreated(true)
+     }, 3000)
+   }
+
+   // Add routing in handleAction (~line 1955)
+   if (eventId === 'stage-id') {
+     handleAnchorAction(action)
+     return
+   }
+   ```
+
+#### Common Debugging Issues:
+- **Props showing `undefined`**: Check BOTH ActionZone calls have the new props
+- **Buttons not responding**: Verify action routing in handleAction function
+- **State not updating**: Ensure state variables are declared in Timeline component scope
+- **TypeScript errors**: Add props to BOTH ActionZone and StageCard type definitions
+
+#### Best Practice:
+**Always copy the exact pattern from an existing working stage** (like Engagement Agreement) rather than creating new patterns. Search for all occurrences of existing prop names (e.g., `anchorContactCreated`) to find all locations that need updating.
