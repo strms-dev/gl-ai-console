@@ -7,53 +7,11 @@ import { cn } from "@/lib/utils"
 
 const departments = [
   { name: "STRMS", href: "/strms", icon: "🔧", active: true },
-  { name: "Accounting", href: "/accounting", icon: "📊", active: true },
-  { name: "FP&A", href: "/fpa", icon: "📈", active: true },
-  { name: "Tax", href: "/tax", icon: "🧾", active: true },
-  { name: "HR / PAS", href: "/hr", icon: "👥", active: true },
-  { name: "Sales", href: "/sales", icon: "💼", active: true },
-  { name: "Marketing", href: "/marketing", icon: "📢", active: true },
 ]
 
 const departmentNavigation: Record<string, Array<{ name: string; href: string; icon: string }>> = {
   strms: [
     { name: "Pipeline", href: "/strms", icon: "🔄" },
-  ],
-  accounting: [
-    { name: "General Ledger", href: "/accounting", icon: "📋" },
-    { name: "Accounts Payable", href: "/accounting/ap", icon: "💳" },
-    { name: "Accounts Receivable", href: "/accounting/ar", icon: "💰" },
-    { name: "Monthly Close", href: "/accounting/close", icon: "📅" },
-  ],
-  fpa: [
-    { name: "Financial Reports", href: "/fpa", icon: "📊" },
-    { name: "Budget Planning", href: "/fpa/budget", icon: "📋" },
-    { name: "Forecasting", href: "/fpa/forecast", icon: "🔮" },
-    { name: "Variance Analysis", href: "/fpa/variance", icon: "📈" },
-  ],
-  tax: [
-    { name: "Tax Returns", href: "/tax", icon: "📄" },
-    { name: "Tax Planning", href: "/tax/planning", icon: "📝" },
-    { name: "Compliance", href: "/tax/compliance", icon: "✅" },
-    { name: "Research", href: "/tax/research", icon: "🔍" },
-  ],
-  hr: [
-    { name: "Employee Records", href: "/hr", icon: "👤" },
-    { name: "Payroll", href: "/hr/payroll", icon: "💵" },
-    { name: "Benefits", href: "/hr/benefits", icon: "🎁" },
-    { name: "Performance", href: "/hr/performance", icon: "⭐" },
-  ],
-  sales: [
-    { name: "Pipeline", href: "/sales", icon: "🔄" },
-    { name: "Opportunities", href: "/sales/opportunities", icon: "🎯" },
-    { name: "Forecasting", href: "/sales/forecast", icon: "📊" },
-    { name: "Reports", href: "/sales/reports", icon: "📈" },
-  ],
-  marketing: [
-    { name: "Campaigns", href: "/marketing", icon: "📢" },
-    { name: "Analytics", href: "/marketing/analytics", icon: "📊" },
-    { name: "Content", href: "/marketing/content", icon: "📝" },
-    { name: "Automation", href: "/marketing/automation", icon: "🤖" },
   ],
 }
 
@@ -68,12 +26,6 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   // Determine current department based on pathname
   const getCurrentDepartment = () => {
     if (pathname.startsWith('/strms')) return 'strms'
-    if (pathname.startsWith('/accounting')) return 'accounting'
-    if (pathname.startsWith('/fpa')) return 'fpa'
-    if (pathname.startsWith('/tax')) return 'tax'
-    if (pathname.startsWith('/hr')) return 'hr'
-    if (pathname.startsWith('/sales')) return 'sales'
-    if (pathname.startsWith('/marketing')) return 'marketing'
     return null
   }
 

@@ -16,6 +16,7 @@ interface Message {
 interface ChatInterfaceProps {
   title?: string
   className?: string
+  hideHeader?: boolean
 }
 
 const mockResponses = [
@@ -26,7 +27,7 @@ const mockResponses = [
   "I've created the ClickUp task and Airtable entry for the signed EA. Project setup is complete."
 ]
 
-export function ChatInterface({ title = "AI Agent Assistant", className }: ChatInterfaceProps) {
+export function ChatInterface({ title = "AI Agent Assistant", className, hideHeader = false }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -84,7 +85,88 @@ export function ChatInterface({ title = "AI Agent Assistant", className }: ChatI
     "Generate kickoff email"
   ]
 
-  return (
+  return hideHeader ? (
+    // When hideHeader is true, return just the content without Card wrapper
+    <div className={cn("flex flex-col h-[600px]", className)}>
+      <div className="flex-1 flex flex-col p-0 min-h-0">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={cn(
+                "flex",
+                message.sender === "user" ? "justify-end" : "justify-start"
+              )}
+            >
+              <div
+                className={cn(
+                  "max-w-[80%] p-3 rounded-lg break-words",
+                  message.sender === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                <p className="text-sm break-words">{message.content}</p>
+                <p className="text-xs opacity-70 mt-1">
+                  {message.timestamp.toLocaleTimeString()}
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {isTyping && (
+            <div className="flex justify-start">
+              <div className="bg-muted text-muted-foreground p-3 rounded-lg">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-current rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-current rounded-full animate-pulse" style={{ animationDelay: "0.2s" }}></div>
+                  <div className="w-2 h-2 bg-current rounded-full animate-pulse" style={{ animationDelay: "0.4s" }}></div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div className="border-t p-4 space-y-3 flex-shrink-0">
+          <div className="flex flex-wrap gap-2">
+            {quickCommands.map((command, index) => (
+              <Button
+                key={index}
+                variant="outline"
+                size="sm"
+                onClick={() => sendMessage(command)}
+                className="text-xs"
+              >
+                {command}
+              </Button>
+            ))}
+          </div>
+
+          <div className="flex space-x-2">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === "Enter") {
+                  sendMessage(inputValue)
+                }
+              }}
+              placeholder="Ask the AI agent anything..."
+              className="flex-1 px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <Button
+              onClick={() => sendMessage(inputValue)}
+              disabled={!inputValue.trim() || isTyping}
+            >
+              Send
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : (
     <Card className={cn("flex flex-col h-[600px]", className)}>
       <CardHeader className="pb-3 flex-shrink-0">
         <CardTitle className="flex items-center space-x-2">

@@ -77,23 +77,29 @@ export function SprintPricingForm({ onConfirm, onCancel, initialData, isAdjustme
 
   return (
     <Card className="w-full max-w-2xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <span className="text-2xl">💰</span>
-          Sprint Length & Price Estimate
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* AI Generated Notice */}
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">🤖</span>
-            <p className="text-sm font-medium text-blue-800">AI-Generated Estimates</p>
+      <CardContent className="space-y-6 pt-6">
+        {/* Adjustment Mode Notice OR AI Generated Notice */}
+        {isAdjustmentMode ? (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">🔄</span>
+              <p className="text-sm font-medium text-blue-800">Adjust Proposal Terms</p>
+            </div>
+            <p className="text-xs text-blue-700">
+              Client requested adjustments. Please review and update the sprint length and pricing as needed.
+            </p>
           </div>
-          <p className="text-xs text-blue-700">
-            These estimates have been automatically generated based on the project requirements. You can review and adjust them before confirming.
-          </p>
-        </div>
+        ) : (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">🤖</span>
+              <p className="text-sm font-medium text-blue-800">AI-Generated Estimates</p>
+            </div>
+            <p className="text-xs text-blue-700">
+              These estimates have been automatically generated based on the project requirements. You can review and adjust them before confirming.
+            </p>
+          </div>
+        )}
 
         {/* Sprint Length Selection */}
         <div className="space-y-2">
@@ -147,9 +153,6 @@ export function SprintPricingForm({ onConfirm, onCancel, initialData, isAdjustme
                 className="w-full p-3 border border-gray-300 rounded-lg resize-vertical min-h-[100px] text-sm"
                 placeholder="Please explain the reasoning for adjusting the sprint length and/or price..."
               />
-              <p className="text-xs text-gray-500">
-                Provide details about why the sprint length or price needed to be adjusted.
-              </p>
             </>
           ) : (
             <>
@@ -158,27 +161,10 @@ export function SprintPricingForm({ onConfirm, onCancel, initialData, isAdjustme
                   {explanation}
                 </p>
               </div>
-              <p className="text-xs text-gray-500">
-                This explanation describes why the selected sprint length was recommended for this project.
-              </p>
             </>
           )}
         </div>
 
-        {/* Summary Card */}
-        <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
-          <h3 className="font-medium text-gray-800 mb-2">Estimate Summary</h3>
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Sprint Length:</span>
-              <span className="font-medium">{selectedOption?.label}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Total Price:</span>
-              <span className="font-medium text-green-600">${price.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
@@ -195,7 +181,7 @@ export function SprintPricingForm({ onConfirm, onCancel, initialData, isAdjustme
             onClick={handleConfirm}
             className={`${onCancel ? 'flex-1' : 'w-full'} bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0`}
           >
-            ✅ Confirm Estimate
+            ✅ {isAdjustmentMode ? 'Confirm Adjustment' : 'Confirm Estimate'}
           </Button>
         </div>
       </CardContent>

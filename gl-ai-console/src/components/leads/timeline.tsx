@@ -23,6 +23,7 @@ const SPRINT_OPTIONS = [
 interface TimelineProps {
   events: TimelineEvent[]
   leadId: string
+  hideHeader?: boolean
 }
 
 const getStatusColor = (status: TimelineEvent["status"]) => {
@@ -344,7 +345,7 @@ const ActionZone = ({
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">✅</span>
-              <h3 className="font-bold text-lg text-gray-800">Sprint Estimate Complete - Recap</h3>
+              <h3 className="font-bold text-lg text-gray-800">Recap</h3>
             </div>
           </div>
 
@@ -412,7 +413,7 @@ const ActionZone = ({
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">✅</span>
-              <h3 className="font-bold text-lg text-gray-800">Proposal Email Sent - Complete</h3>
+              <h3 className="font-bold text-lg text-gray-800">Recap</h3>
             </div>
           </div>
 
@@ -591,10 +592,10 @@ The GrowthLab Team`
     }
   }
 
-  // Special handling for Kickoff Brief stage
+  // Special handling for Kickoff Meeting Agenda stage
   if (event.type === "kickoff") {
-    const kickoffBriefFileType = getFileTypeById('kickoff-meeting-brief')
-    if (kickoffBriefFileType) {
+    const kickoffAgendaFileType = getFileTypeById('kickoff-meeting-brief')
+    if (kickoffAgendaFileType) {
       return (
         <div className="mt-4 p-3 bg-muted/30 rounded-lg border">
           {/* AI Generation Button */}
@@ -608,9 +609,6 @@ The GrowthLab Team`
               >
                 {event.actions.automated.label}
               </Button>
-              <p className="text-xs text-muted-foreground mt-1">
-                AI will generate kickoff brief document for project introduction and team alignment
-              </p>
             </div>
           )}
 
@@ -620,7 +618,7 @@ The GrowthLab Team`
               <p className="text-sm font-medium text-foreground">Or upload manually:</p>
             </div>
             <FileUpload
-              fileType={kickoffBriefFileType}
+              fileType={kickoffAgendaFileType}
               existingFile={existingFile}
               onFileUploaded={onFileUploaded}
               onFileCleared={() => onFileCleared?.('kickoff-meeting-brief')}
@@ -794,15 +792,6 @@ The GrowthLab Team`
     }
     return (
       <div className="mt-4">
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">🔄</span>
-            <h3 className="font-medium text-blue-800">Adjust Proposal Terms</h3>
-          </div>
-          <p className="text-sm text-blue-700">
-            Client requested adjustments. Please review and update the sprint length and pricing as needed.
-          </p>
-        </div>
         <SprintPricingForm
           onConfirm={onProposalAdjustmentConfirm}
           onCancel={() => onAction('cancel_proposal_adjustment')}
@@ -823,7 +812,7 @@ The GrowthLab Team`
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">❌</span>
-            <h3 className="font-bold text-lg text-gray-800">Proposal Declined - Complete</h3>
+            <h3 className="font-bold text-lg text-gray-800">Recap</h3>
           </div>
         </div>
 
@@ -831,8 +820,8 @@ The GrowthLab Team`
           <div className="flex items-center gap-3 mb-3">
             <img src="/hubspot-logo.svg" alt="HubSpot" className="w-6 h-6" />
             <div>
-              <h4 className="font-semibold text-gray-800">HubSpot Deal Closed Lost</h4>
-              <p className="text-sm text-gray-600">Client declined the proposal - deal automatically moved to closed lost</p>
+              <h4 className="font-semibold text-gray-800">Proposal Declined</h4>
+              <p className="text-sm text-gray-600">Client declined the proposal - HubSpot deal automatically moved to closed lost</p>
             </div>
           </div>
           <div className="text-sm text-gray-700">
@@ -863,7 +852,7 @@ The GrowthLab Team`
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">🔄</span>
-              <h3 className="font-bold text-lg text-gray-800">Proposal Adjusted & Accepted - Complete</h3>
+              <h3 className="font-bold text-lg text-gray-800">Recap</h3>
             </div>
           </div>
 
@@ -871,17 +860,17 @@ The GrowthLab Team`
             <div className="flex items-center gap-3 mb-3">
               <span className="text-2xl">💰</span>
               <div>
-                <h4 className="font-semibold text-gray-800">Adjusted Sprint & Pricing</h4>
-                <p className="text-sm text-gray-600">Client requested adjustments to the original proposal</p>
+                <h4 className="font-semibold text-gray-800">Adjusted Sprint Length & Pricing</h4>
+                <p className="text-sm text-gray-600">Client accepted the proposal but requested adjustments to the original sprint length and price</p>
               </div>
             </div>
             <div className="space-y-2 text-sm text-gray-700">
               <div className="flex justify-between">
-                <span className="font-medium">Sprint Length:</span>
+                <span className="font-medium">New Sprint Length:</span>
                 <span>{SPRINT_OPTIONS.find(opt => opt.value === sprintPricingData.sprintLength)?.label}</span>
               </div>
               <div className="flex justify-between">
-                <span className="font-medium">Final Price:</span>
+                <span className="font-medium">New Price:</span>
                 <span className="font-semibold text-green-600">${sprintPricingData.price.toLocaleString()}</span>
               </div>
               <div className="mt-3">
@@ -912,7 +901,7 @@ The GrowthLab Team`
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">✅</span>
-              <h3 className="font-bold text-lg text-gray-800">Proposal Accepted - Complete</h3>
+              <h3 className="font-bold text-lg text-gray-800">Recap</h3>
             </div>
           </div>
 
@@ -920,7 +909,7 @@ The GrowthLab Team`
             <div className="flex items-center gap-3 mb-3">
               <span className="text-2xl">💰</span>
               <div>
-                <h4 className="font-semibold text-gray-800">Original Proposal Accepted</h4>
+                <h4 className="font-semibold text-gray-800">Proposal Accepted</h4>
                 <p className="text-sm text-gray-600">Client accepted the proposal as originally presented</p>
               </div>
             </div>
@@ -956,11 +945,6 @@ The GrowthLab Team`
     return (
       <div className="mt-4 space-y-4">
         <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">📝</span>
-            <h3 className="font-semibold text-gray-800">Engagement Agreement Setup</h3>
-          </div>
-
           <div className="space-y-3">
             {/* Create Contact In Anchor */}
             <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
@@ -968,7 +952,6 @@ The GrowthLab Team`
                 <span className="text-xl">👤</span>
                 <div>
                   <h4 className="font-medium text-gray-800">Create Contact In Anchor</h4>
-                  <p className="text-sm text-gray-500">Set up client contact in Anchor system</p>
                 </div>
               </div>
               <div className="flex items-center">
@@ -1000,7 +983,6 @@ The GrowthLab Team`
                 <span className="text-xl">📄</span>
                 <div>
                   <h4 className="font-medium text-gray-800">Create Proposal Draft In Anchor</h4>
-                  <p className="text-sm text-gray-500">Generate proposal draft in Anchor system</p>
                 </div>
               </div>
               <div className="flex items-center">
@@ -1032,7 +1014,6 @@ The GrowthLab Team`
                 <span className="text-xl">📝</span>
                 <div>
                   <h4 className="font-medium text-gray-800">Project-Specific EA Wording</h4>
-                  <p className="text-sm text-gray-500">AI will generate comprehensive project-specific engagement agreement wording</p>
                 </div>
               </div>
               {eaWordingGenerated ? (
@@ -1081,7 +1062,6 @@ The GrowthLab Team`
                 <span className="text-xl">✅</span>
                 <div>
                   <h4 className="font-medium text-gray-800">Confirm Anchor Proposal Completed and Sent</h4>
-                  <p className="text-sm text-gray-500">Confirm that the proposal was completed in Anchor and sent to the customer</p>
                 </div>
               </div>
               <div className="flex items-center">
@@ -1112,14 +1092,6 @@ The GrowthLab Team`
     return (
       <div className="mt-4 space-y-4">
         <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg">⚙️</span>
-            <h3 className="font-semibold text-gray-800">Project Setup</h3>
-          </div>
-          <p className="text-sm text-gray-600 mb-4">
-            Complete these steps to initialize project resources and development environment
-          </p>
-
           <div className="space-y-3">
             {/* Create ClickUp Task */}
             <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
@@ -1127,7 +1099,6 @@ The GrowthLab Team`
                 <span className="text-xl">📋</span>
                 <div>
                   <h4 className="font-medium text-gray-800">Create ClickUp Task</h4>
-                  <p className="text-sm text-gray-500">Set up project task in ClickUp system</p>
                 </div>
               </div>
               <div className="flex items-center">
@@ -1147,7 +1118,7 @@ The GrowthLab Team`
                     size="sm"
                     className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
-                    Create ClickUp Task
+                    Create
                   </Button>
                 )}
               </div>
@@ -1159,7 +1130,6 @@ The GrowthLab Team`
                 <span className="text-xl">📊</span>
                 <div>
                   <h4 className="font-medium text-gray-800">Create Airtable Inventory Record</h4>
-                  <p className="text-sm text-gray-500">Create inventory record in Airtable system</p>
                 </div>
               </div>
               <div className="flex items-center">
@@ -1179,7 +1149,7 @@ The GrowthLab Team`
                     size="sm"
                     className="bg-purple-600 hover:bg-purple-700 text-white"
                   >
-                    Create Airtable Inventory Record
+                    Create
                   </Button>
                 )}
               </div>
@@ -1273,7 +1243,7 @@ The GrowthLab Team`}
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">✅</span>
-            <h3 className="font-bold text-lg text-gray-800">Decision Complete - Recap</h3>
+            <h3 className="font-bold text-lg text-gray-800">Recap</h3>
           </div>
         </div>
 
@@ -1395,11 +1365,6 @@ The GrowthLab Team`}
               </Button>
             ))}
           </div>
-          <p className="text-xs text-gray-500 text-center mt-3">
-            {event.type === "proposal-decision"
-              ? "This will determine how to proceed with the client engagement"
-              : "This decision will determine the next steps in your client onboarding process"}
-          </p>
         </div>
       )}
 
@@ -1617,7 +1582,10 @@ const StageCard = ({
             "p-4 border rounded-lg bg-background transition-all duration-300",
             event.status === "completed" && event.isCollapsed ? "border-green-200 bg-green-50/30" :
             event.status === "skipped" ? "border-gray-200 bg-gray-50/50 opacity-60" :
-            isActive ? "border-blue-200 bg-blue-50/30" : "border-gray-200"
+            isActive ? "border-blue-200 bg-blue-50/30" :
+            event.automationLevel === "fully-automated" ? "border-green-200 bg-green-50/10" :
+            event.automationLevel === "manual-intervention" ? "border-blue-200 bg-blue-50/10" :
+            "border-gray-200"
           )}>
             {/* Header */}
             <div className="flex items-center justify-between mb-2">
@@ -1628,6 +1596,15 @@ const StageCard = ({
                 )}>
                   {event.title}
                 </h3>
+                {/* Automation Level Badge */}
+                <span className={cn(
+                  "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium",
+                  event.automationLevel === "fully-automated"
+                    ? "bg-green-100 text-green-800 border border-green-200"
+                    : "bg-blue-100 text-blue-800 border border-blue-200"
+                )}>
+                  {event.automationLevel === "fully-automated" ? "⚡ Automated" : "👤 Manual"}
+                </span>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1723,7 +1700,7 @@ const StageCard = ({
                     <div className="mb-4">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-lg">✅</span>
-                        <h3 className="font-bold text-lg text-gray-800">Engagement Agreement Complete - Recap</h3>
+                        <h3 className="font-bold text-lg text-gray-800">Recap</h3>
                       </div>
                     </div>
 
@@ -1835,7 +1812,7 @@ const StageCard = ({
                     <div className="mb-4">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-lg">✅</span>
-                        <h3 className="font-bold text-lg text-gray-800">Project Setup Complete - Recap</h3>
+                        <h3 className="font-bold text-lg text-gray-800">Recap</h3>
                       </div>
                     </div>
 
@@ -1891,14 +1868,15 @@ const StageCard = ({
                       </div>
                     </div>
 
-                    <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">🚀</span>
-                        <h4 className="font-semibold text-gray-800">Ready for Kickoff</h4>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        All project setup tasks completed successfully. The client has been notified with kickoff details and the project is ready to begin development.
-                      </p>
+                    <div className="flex justify-center mt-4">
+                      <Button
+                        onClick={() => onAction('setup', 'reset_setup_stage')}
+                        variant="outline"
+                        size="sm"
+                        className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+                      >
+                        🔄 Reset Stage
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1914,7 +1892,7 @@ const StageCard = ({
   )
 }
 
-export function Timeline({ events, leadId }: TimelineProps) {
+export function Timeline({ events, leadId, hideHeader = false }: TimelineProps) {
   const [collapsedItems, setCollapsedItems] = useState<Set<string>>(
     new Set(events.filter(e => e.isCollapsed).map(e => e.id))
   )
@@ -2019,6 +1997,34 @@ export function Timeline({ events, leadId }: TimelineProps) {
       setCollapsedItems(prev => {
         const newSet = new Set(prev)
         newSet.delete('ea')
+        return newSet
+      })
+      return
+    }
+
+    // Handle reset Setup stage
+    if (eventId === 'setup' && action === 'reset_setup_stage') {
+      console.log('Resetting Setup stage')
+
+      // Reset all Setup related state
+      setClickupTaskCreated(false)
+      setClickupTaskLoading(false)
+      setAirtableRecordCreated(false)
+      setAirtableRecordLoading(false)
+      setSetupEmailCopied(false)
+      setSetupEmailSent(false)
+
+      // Reset Setup stage to pending
+      setCompletedStages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('setup')
+        return newSet
+      })
+
+      // Expand the Setup stage
+      setCollapsedItems(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('setup')
         return newSet
       })
       return
@@ -2429,9 +2435,9 @@ export function Timeline({ events, leadId }: TimelineProps) {
       })
     }
 
-    // If Kickoff Brief is uploaded, mark kickoff stage as completed
+    // If Kickoff Meeting Agenda is uploaded, mark kickoff stage as completed
     if (file.fileTypeId === 'kickoff-meeting-brief') {
-      console.log('Kickoff Brief uploaded - marking stage as completed')
+      console.log('Kickoff Meeting Agenda uploaded - marking stage as completed')
 
       // Mark kickoff stage as completed
       setCompletedStages(prev => new Set(prev).add('kickoff'))
@@ -2755,9 +2761,9 @@ The GrowthLab Team`
       })
     }
 
-    // If Kickoff Brief is cleared, mark kickoff stage as pending
+    // If Kickoff Meeting Agenda is cleared, mark kickoff stage as pending
     if (fileTypeId === 'kickoff-meeting-brief') {
-      console.log('Kickoff Brief cleared - marking stage as pending')
+      console.log('Kickoff Meeting Agenda cleared - marking stage as pending')
 
       // Remove kickoff stage from completed stages
       setCompletedStages(prev => {
@@ -2817,18 +2823,9 @@ The GrowthLab Team`
     }
   }, [leadId, updatedEvents])
 
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Onboarding Timeline</CardTitle>
-          <div className="text-sm text-muted-foreground">
-            {completedCount} of {totalCount} completed
-          </div>
-        </div>
-        <ProgressBar percentage={progressPercentage} />
-      </CardHeader>
-      <CardContent>
+  return hideHeader ? (
+    // When hideHeader is true, return just the content without Card wrapper
+    <div className="space-y-8 p-6">
         <div className="space-y-8">
           {updatedEvents.map((event, index) => {
             // Determine which file to show based on the event type
@@ -2874,6 +2871,101 @@ The GrowthLab Team`
                 decisionMade={decisionMade}
                 onSprintPricingConfirm={event.id === "sprint-pricing" ? handleSprintPricingConfirm : undefined}
                 sprintPricingData={(event.id === "sprint-pricing" || event.id === "proposal" || event.id === "proposal-decision") ? sprintPricingData : null}
+                proposalDeclined={event.id === "proposal-decision" ? proposalDeclined : false}
+                showProposalAdjustment={event.id === "proposal-decision" ? showProposalAdjustment : false}
+                proposalWasAdjusted={event.id === "proposal-decision" ? proposalWasAdjusted : false}
+                onProposalAdjustmentConfirm={event.id === "proposal-decision" ? handleProposalAdjustmentConfirm : undefined}
+                anchorContactCreated={event.id === "ea" ? anchorContactCreated : false}
+                anchorProposalCreated={event.id === "ea" ? anchorProposalCreated : false}
+                anchorContactLoading={event.id === "ea" ? anchorContactLoading : false}
+                anchorProposalLoading={event.id === "ea" ? anchorProposalLoading : false}
+                eaWordingGenerated={event.id === "ea" ? eaWordingGenerated : false}
+                eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
+                eaConfirmed={event.id === "ea" ? eaConfirmed : false}
+                clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
+                clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
+                airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
+                airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
+                setupEmailCopied={event.id === "setup" ? setupEmailCopied : false}
+                setupEmailSent={event.id === "setup" ? setupEmailSent : false}
+              />
+            )
+          })}
+        </div>
+    </div>
+  ) : (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Onboarding Timeline</CardTitle>
+          <div className="text-sm text-muted-foreground">
+            {completedCount} of {totalCount} completed
+          </div>
+        </div>
+        <ProgressBar percentage={progressPercentage} />
+
+        {/* Automation Level Legend */}
+        <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-gray-100">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+              ⚡ Automated
+            </span>
+            <span className="text-xs text-muted-foreground">7 stages</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-green-200">
+              👤 Manual
+            </span>
+            <span className="text-xs text-muted-foreground">7 stages</span>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-8">
+          {updatedEvents.map((event, index) => {
+            // Determine which file to show based on the event type
+            let existingFile = undefined
+            if (event.type === "demo") {
+              existingFile = uploadedFiles['demo-call-transcript']
+            } else if (event.type === "readiness") {
+              existingFile = uploadedFiles['readiness-pdf']
+            } else if (event.type === "scoping-prep") {
+              existingFile = uploadedFiles['scoping-prep-doc']
+            } else if (event.type === "scoping") {
+              existingFile = uploadedFiles['scoping-call-transcript']
+            } else if (event.type === "dev-overview") {
+              existingFile = uploadedFiles['developer-audio-overview']
+            } else if (event.type === "workflow-docs") {
+              existingFile = uploadedFiles['workflow-description']
+            } else if (event.type === "sprint-pricing") {
+              existingFile = uploadedFiles['sprint-pricing-estimate']
+            } else if (event.type === "internal-client-docs") {
+              existingFile = uploadedFiles['internal-client-documentation']
+            } else if (event.type === "ea") {
+              existingFile = uploadedFiles['ea-wording']
+            } else if (event.type === "kickoff") {
+              existingFile = uploadedFiles['kickoff-meeting-brief']
+            }
+
+            return (
+              <StageCard
+                key={event.id}
+                event={event}
+                index={index}
+                isLast={index === updatedEvents.length - 1}
+                nextEvent={updatedEvents[index + 1]}
+                onToggleCollapse={handleToggleCollapse}
+                onAction={handleAction}
+                onFileUploaded={handleFileUploaded}
+                onFileCleared={handleFileCleared}
+                existingFile={existingFile}
+                showDeveloperSelection={event.id === "dev-overview" && showDeveloperSelection}
+                showEmailDraft={event.id === "decision" && decisionMade === "reject"}
+                selectedDeveloper={selectedDeveloper}
+                showNotAFitEmail={event.id === "decision" && decisionMade === "reject"}
+                decisionMade={event.id === "decision" ? decisionMade : undefined}
+                onSprintPricingConfirm={event.id === "sprint-pricing" ? handleSprintPricingConfirm : undefined}
+                sprintPricingData={event.id === "sprint-pricing" ? sprintPricingData : undefined}
                 proposalDeclined={event.id === "proposal-decision" ? proposalDeclined : false}
                 showProposalAdjustment={event.id === "proposal-decision" ? showProposalAdjustment : false}
                 proposalWasAdjusted={event.id === "proposal-decision" ? proposalWasAdjusted : false}

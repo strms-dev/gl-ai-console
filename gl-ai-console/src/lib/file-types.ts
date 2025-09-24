@@ -90,8 +90,8 @@ export const fileTypes: FileType[] = [
   },
   {
     id: 'kickoff-meeting-brief',
-    label: 'Kickoff Meeting Brief',
-    description: 'Brief document for project kickoff meeting',
+    label: 'Kickoff Meeting Agenda',
+    description: 'Agenda document for project kickoff meeting',
     acceptedTypes: ['.pdf', '.doc', '.docx'],
     icon: '🚀',
     category: 'planning'
