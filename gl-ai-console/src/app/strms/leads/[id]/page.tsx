@@ -10,7 +10,7 @@ import { getTimelineForLead } from "@/lib/timeline-data"
 import { cn } from "@/lib/utils"
 import { FileUpload } from "@/components/leads/file-upload"
 import { fileTypes, getFilesByCategory, UploadedFile } from "@/lib/file-types"
-import { getLeadById } from "@/lib/leads-store"
+import { getLeadById, updateLead } from "@/lib/leads-store"
 import { use, useState, useEffect } from "react"
 
 interface LeadDetailPageProps {
@@ -38,6 +38,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
     documents: false
   })
 
+
   // Monitor for lead data changes
   useEffect(() => {
     const checkForLeadUpdates = () => {
@@ -59,6 +60,62 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
       ...prev,
       [file.fileTypeId]: file
     }))
+
+    // Trigger stage completion logic for demo call transcript
+    if (file.fileTypeId === 'demo-call-transcript') {
+      // Small delay for stage automation to not interfere with UI
+      setTimeout(() => {
+        const currentLead = getLeadById(id)
+        if (currentLead) {
+          updateLead(id, { stage: 'readiness' }) // Move to next stage
+          // Force refresh of lead data
+          setLead(getLeadById(id))
+        }
+      }, 100)
+    }
+
+    // Trigger stage completion logic for readiness assessment
+    if (file.fileTypeId === 'readiness-pdf') {
+      // Small delay for stage automation to not interfere with UI
+      setTimeout(() => {
+        const currentLead = getLeadById(id)
+        if (currentLead) {
+          updateLead(id, { stage: 'scoping-prep' }) // Move to next stage
+          // Force refresh of lead data
+          setLead(getLeadById(id))
+        }
+      }, 100)
+    }
+  }
+
+  const handleFileCleared = (fileTypeId: string) => {
+    setUploadedFiles(prev => {
+      const updated = { ...prev }
+      delete updated[fileTypeId]
+      return updated
+    })
+
+    // Trigger stage reset logic for demo call transcript
+    if (fileTypeId === 'demo-call-transcript') {
+      // Reset the lead stage back to demo
+      const currentLead = getLeadById(id)
+      if (currentLead) {
+        updateLead(id, { stage: 'demo' }) // Move back to demo stage
+        // Force refresh of lead data
+        setLead(getLeadById(id))
+      }
+    }
+
+    // Trigger stage reset logic for readiness assessment
+    if (fileTypeId === 'readiness-pdf') {
+      // Reset the lead stage back to readiness
+      const currentLead = getLeadById(id)
+      if (currentLead) {
+        updateLead(id, { stage: 'readiness' }) // Move back to readiness stage
+        // Force refresh of lead data
+        setLead(getLeadById(id))
+      }
+    }
   }
 
   const toggleSection = (section: keyof typeof collapsedSections) => {
@@ -73,7 +130,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
       <div className="p-8 bg-muted/30">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-4">Lead Not Found</h1>
-          <Link href="/strms">
+          <Link href="/strms" scroll={false}>
             <Button>Back to STRMS Leads</Button>
           </Link>
         </div>
@@ -85,7 +142,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
     <div className="p-8 bg-muted/30">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center space-x-4">
-          <Link href="/strms">
+          <Link href="/strms" scroll={false}>
             <Button variant="outline" size="sm">← Back to Leads</Button>
           </Link>
           <div>
@@ -204,7 +261,15 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
             )}
           </CardHeader>
           {!collapsedSections.timeline && (
-            <Timeline events={timeline} leadId={id} hideHeader={true} />
+            <Timeline
+              events={timeline}
+              leadId={id}
+              hideHeader={true}
+              uploadedFiles={uploadedFiles}
+              onFileUploaded={handleFileUploaded}
+              onFileCleared={handleFileCleared}
+              leadStage={lead?.stage}
+            />
           )}
         </Card>
 
@@ -243,12 +308,13 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
           </CardHeader>
           {!collapsedSections.documents && (
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {fileTypes.map((fileType) => (
                   <FileUpload
                     key={fileType.id}
                     fileType={fileType}
                     onFileUploaded={handleFileUploaded}
+                    onFileCleared={handleFileCleared}
                     existingFile={uploadedFiles[fileType.id]}
                   />
                 ))}

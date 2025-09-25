@@ -53,3 +53,10 @@ export function updateLead(id: string, updates: Partial<Lead>): void {
   )
   saveLeads(updatedLeads)
 }
+
+export function deleteLead(id: string): void {
+  const leads = getLeads()
+  const updatedLeads = leads.filter(lead => lead.id !== id)
+  saveLeads(updatedLeads)
+}
+

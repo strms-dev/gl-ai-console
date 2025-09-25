@@ -16,48 +16,8 @@ export const dummyLeads: Lead[] = [
     company: "Acme Corp",
     contact: "John Smith",
     email: "john@acmecorp.com",
-    stage: "demo", // Brand new lead at Demo Call stage
+    stage: "demo",
     lastActivity: "2 hours ago"
-  },
-  {
-    id: "lead-2",
-    company: "TechStart Inc",
-    contact: "Sarah Johnson",
-    email: "sarah@techstart.io",
-    stage: "decision", // At Decision Point with 85% readiness
-    lastActivity: "5 hours ago"
-  },
-  {
-    id: "lead-3",
-    company: "DataFlow Solutions",
-    contact: "Mike Chen",
-    email: "mike@dataflow.com",
-    stage: "dev-overview", // In progress with Developer Audio Overview
-    lastActivity: "1 day ago"
-  },
-  {
-    id: "lead-4",
-    company: "AutoBot Industries",
-    contact: "Lisa Rodriguez",
-    email: "lisa@autobot.com",
-    stage: "decision", // Rejected at Decision Point (45% score)
-    lastActivity: "3 hours ago"
-  },
-  {
-    id: "lead-5",
-    company: "CloudSync Pro",
-    contact: "David Wilson",
-    email: "david@cloudsync.pro",
-    stage: "kickoff", // Fully completed through Kickoff
-    lastActivity: "6 hours ago"
-  },
-  {
-    id: "lead-6",
-    company: "InnovateTech",
-    contact: "Emma Thompson",
-    email: "emma@innovatetech.com",
-    stage: "new", // Fresh lead, everything pending
-    lastActivity: "2 days ago"
   }
 ]
 

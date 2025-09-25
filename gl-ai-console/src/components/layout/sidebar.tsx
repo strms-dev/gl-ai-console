@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -11,7 +12,7 @@ const departments = [
 
 const departmentNavigation: Record<string, Array<{ name: string; href: string; icon: string }>> = {
   strms: [
-    { name: "Pipeline", href: "/strms", icon: "🔄" },
+    { name: "Sales Pipeline", href: "/strms", icon: "🔄" },
   ],
 }
 
@@ -47,7 +48,13 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           {isCollapsed ? "→" : "←"}
         </Button>
         {!isCollapsed && (
-          <h1 className="ml-2 text-xl font-bold text-primary">GrowthLab AI Console</h1>
+          <Image
+            src="/gl-ai-console-logo.png"
+            alt="GrowthLab AI Console"
+            width={200}
+            height={40}
+            className="ml-2 object-contain"
+          />
         )}
       </div>
 
@@ -75,10 +82,18 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                     )}
                     title={isCollapsed ? dept.name : undefined}
                   >
-                    <span className={cn(
-                      "text-lg",
-                      isCollapsed ? "" : "mr-3"
-                    )}>{dept.icon}</span>
+                    <div className={cn(
+                      "flex items-center justify-center",
+                      isCollapsed ? "w-6 h-6" : "w-6 h-6 mr-3"
+                    )}>
+                      <Image
+                        src="/strms-logo-square.png"
+                        alt="STRMS"
+                        width={24}
+                        height={24}
+                        className="object-contain"
+                      />
+                    </div>
                     {!isCollapsed && dept.name}
                   </Link>
                 </li>

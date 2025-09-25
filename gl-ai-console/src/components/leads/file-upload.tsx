@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useId } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -18,6 +18,20 @@ export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFi
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | undefined>(existingFile)
+
+  // Generate a unique ID for this component instance to avoid DOM conflicts
+  // Use React's useId for SSR-safe unique IDs
+  const reactId = useId()
+  const uniqueId = `file-${fileType.id}-${reactId.replace(/:/g, '')}`
+
+  // Sync local state with existingFile prop changes
+  // BUT don't sync while actively uploading to prevent interference
+  useEffect(() => {
+    // Only sync if we're not currently uploading
+    if (!isUploading) {
+      setUploadedFile(existingFile)
+    }
+  }, [existingFile, isUploading])
 
   // Animate progress bar gradually when uploading
   useEffect(() => {
@@ -215,9 +229,9 @@ For more information about this document, please contact the GrowthLab team.`
   }, [uploadedFile, existingFile, fileType])
 
   const triggerFileInput = useCallback(() => {
-    const input = document.getElementById(`file-${fileType.id}`) as HTMLInputElement
+    const input = document.getElementById(uniqueId) as HTMLInputElement
     input?.click()
-  }, [fileType.id])
+  }, [uniqueId])
 
   const handleClearFile = useCallback(() => {
     setUploadedFile(undefined)
@@ -247,17 +261,17 @@ For more information about this document, please contact the GrowthLab team.`
                 </p>
               </div>
             </div>
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={handleDownload}>
+            <div className="flex flex-col space-y-2">
+              <Button variant="outline" size="sm" onClick={handleDownload}>
                 📥 Download
               </Button>
-              <Button variant="outline" size="sm" className="flex-1" onClick={triggerFileInput}>
+              <Button variant="outline" size="sm" onClick={triggerFileInput}>
                 🔄 Replace
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1 text-red-600 hover:text-red-700 hover:border-red-300"
+                className="text-red-600 hover:text-red-700 hover:border-red-300"
                 onClick={handleClearFile}
               >
                 🗑️ Clear
@@ -267,7 +281,7 @@ For more information about this document, please contact the GrowthLab team.`
               type="file"
               onChange={handleFileSelect}
               className="hidden"
-              id={`file-${fileType.id}`}
+              id={uniqueId}
             />
           </div>
         </CardContent>
@@ -318,7 +332,7 @@ For more information about this document, please contact the GrowthLab team.`
                 type="file"
                 onChange={handleFileSelect}
                 className="hidden"
-                id={`file-${fileType.id}`}
+                id={uniqueId}
               />
             </>
           )}

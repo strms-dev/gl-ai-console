@@ -170,7 +170,6 @@ export function ChatInterface({ title = "AI Agent Assistant", className, hideHea
     <Card className={cn("flex flex-col h-[600px]", className)}>
       <CardHeader className="pb-3 flex-shrink-0">
         <CardTitle className="flex items-center space-x-2">
-          <span>🤖</span>
           <span>{title}</span>
         </CardTitle>
       </CardHeader>

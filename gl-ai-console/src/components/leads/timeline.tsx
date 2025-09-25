@@ -24,6 +24,10 @@ interface TimelineProps {
   events: TimelineEvent[]
   leadId: string
   hideHeader?: boolean
+  uploadedFiles?: Record<string, UploadedFile>
+  onFileUploaded?: (file: UploadedFile) => void
+  onFileCleared?: (fileTypeId: string) => void
+  leadStage?: string
 }
 
 const getStatusColor = (status: TimelineEvent["status"]) => {
@@ -1892,14 +1896,16 @@ const StageCard = ({
   )
 }
 
-export function Timeline({ events, leadId, hideHeader = false }: TimelineProps) {
+export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: propUploadedFiles, onFileUploaded, onFileCleared, leadStage }: TimelineProps) {
   const [collapsedItems, setCollapsedItems] = useState<Set<string>>(
     new Set(events.filter(e => e.isCollapsed).map(e => e.id))
   )
   const [completedStages, setCompletedStages] = useState<Set<string>>(
     new Set(events.filter(e => e.status === "completed").map(e => e.id))
   )
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedFile>>({})
+  // Use uploaded files from props if provided, otherwise use local state as fallback
+  const [localUploadedFiles, setLocalUploadedFiles] = useState<Record<string, UploadedFile>>({})
+  const uploadedFiles = propUploadedFiles || localUploadedFiles
   const [showDeveloperSelection, setShowDeveloperSelection] = useState(false)
   const [selectedDeveloper, setSelectedDeveloper] = useState<string | null>(null)
   const [showEmailDraft, setShowEmailDraft] = useState(false)
@@ -1911,6 +1917,43 @@ export function Timeline({ events, leadId, hideHeader = false }: TimelineProps) 
   const [proposalWasAdjusted, setProposalWasAdjusted] = useState(false)
   const [anchorContactCreated, setAnchorContactCreated] = useState(false)
   const [anchorProposalCreated, setAnchorProposalCreated] = useState(false)
+
+  // Sync Timeline internal state with external changes (like file clearing from documents section)
+  useEffect(() => {
+    // If demo call transcript is not uploaded and lead stage is demo, ensure demo stage is not completed
+    if (leadStage === 'demo' && uploadedFiles && !uploadedFiles['demo-call-transcript']) {
+      setCompletedStages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('demo')
+        return newSet
+      })
+      // Also expand demo stage and collapse others
+      setCollapsedItems(prev => {
+        const newSet = new Set(prev)
+        newSet.delete('demo') // Expand demo stage
+        newSet.add('readiness') // Collapse readiness stage
+        return newSet
+      })
+    }
+    // If demo call transcript is uploaded, ensure demo stage is completed
+    else if (uploadedFiles && uploadedFiles['demo-call-transcript']) {
+      // Add a slight delay to allow upload animation to complete when uploading from documents section
+      setTimeout(() => {
+        setCompletedStages(prev => {
+          const newSet = new Set(prev)
+          newSet.add('demo')
+          return newSet
+        })
+        // Also collapse demo stage and expand readiness
+        setCollapsedItems(prev => {
+          const newSet = new Set(prev)
+          newSet.add('demo') // Collapse demo stage
+          newSet.delete('readiness') // Expand readiness stage
+          return newSet
+        })
+      }, 100) // Small delay to let animation start
+    }
+  }, [uploadedFiles, leadStage])
   const [anchorContactLoading, setAnchorContactLoading] = useState(false)
   const [anchorProposalLoading, setAnchorProposalLoading] = useState(false)
   const [eaWordingGenerated, setEaWordingGenerated] = useState(false)
@@ -2302,11 +2345,20 @@ export function Timeline({ events, leadId, hideHeader = false }: TimelineProps) 
     console.log(`File uploaded: ${file.fileName} for ${file.fileTypeId}`)
 
     // Store the uploaded file
-    setUploadedFiles(prev => ({
-      ...prev,
-      [file.fileTypeId]: file
-    }))
+    if (onFileUploaded) {
+      // Use prop callback if provided - parent will handle all automation logic
+      onFileUploaded(file)
+      // Don't run Timeline's own automation logic when using parent callback
+      return
+    } else {
+      // Fallback to local state
+      setLocalUploadedFiles(prev => ({
+        ...prev,
+        [file.fileTypeId]: file
+      }))
+    }
 
+    // Only run Timeline's internal automation logic when using local state (no parent callback)
     // If demo call transcript is uploaded, mark demo stage as completed
     if (file.fileTypeId === 'demo-call-transcript') {
       console.log('Demo call transcript uploaded - marking stage as completed')
@@ -2595,11 +2647,17 @@ The GrowthLab Team`
     console.log(`File cleared: ${fileTypeId}`)
 
     // Remove the specific uploaded file from state
-    setUploadedFiles(prev => {
-      const updated = { ...prev }
-      delete updated[fileTypeId]
-      return updated
-    })
+    if (onFileCleared) {
+      // Use prop callback if provided
+      onFileCleared(fileTypeId)
+    } else {
+      // Fallback to local state
+      setLocalUploadedFiles(prev => {
+        const updated = { ...prev }
+        delete updated[fileTypeId]
+        return updated
+      })
+    }
 
     // If demo call transcript is cleared, mark demo stage as pending
     if (fileTypeId === 'demo-call-transcript') {

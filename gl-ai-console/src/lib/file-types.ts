@@ -57,35 +57,19 @@ export const fileTypes: FileType[] = [
     category: 'technical'
   },
   {
-    id: 'sprint-pricing-estimate',
-    label: 'Sprint & Pricing Estimate',
-    description: 'Sprint planning and pricing estimate document',
-    acceptedTypes: ['.pdf', '.doc', '.docx', '.xlsx'],
-    icon: '💰',
-    category: 'planning'
-  },
-  {
-    id: 'internal-scoping-doc',
-    label: 'Internal Scoping Doc',
-    description: 'Internal scoping document for team reference',
-    acceptedTypes: ['.pdf', '.doc', '.docx'],
-    icon: '📄',
-    category: 'document'
-  },
-  {
-    id: 'client-scoping-doc',
-    label: 'Client Scoping Doc',
-    description: 'Scoping document for client reference',
-    acceptedTypes: ['.pdf', '.doc', '.docx'],
-    icon: '📋',
-    category: 'document'
-  },
-  {
     id: 'internal-client-documentation',
     label: 'Internal & Client Scoping Document',
     description: 'Comprehensive scoping document for both internal team and client reference',
     acceptedTypes: ['.pdf', '.doc', '.docx'],
     icon: '📋',
+    category: 'document'
+  },
+  {
+    id: 'ea-wording',
+    label: 'EA Wording',
+    description: 'Project-specific engagement agreement wording',
+    acceptedTypes: ['.txt', '.doc', '.docx', '.pdf'],
+    icon: '📝',
     category: 'document'
   },
   {
@@ -95,14 +79,6 @@ export const fileTypes: FileType[] = [
     acceptedTypes: ['.pdf', '.doc', '.docx'],
     icon: '🚀',
     category: 'planning'
-  },
-  {
-    id: 'ea-wording',
-    label: 'EA Wording File',
-    description: 'Project-specific engagement agreement wording',
-    acceptedTypes: ['.txt', '.doc', '.docx', '.pdf'],
-    icon: '📝',
-    category: 'document'
   }
 ]
 
