@@ -52,7 +52,9 @@ export function LeadsTable({
       <table className="w-full">
         <thead>
           <tr className="border-b">
+            <th className="text-left py-3 px-4 font-medium">Project Name</th>
             <th className="text-left py-3 px-4 font-medium">Company</th>
+            <th className="text-left py-3 px-4 font-medium">Email</th>
             <th className="text-left py-3 px-4 font-medium">Contact</th>
             <th className="text-left py-3 px-4 font-medium">Stage</th>
             <th className="text-left py-3 px-4 font-medium">Last Activity</th>
@@ -67,13 +69,16 @@ export function LeadsTable({
               onClick={(e) => handleRowClick(lead.id, e)}
             >
               <td className="py-3 px-4">
-                <div>
-                  <p className="font-medium">{lead.company}</p>
-                  <p className="text-sm text-muted-foreground">{lead.email}</p>
-                </div>
+                <p className="font-medium">{lead.projectName || "—"}</p>
               </td>
               <td className="py-3 px-4">
-                <p className="font-medium">{lead.contact}</p>
+                <p className="font-medium">{lead.company || "—"}</p>
+              </td>
+              <td className="py-3 px-4">
+                <p className="font-medium">{lead.email}</p>
+              </td>
+              <td className="py-3 px-4">
+                <p className="font-medium">{lead.contact || "—"}</p>
               </td>
               <td className="py-3 px-4">
                 <span className={cn(
@@ -133,15 +138,15 @@ export function LeadsTable({
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center mb-4">
-          <CardTitle>Leads</CardTitle>
-          <Button onClick={onAddNewLead}>Add New Lead</Button>
+          <CardTitle>Projects</CardTitle>
+          <Button onClick={onAddNewLead}>Add New Project</Button>
         </div>
 
         {/* Search and Sort Controls */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
             <Input
-              placeholder="Search by company, contact, or email..."
+              placeholder="Search by project name, company, contact, or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full"

@@ -43,7 +43,7 @@ export const fileTypes: FileType[] = [
   {
     id: 'developer-audio-overview',
     label: 'Developer Overview',
-    description: 'Developer overview of lead automation',
+    description: 'Developer overview of project automation',
     acceptedTypes: ['.mp3', '.wav', '.m4a', '.pdf', '.doc', '.docx'],
     icon: '🎧',
     category: 'technical'

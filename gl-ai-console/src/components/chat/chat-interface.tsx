@@ -20,7 +20,7 @@ interface ChatInterfaceProps {
 }
 
 const mockResponses = [
-  "I've analyzed the lead data and generated a readiness assessment. The automation readiness score is 85% based on their tech stack and process complexity.",
+  "I've analyzed the project data and generated a readiness assessment. The automation readiness score is 85% based on their tech stack and process complexity.",
   "I can schedule the scoping call with Nick for tomorrow at 2 PM. Would you like me to send the calendar invite?",
   "Based on the demo transcript, I recommend focusing on their data entry automation and API integrations in the scoping call.",
   "The proposal has been generated with a 2-sprint timeline and $24,000 estimate. Ready for your review.",
@@ -31,7 +31,7 @@ export function ChatInterface({ title = "AI Agent Assistant", className, hideHea
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      content: "Hi! I'm your STRMS AI assistant. I can help you with lead management, proposal generation, and workflow automation. How can I help you today?",
+      content: "Hi! I'm your STRMS AI assistant. I can help you with project management, proposal generation, and workflow automation. How can I help you today?",
       sender: "agent",
       timestamp: new Date(),
       type: "response"

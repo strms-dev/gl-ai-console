@@ -16,6 +16,7 @@ interface LeadFormProps {
 
 export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: LeadFormProps) {
   const [formData, setFormData] = useState({
+    projectName: initialData?.projectName || "",
     company: initialData?.company || "",
     contact: initialData?.contact || "",
     email: initialData?.email || ""
@@ -27,6 +28,7 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
   useEffect(() => {
     if (initialData) {
       setFormData({
+        projectName: initialData.projectName || "",
         company: initialData.company || "",
         contact: initialData.contact || "",
         email: initialData.email || ""
@@ -34,6 +36,7 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
     } else {
       // Reset form for create mode
       setFormData({
+        projectName: "",
         company: "",
         contact: "",
         email: ""
@@ -44,14 +47,7 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.company.trim()) {
-      newErrors.company = "Company name is required"
-    }
-
-    if (!formData.contact.trim()) {
-      newErrors.contact = "Contact name is required"
-    }
-
+    // Only email is required
     if (!formData.email.trim()) {
       newErrors.email = "Email is required"
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -82,14 +78,29 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {mode === "create" ? "Add New Lead" : "Edit Lead"}
+            {mode === "create" ? "Add New Project" : "Edit Project"}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div>
+            <label htmlFor="projectName" className="block text-sm font-medium text-foreground mb-1">
+              Project Name <span className="text-gray-500">(optional)</span>
+            </label>
+            <Input
+              id="projectName"
+              value={formData.projectName}
+              onChange={(e) => setFormData({ ...formData, projectName: e.target.value })}
+              className={errors.projectName ? "border-red-500" : ""}
+            />
+            {errors.projectName && (
+              <p className="text-red-500 text-sm mt-1">{errors.projectName}</p>
+            )}
+          </div>
+
+          <div>
             <label htmlFor="company" className="block text-sm font-medium text-foreground mb-1">
-              Company Name
+              Company Name <span className="text-gray-500">(optional)</span>
             </label>
             <Input
               id="company"
@@ -104,7 +115,7 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
 
           <div>
             <label htmlFor="contact" className="block text-sm font-medium text-foreground mb-1">
-              Contact Name
+              Contact Name <span className="text-gray-500">(optional)</span>
             </label>
             <Input
               id="contact"
@@ -138,7 +149,7 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
               Cancel
             </Button>
             <Button type="submit">
-              {mode === "create" ? "Create Lead" : "Save Changes"}
+              {mode === "create" ? "Create Project" : "Save Changes"}
             </Button>
           </DialogFooter>
         </form>

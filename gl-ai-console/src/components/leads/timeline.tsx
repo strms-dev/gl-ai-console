@@ -1660,10 +1660,10 @@ const StageCard = ({
                   </div>
                 )}
 
-                {/* Action Zone - Show for non-completed stages OR for demo/readiness/scoping-prep/scoping/dev-overview/workflow-docs/sprint-pricing/proposal/internal-client-docs/kickoff stages with uploaded files OR for completed decision/proposal-decision stages OR for proposal-decision adjustment mode */}
+                {/* Action Zone - Show for non-completed stages OR for demo/readiness/scoping-prep/scoping/dev-overview/workflow-docs/sprint-pricing/proposal/internal-client-docs/kickoff stages with uploaded files OR for completed decision/proposal-decision stages (when expanded) OR for proposal-decision adjustment mode */}
                 {(event.status !== "completed" && event.status !== "skipped") ||
                  ((event.id === "demo" || event.id === "readiness" || event.id === "scoping-prep" || event.id === "scoping" || event.id === "dev-overview" || event.id === "workflow-docs" || event.id === "sprint-pricing" || event.id === "proposal" || event.id === "internal-client-docs" || event.id === "ea" || event.id === "kickoff") && event.status === "completed") ||
-                 ((event.id === "decision" || event.id === "proposal-decision") && event.status === "completed") ||
+                 ((event.id === "decision" || event.id === "proposal-decision") && event.status === "completed" && !event.isCollapsed) ||
                  (event.id === "proposal-decision" && showProposalAdjustment) ? (
                   <ActionZone
                     event={event}
@@ -1699,7 +1699,7 @@ const StageCard = ({
                 ) : null}
 
                 {/* EA Recap - show for completed EA stage when expanded */}
-                {event.type === "ea" && event.status === "completed" && eaConfirmed && (
+                {event.type === "ea" && event.status === "completed" && !event.isCollapsed && eaConfirmed && (
                   <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
                     <div className="mb-4">
                       <div className="flex items-center gap-2 mb-2">
@@ -1811,7 +1811,7 @@ const StageCard = ({
                 )}
 
                 {/* Project Setup Recap - show for completed setup stage when expanded */}
-                {event.type === "setup" && event.status === "completed" && setupEmailSent && (
+                {event.type === "setup" && event.status === "completed" && !event.isCollapsed && setupEmailSent && (
                   <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
                     <div className="mb-4">
                       <div className="flex items-center gap-2 mb-2">
@@ -1920,39 +1920,62 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
   // Sync Timeline internal state with external changes (like file clearing from documents section)
   useEffect(() => {
-    // If demo call transcript is not uploaded and lead stage is demo, ensure demo stage is not completed
-    if (leadStage === 'demo' && uploadedFiles && !uploadedFiles['demo-call-transcript']) {
-      setCompletedStages(prev => {
-        const newSet = new Set(prev)
-        newSet.delete('demo')
-        return newSet
-      })
-      // Also expand demo stage and collapse others
-      setCollapsedItems(prev => {
-        const newSet = new Set(prev)
-        newSet.delete('demo') // Expand demo stage
-        newSet.add('readiness') // Collapse readiness stage
-        return newSet
-      })
-    }
-    // If demo call transcript is uploaded, ensure demo stage is completed
-    else if (uploadedFiles && uploadedFiles['demo-call-transcript']) {
-      // Add a slight delay to allow upload animation to complete when uploading from documents section
-      setTimeout(() => {
+    // Define stage file mappings and next stages
+    const stageFileMap = [
+      { stage: 'demo', fileId: 'demo-call-transcript', nextStage: 'readiness' },
+      { stage: 'readiness', fileId: 'readiness-pdf', nextStage: 'decision' },
+      { stage: 'scoping-prep', fileId: 'scoping-prep-doc', nextStage: 'scoping' },
+      { stage: 'scoping', fileId: 'scoping-call-transcript', nextStage: 'dev-overview' },
+      { stage: 'dev-overview', fileId: 'developer-audio-overview', nextStage: 'workflow-docs' },
+      { stage: 'workflow-docs', fileId: 'workflow-description', nextStage: 'sprint-pricing' },
+      { stage: 'sprint-pricing', fileId: 'sprint-pricing-estimate', nextStage: 'proposal' },
+      { stage: 'internal-client-docs', fileId: 'internal-client-documentation', nextStage: 'ea' },
+      { stage: 'kickoff', fileId: 'kickoff-meeting-brief', nextStage: null }
+    ]
+
+    stageFileMap.forEach(({ stage, fileId, nextStage }) => {
+      // If file is not uploaded and lead stage matches, ensure stage is not completed
+      if (leadStage === stage && uploadedFiles && !uploadedFiles[fileId]) {
         setCompletedStages(prev => {
           const newSet = new Set(prev)
-          newSet.add('demo')
+          newSet.delete(stage)
           return newSet
         })
-        // Also collapse demo stage and expand readiness
+        // Also expand current stage and collapse next stage if exists
         setCollapsedItems(prev => {
           const newSet = new Set(prev)
-          newSet.add('demo') // Collapse demo stage
-          newSet.delete('readiness') // Expand readiness stage
+          newSet.delete(stage) // Expand current stage
+          if (nextStage) {
+            newSet.add(nextStage) // Collapse next stage
+          }
           return newSet
         })
-      }, 100) // Small delay to let animation start
-    }
+      }
+      // If file is uploaded, ensure stage is completed
+      else if (uploadedFiles && uploadedFiles[fileId]) {
+        // Add a slight delay to allow upload animation to complete when uploading from documents section
+        setTimeout(() => {
+          // Capture current completed stages to check
+          setCompletedStages(currentCompleted => {
+            const newCompleted = new Set(currentCompleted)
+            newCompleted.add(stage)
+
+            // Also update collapsed items, but only expand next stage if it's not completed
+            setCollapsedItems(prev => {
+              const newSet = new Set(prev)
+              newSet.add(stage) // Collapse current stage
+              // Only expand next stage if it hasn't been manually completed yet
+              if (nextStage && !newCompleted.has(nextStage)) {
+                newSet.delete(nextStage) // Expand next stage
+              }
+              return newSet
+            })
+
+            return newCompleted
+          })
+        }, 100) // Small delay to let animation start
+      }
+    })
   }, [uploadedFiles, leadStage])
   const [anchorContactLoading, setAnchorContactLoading] = useState(false)
   const [anchorProposalLoading, setAnchorProposalLoading] = useState(false)
@@ -2091,7 +2114,6 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
     // Handle email sent
     if (action === 'email_sent' && eventId === 'decision') {
-      console.log('Email sent - completing decision stage')
       setShowEmailDraft(false)
       setDecisionMade(`proceed_${selectedDeveloper}`) // Track the decision with developer
       setSelectedDeveloper(null)
@@ -2570,11 +2592,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       // Mark the engagement agreement stage as completed
       setCompletedStages(prev => new Set(prev).add('ea'))
 
-      // Collapse the EA stage and expand the next stage
+      // Collapse the EA stage and expand the next stage (setup)
       setCollapsedItems(prev => {
         const newSet = new Set(prev)
         newSet.add('ea') // Collapse EA stage
-        // Find and expand the next stage after EA if it exists
+        newSet.delete('setup') // Expand setup stage (next stage after EA)
         return newSet
       })
     } else if (action === 'create_clickup_task') {

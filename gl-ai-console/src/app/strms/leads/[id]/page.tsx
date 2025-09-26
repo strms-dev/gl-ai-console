@@ -9,9 +9,9 @@ import { stageLabels, stageColors, Lead } from "@/lib/dummy-data"
 import { getTimelineForLead } from "@/lib/timeline-data"
 import { cn } from "@/lib/utils"
 import { FileUpload } from "@/components/leads/file-upload"
-import { fileTypes, getFilesByCategory, UploadedFile } from "@/lib/file-types"
+import { fileTypes, UploadedFile } from "@/lib/file-types"
 import { getLeadById, updateLead } from "@/lib/leads-store"
-import { use, useState, useEffect } from "react"
+import { use, useState, useEffect, useMemo } from "react"
 
 interface LeadDetailPageProps {
   params: Promise<{
@@ -25,10 +25,35 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
 
   // Reactive lead state that updates when lead data changes
   const [lead, setLead] = useState<Lead | undefined>(() => getLeadById(id))
-  const timeline = getTimelineForLead(id)
+
+  // Generate timeline based on current lead stage
+  const timeline = useMemo(() => {
+    return getTimelineForLead(id, lead?.stage)
+  }, [id, lead?.stage])
 
   // State to track uploaded files
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedFile>>({})
+
+  // Calculate actual timeline progress based on lead stage and uploaded files
+  const calculateTimelineProgress = () => {
+    if (!lead) return { completed: 0, total: timeline.length }
+
+    // Define the stage order and their dependencies
+    const stageOrder = ['demo', 'readiness', 'decision', 'scoping-prep', 'scoping', 'dev-overview', 'workflow-docs', 'sprint-pricing', 'proposal', 'proposal-decision', 'internal-client-docs', 'ea', 'setup', 'kickoff']
+    const currentStageIndex = stageOrder.indexOf(lead.stage)
+
+    let completedCount = 0
+
+    // Count stages before current stage as completed
+    // Current stage is only completed if we've moved past it
+    for (let i = 0; i < currentStageIndex && i < stageOrder.length; i++) {
+      completedCount++
+    }
+
+    return { completed: completedCount, total: timeline.length }
+  }
+
+  const { completed: completedStages, total: totalStages } = calculateTimelineProgress()
 
   // State to track collapsible sections
   const [collapsedSections, setCollapsedSections] = useState({
@@ -61,26 +86,28 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
       [file.fileTypeId]: file
     }))
 
-    // Trigger stage completion logic for demo call transcript
-    if (file.fileTypeId === 'demo-call-transcript') {
-      // Small delay for stage automation to not interfere with UI
-      setTimeout(() => {
-        const currentLead = getLeadById(id)
-        if (currentLead) {
-          updateLead(id, { stage: 'readiness' }) // Move to next stage
-          // Force refresh of lead data
-          setLead(getLeadById(id))
-        }
-      }, 100)
+    // Define file to stage transition mappings
+    const fileStageMap: Record<string, string> = {
+      'demo-call-transcript': 'readiness',
+      'readiness-pdf': 'decision',
+      'scoping-prep-doc': 'scoping',
+      'scoping-call-transcript': 'dev-overview',
+      'developer-audio-overview': 'workflow-docs',
+      'workflow-description': 'sprint-pricing',
+      'sprint-pricing-estimate': 'proposal',
+      'internal-client-documentation': 'ea',
+      // Note: kickoff-meeting-brief doesn't need a mapping since kickoff is the final stage
     }
 
-    // Trigger stage completion logic for readiness assessment
-    if (file.fileTypeId === 'readiness-pdf') {
+    // Get the next stage for this file type
+    const nextStage = fileStageMap[file.fileTypeId]
+
+    if (nextStage) {
       // Small delay for stage automation to not interfere with UI
       setTimeout(() => {
         const currentLead = getLeadById(id)
         if (currentLead) {
-          updateLead(id, { stage: 'scoping-prep' }) // Move to next stage
+          updateLead(id, { stage: nextStage }) // Move to next stage
           // Force refresh of lead data
           setLead(getLeadById(id))
         }
@@ -95,23 +122,27 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
       return updated
     })
 
-    // Trigger stage reset logic for demo call transcript
-    if (fileTypeId === 'demo-call-transcript') {
-      // Reset the lead stage back to demo
-      const currentLead = getLeadById(id)
-      if (currentLead) {
-        updateLead(id, { stage: 'demo' }) // Move back to demo stage
-        // Force refresh of lead data
-        setLead(getLeadById(id))
-      }
+    // Define file to stage reset mappings (back to the stage that requires the file)
+    const fileResetStageMap: Record<string, string> = {
+      'demo-call-transcript': 'demo',
+      'readiness-pdf': 'readiness',
+      'scoping-prep-doc': 'scoping-prep',
+      'scoping-call-transcript': 'scoping',
+      'developer-audio-overview': 'dev-overview',
+      'workflow-description': 'workflow-docs',
+      'sprint-pricing-estimate': 'sprint-pricing',
+      'internal-client-documentation': 'internal-client-docs',
+      'kickoff-meeting-brief': 'kickoff'
     }
 
-    // Trigger stage reset logic for readiness assessment
-    if (fileTypeId === 'readiness-pdf') {
-      // Reset the lead stage back to readiness
+    // Get the stage to reset to for this file type
+    const resetStage = fileResetStageMap[fileTypeId]
+
+    if (resetStage) {
+      // Reset the lead stage back to the stage that requires this file
       const currentLead = getLeadById(id)
       if (currentLead) {
-        updateLead(id, { stage: 'readiness' }) // Move back to readiness stage
+        updateLead(id, { stage: resetStage }) // Move back to required stage
         // Force refresh of lead data
         setLead(getLeadById(id))
       }
@@ -131,7 +162,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-4">Lead Not Found</h1>
           <Link href="/strms" scroll={false}>
-            <Button>Back to STRMS Leads</Button>
+            <Button>Back to STRMS Projects</Button>
           </Link>
         </div>
       </div>
@@ -143,20 +174,20 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center space-x-4">
           <Link href="/strms" scroll={false}>
-            <Button variant="outline" size="sm">← Back to Leads</Button>
+            <Button variant="outline" size="sm">← Back to Projects</Button>
           </Link>
           <div>
             <h1 className="text-3xl font-bold text-foreground">
-              {lead.company}
+              {lead.projectName || "—"}
             </h1>
             <p className="text-muted-foreground">
-              Contact: {lead.contact} • {lead.email}
+              {lead.company} • {lead.contact} • {lead.email}
             </p>
           </div>
         </div>
         <div className="flex items-center space-x-3">
           <span className={cn(
-            "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium",
+            "inline-flex items-center px-4 py-2 rounded-full text-base font-medium",
             stageColors[lead.stage]
           )}>
             {stageLabels[lead.stage]}
@@ -168,7 +199,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Lead Summary</CardTitle>
+              <CardTitle>Project Summary</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
@@ -181,10 +212,14 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
           </CardHeader>
           {!collapsedSections.summary && (
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Project Name</label>
+                  <p className="text-foreground">{lead.projectName || "—"}</p>
+                </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Company</label>
-                  <p className="text-foreground">{lead.company}</p>
+                  <p className="text-foreground">{lead.company || "—"}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Primary Contact</label>
@@ -219,7 +254,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
               <div className="flex items-center space-x-2">
                 <CardTitle>Onboarding Timeline</CardTitle>
                 <div className="text-sm text-muted-foreground">
-                  {timeline.filter(e => e.status === "completed").length} of {timeline.length} completed
+                  {completedStages} of {totalStages} completed
                 </div>
               </div>
               <Button
@@ -238,7 +273,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
                   <div
                     className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                     style={{
-                      width: `${Math.round((timeline.filter(e => e.status === "completed").length / timeline.length) * 100)}%`
+                      width: `${Math.round((completedStages / totalStages) * 100)}%`
                     }}
                   />
                 </div>
@@ -295,7 +330,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Lead Documents</CardTitle>
+              <CardTitle>Project Documents</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"

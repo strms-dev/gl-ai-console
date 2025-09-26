@@ -1,5 +1,6 @@
 export interface Lead {
   id: string
+  projectName: string
   company: string
   contact: string
   email: string
@@ -13,6 +14,7 @@ export interface Lead {
 export const dummyLeads: Lead[] = [
   {
     id: "lead-1",
+    projectName: "Karbon > Notion Sync",
     company: "Acme Corp",
     contact: "John Smith",
     email: "john@acmecorp.com",

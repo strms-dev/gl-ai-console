@@ -101,6 +101,7 @@ export default function STRMSPage() {
     if (searchTerm) {
       const search = searchTerm.toLowerCase()
       filtered = leads.filter(lead =>
+        lead.projectName.toLowerCase().includes(search) ||
         lead.company.toLowerCase().includes(search) ||
         lead.contact.toLowerCase().includes(search) ||
         lead.email.toLowerCase().includes(search)
@@ -145,7 +146,7 @@ export default function STRMSPage() {
             Sales Pipeline
           </h1>
           <p className="text-muted-foreground">
-            Manage and track all leads through the sales pipeline
+            Manage and track all projects through the sales pipeline
           </p>
         </div>
       </div>
@@ -154,7 +155,7 @@ export default function STRMSPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Leads</CardTitle>
+              <CardTitle>Projects</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
@@ -169,14 +170,14 @@ export default function STRMSPage() {
             <CardContent className="pt-0">
               <div className="mb-4">
                 <div className="flex justify-end mb-4">
-                  <Button onClick={() => setShowLeadForm(true)}>Add New Lead</Button>
+                  <Button onClick={() => setShowLeadForm(true)}>Add New Project</Button>
                 </div>
 
                 {/* Search and Sort Controls */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-6">
                   <div className="flex-1">
                     <Input
-                      placeholder="Search by company, contact, or email..."
+                      placeholder="Search by project name, company, contact, or email..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full"

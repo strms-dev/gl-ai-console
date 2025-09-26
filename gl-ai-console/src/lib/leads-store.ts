@@ -12,7 +12,24 @@ export function getLeads(): Lead[] {
   try {
     const stored = localStorage.getItem(LEADS_STORAGE_KEY)
     if (stored) {
-      return JSON.parse(stored)
+      const leads = JSON.parse(stored)
+
+      // Migrate existing leads to include projectName field
+      const migratedLeads = leads.map((lead: any) => {
+        if (!lead.projectName) {
+          // For the existing Acme Corp lead, set the project name
+          if (lead.id === "lead-1" && lead.company === "Acme Corp") {
+            return { ...lead, projectName: "Karbon > Notion Sync" }
+          }
+          // For other leads without projectName, use empty string
+          return { ...lead, projectName: "" }
+        }
+        return lead
+      })
+
+      // Save migrated data back to localStorage
+      localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(migratedLeads))
+      return migratedLeads
     }
   } catch (error) {
     console.error("Error reading leads from localStorage:", error)

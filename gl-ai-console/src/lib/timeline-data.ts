@@ -57,13 +57,13 @@ export const determineCurrentStage = (events: TimelineEvent[]): string => {
   return lastCompletedStage?.type || "new"
 }
 
-export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
+export const getTimelineForLead = (leadId: string, leadStage?: string): TimelineEvent[] => {
   const baseTimeline: TimelineEvent[] = [
     {
       id: "demo",
       type: "demo",
       title: "Demo Call",
-      description: "⚡ This stage runs automatically. Demo call transcript is usually uploaded automatically via automation. If not received automatically, manually upload to complete this stage",
+      description: "⚡ This stage runs automatically. Demo call transcript is usually uploaded automatically via automation. When uploaded, it will automatically populate the project name (which can be edited afterwards). If not received automatically, manually upload to complete this stage.\n\n📋 Note for existing customers: This can be the meeting transcript where the new project was discussed at a high level, or a brief document prepared by the developer outlining the new project. For new customers, this is the formal demo call transcript.",
       timestamp: "",
       status: "pending",
       icon: "🎥",
@@ -122,7 +122,7 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
       id: "scoping",
       type: "scoping",
       title: "Scoping Call",
-      description: "⚡ This stage runs automatically. Scoping call transcript is usually uploaded automatically via automation. If not received automatically, manually upload to complete this stage",
+      description: "⚡ This stage runs automatically. Scoping call transcript is usually uploaded automatically via automation. If not received automatically, manually upload to complete this stage.\n\n📋 Note for existing customers: This should be a transcript of a detailed technical meeting between the existing customer and developer to discuss the new project in depth, including mappings, edge cases, error handling, and technical specifications. For new customers, this is the formal scoping call transcript.",
       timestamp: "",
       status: "pending",
       icon: "🔍",
@@ -208,7 +208,7 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
       id: "internal-client-docs",
       type: "internal-client-docs",
       title: "Internal & Client Scoping Document",
-      description: "⚡ This stage runs automatically. The internal & client scoping document should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
+      description: "⚡ This stage runs automatically. The internal & client scoping document should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually.\n\n📋 Note for existing customers: This AI-generated document can be added to the existing customer's scoping documentation or kept as a separate project-specific document, based on customer preference.",
       timestamp: "",
       status: "pending",
       icon: "📋",
@@ -222,7 +222,7 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
       id: "ea",
       type: "ea",
       title: "Engagement Agreement",
-      description: "👤 This stage requires your action. The contact and proposal draft, as well as the project specific EA wording should automatically be completed and attached, then you just must make the final touches in the Anchor proposal and send to the client, then click the confirm completed button. If any of those items are not done automatically you have the option to trigger the creation of the contact and proposal draft in Anchor and can also manually trigger the generation of the project specific EA wording or can manually upload your own file",
+      description: "👤 This stage requires your action. The contact and proposal draft, as well as the project specific EA wording should automatically be completed and attached, then you just must make the final touches in the Anchor proposal and send to the client, then click the confirm completed button. If any of those items are not done automatically you have the option to trigger the creation of the contact and proposal draft in Anchor and can also manually trigger the generation of the project specific EA wording or can manually upload your own file.\n\n📋 Note for existing customers: The project-specific wording can be added to the existing engagement agreement's custom wording section rather than creating a separate agreement.",
       timestamp: "",
       status: "pending",
       icon: "📝",
@@ -262,7 +262,36 @@ export const getTimelineForLead = (leadId: string): TimelineEvent[] => {
     }
   ]
 
-  // Create different scenarios based on lead ID
+  // If leadStage is provided, use it to determine timeline state
+  if (leadStage) {
+    const stageOrder = ['demo', 'readiness', 'decision', 'scoping-prep', 'scoping', 'dev-overview', 'workflow-docs', 'sprint-pricing', 'proposal', 'proposal-decision', 'internal-client-docs', 'ea', 'setup', 'kickoff']
+    const currentStageIndex = stageOrder.indexOf(leadStage)
+
+    return baseTimeline.map((item, index) => {
+      if (index < currentStageIndex) {
+        return {
+          ...item,
+          status: "completed" as const,
+          timestamp: "Completed",
+          isCollapsed: true
+        }
+      }
+      if (index === currentStageIndex) {
+        return {
+          ...item,
+          status: "pending" as const,
+          timestamp: "",
+          isCollapsed: false // Current stage - expanded
+        }
+      }
+      return {
+        ...item,
+        isCollapsed: true // Future stages collapsed
+      }
+    })
+  }
+
+  // Fallback to hardcoded scenarios for specific demo leads
   switch (leadId) {
     case "lead-1":
       // Brand new lead at Demo Call stage
