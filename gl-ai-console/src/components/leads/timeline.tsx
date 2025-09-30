@@ -33,19 +33,19 @@ interface TimelineProps {
 const getStatusColor = (status: TimelineEvent["status"]) => {
   switch (status) {
     case "completed":
-      return "bg-green-100 text-green-800 border-green-200"
+      return "bg-[#C8E4BB]/20 text-[#5A8A4A] border border-[#C8E4BB]/40"
     case "in_progress":
-      return "bg-blue-100 text-blue-800 border-blue-200"
+      return "bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30"
     case "action-required":
-      return "bg-amber-100 text-amber-800 border-amber-200"
+      return "bg-amber-50 text-amber-700 border border-amber-200"
     case "pending":
-      return "bg-gray-100 text-gray-800 border-gray-200"
+      return "bg-gray-50 text-gray-600 border border-gray-200"
     case "failed":
-      return "bg-red-100 text-red-800 border-red-200"
+      return "bg-red-50 text-red-700 border border-red-200"
     case "skipped":
-      return "bg-gray-100 text-gray-500 border-gray-200"
+      return "bg-gray-50 text-gray-400 border border-gray-200"
     default:
-      return "bg-gray-100 text-gray-800 border-gray-200"
+      return "bg-gray-50 text-gray-600 border border-gray-200"
   }
 }
 
@@ -70,10 +70,10 @@ const getStatusIcon = (status: TimelineEvent["status"]) => {
 
 const getConnectorStyles = (currentStatus: TimelineEvent["status"], nextStatus?: TimelineEvent["status"]) => {
   if (currentStatus === "completed") {
-    return "bg-green-500"
+    return "bg-[#C8E4BB]"
   }
   if (currentStatus === "in_progress") {
-    return "bg-blue-500"
+    return "bg-[#407B9D]"
   }
   if (currentStatus === "skipped") {
     return "bg-gray-300 border-l-2 border-dashed border-gray-400"
@@ -84,7 +84,7 @@ const getConnectorStyles = (currentStatus: TimelineEvent["status"], nextStatus?:
 const ProgressBar = ({ percentage }: { percentage: number }) => (
   <div className="w-full bg-muted rounded-full h-2 mb-4">
     <div
-      className="bg-primary h-2 rounded-full transition-all duration-300"
+      className="bg-[#407B9D] h-2 rounded-full transition-all duration-300"
       style={{ width: `${percentage}%` }}
     />
   </div>
@@ -1559,7 +1559,8 @@ const StageCard = ({
       {!isLast && (
         <div
           className={cn(
-            "absolute left-6 top-16 w-px h-full transition-all duration-300",
+            "absolute left-6 top-12 w-px transition-all duration-300",
+            "h-[calc(100%-3rem+2rem)]",
             getConnectorStyles(event.status, nextEvent?.status)
           )}
         />
@@ -1569,8 +1570,8 @@ const StageCard = ({
         {/* Status Circle */}
         <div className={cn(
           "flex items-center justify-center w-12 h-12 rounded-full border-2 bg-background relative z-10 transition-all duration-300",
-          event.status === "completed" ? "border-green-500 bg-green-50" :
-          event.status === "in_progress" ? "border-blue-500 bg-blue-50" :
+          event.status === "completed" ? "border-[#C8E4BB] bg-[#C8E4BB]/20" :
+          event.status === "in_progress" ? "border-[#407B9D] bg-[#407B9D]/20" :
           event.status === "action-required" ? "border-amber-500 bg-amber-50" :
           event.status === "failed" ? "border-red-500 bg-red-50" :
           event.status === "skipped" ? "border-gray-300 bg-gray-50 opacity-50" :
@@ -1583,13 +1584,11 @@ const StageCard = ({
         {/* Main Content */}
         <div className="flex-1 min-w-0">
           <div className={cn(
-            "p-4 border rounded-lg bg-background transition-all duration-300",
-            event.status === "completed" && event.isCollapsed ? "border-green-200 bg-green-50/30" :
-            event.status === "skipped" ? "border-gray-200 bg-gray-50/50 opacity-60" :
-            isActive ? "border-blue-200 bg-blue-50/30" :
-            event.automationLevel === "fully-automated" ? "border-green-200 bg-green-50/10" :
-            event.automationLevel === "manual-intervention" ? "border-blue-200 bg-blue-50/10" :
-            "border-gray-200"
+            "p-4 border-2 rounded-lg bg-background transition-all duration-300",
+            event.status === "completed" && event.isCollapsed ? "border-border bg-[#C8E4BB]/20" :
+            event.status === "skipped" ? "border-border bg-gray-50/50 opacity-60" :
+            isActive ? "border-[#407B9D] bg-[#407B9D]/10" :
+            "border-border"
           )}>
             {/* Header */}
             <div className="flex items-center justify-between mb-2">
@@ -1602,10 +1601,10 @@ const StageCard = ({
                 </h3>
                 {/* Automation Level Badge */}
                 <span className={cn(
-                  "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium",
+                  "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border",
                   event.automationLevel === "fully-automated"
-                    ? "bg-green-100 text-green-800 border border-green-200"
-                    : "bg-blue-100 text-blue-800 border border-blue-200"
+                    ? "bg-[#C8E4BB]/20 text-[#5A8A4A] border-[#C8E4BB]/40"
+                    : "bg-[#407B9D]/10 text-[#407B9D] border-[#407B9D]/30"
                 )}>
                   {event.automationLevel === "fully-automated" ? "⚡ Automated" : "👤 Manual"}
                 </span>
@@ -1619,7 +1618,7 @@ const StageCard = ({
                 </Button>
               </div>
               <span className={cn(
-                "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
                 getStatusColor(event.status)
               )}>
                 {getStatusIcon(event.status)} {event.status.replace(/[-_]/g, " ")}
@@ -1653,7 +1652,7 @@ const StageCard = ({
                     </div>
                     <div className="mt-1 w-full bg-white rounded-full h-2">
                       <div
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                        className="bg-[#407B9D] h-2 rounded-full transition-all duration-300"
                         style={{ width: `${event.readinessScore}%` }}
                       />
                     </div>
@@ -2987,13 +2986,13 @@ The GrowthLab Team`
         {/* Automation Level Legend */}
         <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-gray-100">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#C8E4BB]/20 text-[#5A8A4A] border border-[#C8E4BB]/40">
               ⚡ Automated
             </span>
             <span className="text-xs text-muted-foreground">7 stages</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-green-200">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30">
               👤 Manual
             </span>
             <span className="text-xs text-muted-foreground">7 stages</span>

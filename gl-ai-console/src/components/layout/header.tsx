@@ -34,9 +34,9 @@ export function Header() {
   }
 
   return (
-    <header className="h-16 bg-white border-b border-border flex items-center justify-between px-6">
+    <header className="h-16 bg-white border-b border-border flex items-center justify-between px-6 shadow-sm">
       <div className="flex items-center space-x-4">
-        <h2 className="text-lg font-semibold text-foreground">{renderTitle()}</h2>
+        <h2 className="text-lg font-semibold text-foreground" style={{fontFamily: 'var(--font-heading)'}}>{renderTitle()}</h2>
       </div>
     </header>
   )

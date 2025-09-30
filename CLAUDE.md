@@ -52,15 +52,56 @@ The app uses Next.js App Router with a department-based structure:
 - **Dummy Data**: Static data for development in `src/lib/dummy-data.ts`
 - **No External Database**: Currently uses local storage for persistence
 
-### Styling
+### Styling & Design System
 - **Tailwind CSS v4**: Latest version with PostCSS
-- **Component Library**: Custom UI components with consistent styling
-- **Theming**: Light theme with standard Tailwind color system
+- **Component Library**: Custom UI components with consistent GrowthLab branding
+- **Design System**: Follow guidelines in `design_principles.md` and `brand_guide.md`
+- **Brand Colors**:
+  - Primary Blue: `#407B9D` (buttons, active states, primary actions)
+  - Accent Green: `#C8E4BB` (success states, completed items)
+  - Light Teal: `#95CBD7` (secondary actions, info elements)
+- **Typography**:
+  - Headings: Montserrat (imported via Next.js font optimization)
+  - Body: Source Sans Pro (imported via Next.js font optimization)
+  - Apply via CSS variables: `var(--font-heading)` and `var(--font-body)`
+- **Component Styling Guidelines**:
+  - Always use brand colors for interactive elements
+  - Maintain rounded corners (8-12px for buttons/cards)
+  - Include hover states with subtle scale/shadow effects
+  - Use brand blue focus rings on form inputs
+  - Keep shadows subtle and professional
 
 ### MCP Integration
 The project has MCP (Model Context Protocol) configuration in `.mcp.json` with:
 - Supabase integration for database operations
 - n8n integration for workflow automation
+
+## Design System & Styling Requirements
+
+**IMPORTANT**: All new components, pages, and UI elements MUST follow the established design system.
+
+### Required Reading for New Features
+Before creating any new UI component or page, review:
+1. **`design_principles.md`** - Complete design system with spacing, colors, typography scales
+2. **`brand_guide.md`** - GrowthLab brand colors, fonts, and visual style extracted from company website
+
+### Style Implementation Checklist
+When building new UI components or features:
+- ✅ Use brand colors (`#407B9D`, `#C8E4BB`, `#95CBD7`) for all interactive elements
+- ✅ Apply Montserrat font to headings using `style={{fontFamily: 'var(--font-heading)'}}`
+- ✅ Apply Source Sans Pro to body text using `style={{fontFamily: 'var(--font-body)'}}`
+- ✅ Use consistent border radius (8-12px) for buttons and cards
+- ✅ Include hover effects (scale, shadow, color changes) on interactive elements
+- ✅ Add brand blue focus rings on all form inputs
+- ✅ Maintain professional, subtle shadows (not dramatic)
+- ✅ Use the established spacing system (8px, 16px, 24px, 32px increments)
+
+### Examples of Styled Components
+Reference these existing components as templates:
+- **Buttons**: `src/components/ui/button.tsx` - Shows hover effects, brand colors
+- **Forms**: `src/components/ui/input.tsx`, `label.tsx` - Shows focus states
+- **Cards**: `src/components/ui/card.tsx` - Shows shadows and structure
+- **Navigation**: `src/components/layout/sidebar.tsx` - Shows active states
 
 ## Development Notes
 
@@ -69,6 +110,13 @@ The project has MCP (Model Context Protocol) configuration in `.mcp.json` with:
 - Turbopack is enabled for faster development builds
 - Path aliases configured: `@/*` maps to `./src/*`
 - ESLint configuration for code quality
+
+### CSS & Styling Technical Notes
+- **Font Loading**: Use Next.js font optimization in `layout.tsx`, NOT `@import` in CSS files
+- **Tailwind v4**: Uses `@theme {}` blocks for theme configuration
+- **CSS Import Order**: All `@import` statements must be at the very top of CSS files (no blank lines between them)
+- **Custom Fonts**: Montserrat and Source Sans Pro are loaded via Next.js and exposed as CSS variables
+- **Color Variables**: Brand colors are defined in `:root` and Tailwind's `@theme` block
 
 ## Timeline Component Development Patterns
 

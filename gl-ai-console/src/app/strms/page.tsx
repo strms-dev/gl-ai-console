@@ -139,13 +139,13 @@ export default function STRMSPage() {
   }, [searchTerm, sortField, sortOrder, parseActivityTime, leads])
 
   return (
-    <div className="p-8 bg-muted/30">
+    <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+          <h1 className="text-3xl font-bold text-foreground mb-2" style={{fontFamily: 'var(--font-heading)'}}>
             Sales Pipeline
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground" style={{fontFamily: 'var(--font-body)'}}>
             Manage and track all projects through the sales pipeline
           </p>
         </div>

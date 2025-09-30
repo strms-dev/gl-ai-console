@@ -35,15 +35,15 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
 
   return (
     <div className={cn(
-      "flex h-full flex-col bg-white border-r border-border transition-all duration-300",
+      "flex h-full flex-col bg-white border-r border-border transition-all duration-300 shadow-sm",
       isCollapsed ? "w-16" : "w-64"
     )}>
-      <div className="flex h-16 items-center px-4 border-b border-border">
+      <div className="flex h-16 items-center px-4 border-b border-border bg-gradient-to-r from-white to-[#FAF9F9]">
         <Button
           variant="ghost"
           size="icon"
           onClick={onToggle}
-          className="h-8 w-8"
+          className="h-8 w-8 hover:bg-[#407B9D]/10 text-[#407B9D]"
         >
           {isCollapsed ? "→" : "←"}
         </Button>
@@ -64,7 +64,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           isCollapsed ? "px-2" : "px-4"
         )}>
           {!isCollapsed && (
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Departments</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3" style={{fontFamily: 'var(--font-heading)'}}>Departments</p>
           )}
           <ul className="space-y-1">
             {departments.map((dept) => {
@@ -74,12 +74,13 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                   <Link
                     href={dept.href}
                     className={cn(
-                      "flex items-center text-sm font-medium rounded-md transition-colors",
-                      isCollapsed ? "justify-center p-2" : "px-3 py-2",
+                      "flex items-center text-sm font-semibold rounded-lg transition-all duration-200",
+                      isCollapsed ? "justify-center p-2" : "px-3 py-2.5",
                       isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-foreground hover:bg-accent hover:text-accent-foreground"
+                        ? "bg-[#407B9D] text-white shadow-md"
+                        : "text-[#463939] hover:bg-[#95CBD7]/20 hover:text-[#407B9D]"
                     )}
+                    style={{fontFamily: 'var(--font-heading)'}}
                     title={isCollapsed ? dept.name : undefined}
                   >
                     <div className={cn(
@@ -108,7 +109,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
             isCollapsed ? "px-2" : "px-4"
           )}>
             {!isCollapsed && (
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3" style={{fontFamily: 'var(--font-heading)'}}>
                 {departments.find(d => d.href.includes(currentDepartment))?.name}
               </p>
             )}
@@ -120,12 +121,13 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                     <Link
                       href={item.href}
                       className={cn(
-                        "flex items-center text-sm font-medium rounded-md transition-colors",
+                        "flex items-center text-sm font-medium rounded-lg transition-all duration-200",
                         isCollapsed ? "justify-center p-2" : "px-3 py-2",
                         isActive
-                          ? "bg-accent text-accent-foreground"
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                          ? "bg-[#C8E4BB] text-[#463939] shadow-sm"
+                          : "text-muted-foreground hover:bg-[#95CBD7]/15 hover:text-[#407B9D]"
                       )}
+                      style={{fontFamily: 'var(--font-body)'}}
                       title={isCollapsed ? item.name : undefined}
                     >
                       <span className={cn(

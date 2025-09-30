@@ -271,7 +271,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
               <>
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
                   <div
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    className="bg-[#407B9D] h-2 rounded-full transition-all duration-300"
                     style={{
                       width: `${Math.round((completedStages / totalStages) * 100)}%`
                     }}
@@ -280,13 +280,13 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
                 {/* Automation Level Legend */}
                 <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-gray-100">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#C8E4BB]/20 text-[#5A8A4A] border border-[#C8E4BB]/40">
                       ⚡ Automated
                     </span>
                     <span className="text-xs text-muted-foreground">7 stages</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30">
                       👤 Manual
                     </span>
                     <span className="text-xs text-muted-foreground">7 stages</span>

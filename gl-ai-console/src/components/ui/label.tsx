@@ -10,9 +10,10 @@ const Label = React.forwardRef<
   <label
     ref={ref}
     className={cn(
-      "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+      "text-sm font-semibold leading-none text-[#463939] peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
       className
     )}
+    style={{fontFamily: 'var(--font-heading)'}}
     {...props}
   />
 ))
