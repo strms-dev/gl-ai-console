@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 // import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
+import { RefreshCw, CheckCircle2, Sparkles } from "lucide-react"
 
 interface SprintPricingFormProps {
   onConfirm: (data: { sprintLength: string; price: number; explanation: string }) => void
@@ -80,22 +81,22 @@ export function SprintPricingForm({ onConfirm, onCancel, initialData, isAdjustme
       <CardContent className="space-y-6 pt-6">
         {/* Adjustment Mode Notice OR AI Generated Notice */}
         {isAdjustmentMode ? (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="p-3 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-lg">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">🔄</span>
-              <p className="text-sm font-medium text-blue-800">Adjust Proposal Terms</p>
+              <RefreshCw className="w-5 h-5 text-[#407B9D]" />
+              <p className="text-sm font-medium" style={{fontFamily: 'var(--font-heading)', color: '#407B9D'}}>Adjust Proposal Terms</p>
             </div>
-            <p className="text-xs text-blue-700">
+            <p className="text-xs text-gray-700">
               Client requested adjustments. Please review and update the sprint length and pricing as needed.
             </p>
           </div>
         ) : (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="p-3 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-lg">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">🤖</span>
-              <p className="text-sm font-medium text-blue-800">AI-Generated Estimates</p>
+              <Sparkles className="w-5 h-5 text-[#407B9D]" />
+              <p className="text-sm font-medium" style={{fontFamily: 'var(--font-heading)', color: '#407B9D'}}>AI-Generated Estimates</p>
             </div>
-            <p className="text-xs text-blue-700">
+            <p className="text-xs text-gray-700">
               These estimates have been automatically generated based on the project requirements. You can review and adjust them before confirming.
             </p>
           </div>
@@ -179,9 +180,10 @@ export function SprintPricingForm({ onConfirm, onCancel, initialData, isAdjustme
           )}
           <Button
             onClick={handleConfirm}
-            className={`${onCancel ? 'flex-1' : 'w-full'} bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0`}
+            className={`${onCancel ? 'flex-1' : 'w-full'} bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md`}
           >
-            ✅ {isAdjustmentMode ? 'Confirm Adjustment' : 'Confirm Estimate'}
+            <CheckCircle2 className="w-4 h-4 mr-2" />
+            {isAdjustmentMode ? 'Confirm Adjustment' : 'Confirm Estimate'}
           </Button>
         </div>
       </CardContent>

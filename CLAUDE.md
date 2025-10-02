@@ -117,6 +117,7 @@ Reference these existing components as templates:
 - **CSS Import Order**: All `@import` statements must be at the very top of CSS files (no blank lines between them)
 - **Custom Fonts**: Montserrat and Source Sans Pro are loaded via Next.js and exposed as CSS variables
 - **Color Variables**: Brand colors are defined in `:root` and Tailwind's `@theme` block
+- **Icons**: ALWAYS use Lucide React icons - NEVER use emojis in the UI
 
 ## Timeline Component Development Patterns
 

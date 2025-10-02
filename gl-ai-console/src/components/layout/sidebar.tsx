@@ -5,15 +5,25 @@ import { usePathname } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { Wrench, RotateCw, LucideIcon } from "lucide-react"
 
 const departments = [
-  { name: "STRMS", href: "/strms", icon: "🔧", active: true },
+  { name: "STRMS", href: "/strms", icon: "wrench", active: true },
 ]
 
 const departmentNavigation: Record<string, Array<{ name: string; href: string; icon: string }>> = {
   strms: [
-    { name: "Sales Pipeline", href: "/strms", icon: "🔄" },
+    { name: "Sales Pipeline", href: "/strms", icon: "rotate-cw" },
   ],
+}
+
+// Icon mapping function
+const getIconComponent = (iconName: string): LucideIcon => {
+  const iconMap: Record<string, LucideIcon> = {
+    'wrench': Wrench,
+    'rotate-cw': RotateCw,
+  }
+  return iconMap[iconName] || RotateCw
 }
 
 interface SidebarProps {
@@ -38,29 +48,32 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
       "flex h-full flex-col bg-white border-r border-border transition-all duration-300 shadow-sm",
       isCollapsed ? "w-16" : "w-64"
     )}>
-      <div className="flex h-16 items-center px-4 border-b border-border bg-gradient-to-r from-white to-[#FAF9F9]">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-white">
         <Button
           variant="ghost"
           size="icon"
           onClick={onToggle}
-          className="h-8 w-8 hover:bg-[#407B9D]/10 text-[#407B9D]"
+          className="h-8 w-8 hover:bg-[#407B9D]/10 text-[#407B9D] flex-shrink-0"
         >
           {isCollapsed ? "→" : "←"}
         </Button>
         {!isCollapsed && (
-          <Image
-            src="/gl-ai-console-logo.png"
-            alt="GrowthLab AI Console"
-            width={200}
-            height={40}
-            className="ml-2 object-contain"
-          />
+          <div className="flex-1 min-w-0">
+            <Image
+              src="/gl-ai-console-logo.png"
+              alt="GrowthLab AI Console"
+              width={240}
+              height={60}
+              priority
+              className="w-full h-auto"
+            />
+          </div>
         )}
       </div>
 
       <div className="flex-1 flex flex-col">
         <div className={cn(
-          "py-4 border-b border-border",
+          "pt-4 pb-4 border-b border-border",
           isCollapsed ? "px-2" : "px-4"
         )}>
           {!isCollapsed && (
@@ -116,6 +129,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
             <ul className="space-y-1">
               {currentNavigation.map((item) => {
                 const isActive = pathname === item.href
+                const IconComponent = getIconComponent(item.icon)
                 return (
                   <li key={item.name}>
                     <Link
@@ -130,10 +144,10 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                       style={{fontFamily: 'var(--font-body)'}}
                       title={isCollapsed ? item.name : undefined}
                     >
-                      <span className={cn(
-                        "text-lg",
+                      <IconComponent className={cn(
+                        "w-5 h-5",
                         isCollapsed ? "" : "mr-3"
-                      )}>{item.icon}</span>
+                      )} />
                       {!isCollapsed && item.name}
                     </Link>
                   </li>

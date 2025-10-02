@@ -1,4 +1,5 @@
 import { ComingSoon } from "@/components/layout/coming-soon"
+import { BarChart3 } from "lucide-react"
 
 interface AccountingCatchAllProps {
   params: Promise<{
@@ -11,7 +12,7 @@ export default async function AccountingCatchAll({ params }: AccountingCatchAllP
   return (
     <ComingSoon
       departmentName="Accounting"
-      departmentIcon="📊"
+      departmentIcon={BarChart3}
       description="AI-powered financial automation and real-time accounting insights"
       features={[
         "Automated transaction categorization",

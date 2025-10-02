@@ -5,15 +5,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { fileTypes, FileType, UploadedFile } from "@/lib/file-types"
+import { Download, RotateCw, Trash2, Paperclip } from "lucide-react"
 
 interface FileUploadProps {
   fileType: FileType
   onFileUploaded?: (file: UploadedFile) => void
   onFileCleared?: (fileTypeId: string) => void
   existingFile?: UploadedFile
+  variant?: 'compact' | 'comfortable' // compact = horizontal for timeline, comfortable = vertical for grid
 }
 
-export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFile }: FileUploadProps) {
+export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFile, variant = 'comfortable' }: FileUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -247,43 +249,111 @@ For more information about this document, please contact the GrowthLab team.`
   }
 
   const displayFile = uploadedFile || existingFile
+  const FileIcon = fileType.IconComponent
+
   if (displayFile) {
     return (
-      <Card className="border-green-200 bg-green-50">
+      <Card className="border-[#C8E4BB] bg-[#C8E4BB]/20">
         <CardContent className="p-4">
-          <div className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <span className="text-2xl">{fileType.icon}</span>
+          {variant === 'compact' ? (
+            // Compact horizontal layout for timeline
+            <div className="flex items-start gap-4">
+              <FileIcon className="w-6 h-6 text-gray-700 flex-shrink-0 mt-1" />
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-green-800 truncate">{displayFile.fileName}</p>
-                <p className="text-sm text-green-600">
+                <p className="font-medium text-gray-800 truncate">{displayFile.fileName}</p>
+                <p className="text-sm text-gray-600">
                   {formatFileSize(displayFile.fileSize)} • Uploaded {new Date(displayFile.uploadDate).toLocaleDateString()}
                 </p>
               </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownload}
+                  className="bg-white hover:bg-gray-50"
+                >
+                  <Download className="w-4 h-4 mr-1.5" />
+                  Download
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={triggerFileInput}
+                  className="bg-white hover:bg-gray-50"
+                >
+                  <RotateCw className="w-4 h-4 mr-1.5" />
+                  Replace
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300 bg-white"
+                  onClick={handleClearFile}
+                >
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  Clear
+                </Button>
+              </div>
+              <input
+                type="file"
+                onChange={handleFileSelect}
+                className="hidden"
+                id={uniqueId}
+              />
             </div>
-            <div className="flex flex-col space-y-2">
-              <Button variant="outline" size="sm" onClick={handleDownload}>
-                📥 Download
-              </Button>
-              <Button variant="outline" size="sm" onClick={triggerFileInput}>
-                🔄 Replace
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-red-600 hover:text-red-700 hover:border-red-300"
-                onClick={handleClearFile}
-              >
-                🗑️ Clear
-              </Button>
+          ) : (
+            // Comfortable vertical layout with stacked buttons
+            <div className="space-y-3">
+              {/* File info row - centered */}
+              <div className="flex flex-col items-center justify-center gap-3 py-2">
+                <FileIcon className="w-8 h-8 text-gray-700" />
+                <div className="text-center w-full">
+                  <p className="font-medium text-gray-800 truncate text-base px-2">{displayFile.fileName}</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {formatFileSize(displayFile.fileSize)} • Uploaded {new Date(displayFile.uploadDate).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Button section - each button takes 50% width */}
+              <div className="flex flex-col items-stretch gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownload}
+                  className="bg-white hover:bg-gray-50 w-1/2 mx-auto"
+                >
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
+                  Download
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={triggerFileInput}
+                  className="bg-white hover:bg-gray-50 w-1/2 mx-auto"
+                >
+                  <RotateCw className="w-3.5 h-3.5 mr-1.5" />
+                  Replace
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-300 bg-white w-1/2 mx-auto"
+                  onClick={handleClearFile}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  Clear
+                </Button>
+              </div>
+
+              <input
+                type="file"
+                onChange={handleFileSelect}
+                className="hidden"
+                id={uniqueId}
+              />
             </div>
-            <input
-              type="file"
-              onChange={handleFileSelect}
-              className="hidden"
-              id={uniqueId}
-            />
-          </div>
+          )}
         </CardContent>
       </Card>
     )
@@ -302,7 +372,9 @@ For more information about this document, please contact the GrowthLab team.`
         onDrop={handleDrop}
       >
         <div className="text-center">
-          <div className="text-4xl mb-4">{fileType.icon}</div>
+          <div className="flex justify-center mb-4">
+            <FileIcon className="w-12 h-12 text-gray-600" />
+          </div>
           <h3 className="font-medium mb-2">{fileType.label}</h3>
           <p className="text-sm text-muted-foreground mb-4">{fileType.description}</p>
 
@@ -322,7 +394,8 @@ For more information about this document, please contact the GrowthLab team.`
             <>
               <div className="space-y-3">
                 <Button className="w-full" type="button" onClick={triggerFileInput}>
-                  📎 Choose File
+                  <Paperclip className="w-4 h-4 mr-2" />
+                  Choose File
                 </Button>
                 <p className="text-xs text-muted-foreground">
                   or drag and drop here

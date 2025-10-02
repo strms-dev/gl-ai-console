@@ -12,6 +12,7 @@ import { FileUpload } from "@/components/leads/file-upload"
 import { fileTypes, UploadedFile } from "@/lib/file-types"
 import { getLeadById, updateLead } from "@/lib/leads-store"
 import { use, useState, useEffect, useMemo } from "react"
+import { Zap, User } from "lucide-react"
 
 interface LeadDetailPageProps {
   params: Promise<{
@@ -87,7 +88,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
     }))
 
     // Define file to stage transition mappings
-    const fileStageMap: Record<string, string> = {
+    const fileStageMap: Record<string, Lead['stage']> = {
       'demo-call-transcript': 'readiness',
       'readiness-pdf': 'decision',
       'scoping-prep-doc': 'scoping',
@@ -123,7 +124,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
     })
 
     // Define file to stage reset mappings (back to the stage that requires the file)
-    const fileResetStageMap: Record<string, string> = {
+    const fileResetStageMap: Record<string, Lead['stage']> = {
       'demo-call-transcript': 'demo',
       'readiness-pdf': 'readiness',
       'scoping-prep-doc': 'scoping-prep',
@@ -280,14 +281,14 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
                 {/* Automation Level Legend */}
                 <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-gray-100">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#C8E4BB]/20 text-[#5A8A4A] border border-[#C8E4BB]/40">
-                      ⚡ Automated
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#C8E4BB]/20 text-[#5A8A4A] border border-[#C8E4BB]/40">
+                      <Zap className="w-3 h-3" /> Automated
                     </span>
                     <span className="text-xs text-muted-foreground">7 stages</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30">
-                      👤 Manual
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30">
+                      <User className="w-3 h-3" /> Manual
                     </span>
                     <span className="text-xs text-muted-foreground">7 stages</span>
                   </div>
@@ -305,25 +306,6 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
               onFileCleared={handleFileCleared}
               leadStage={lead?.stage}
             />
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>STRMS AI Assistant</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => toggleSection('assistant')}
-                className="h-8 w-8 p-0"
-              >
-                {collapsedSections.assistant ? "+" : "−"}
-              </Button>
-            </div>
-          </CardHeader>
-          {!collapsedSections.assistant && (
-            <ChatInterface title="STRMS AI Assistant" hideHeader={true} />
           )}
         </Card>
 
@@ -355,6 +337,25 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
                 ))}
               </div>
             </CardContent>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>STRMS AI Assistant</CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => toggleSection('assistant')}
+                className="h-8 w-8 p-0"
+              >
+                {collapsedSections.assistant ? "+" : "−"}
+              </Button>
+            </div>
+          </CardHeader>
+          {!collapsedSections.assistant && (
+            <ChatInterface title="STRMS AI Assistant" hideHeader={true} />
           )}
         </Card>
       </div>

@@ -1,4 +1,5 @@
 import { ComingSoon } from "@/components/layout/coming-soon"
+import { Users } from "lucide-react"
 
 interface HRCatchAllProps {
   params: Promise<{
@@ -10,7 +11,7 @@ export default async function HRCatchAll({ params }: HRCatchAllProps) {
   return (
     <ComingSoon
       departmentName="HR / PAS"
-      departmentIcon="👥"
+      departmentIcon={Users}
       description="People analytics and HR automation for modern workforce management"
       features={[
         "Automated employee onboarding",

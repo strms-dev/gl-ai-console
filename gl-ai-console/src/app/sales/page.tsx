@@ -1,10 +1,11 @@
 import { ComingSoon } from "@/components/layout/coming-soon"
+import { Briefcase } from "lucide-react"
 
 export default function SalesPage() {
   return (
     <ComingSoon
       departmentName="Sales"
-      departmentIcon="💼"
+      departmentIcon={Briefcase}
       description="AI-driven sales automation and pipeline intelligence"
       features={[
         "Lead scoring and qualification",

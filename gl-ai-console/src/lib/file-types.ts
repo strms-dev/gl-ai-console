@@ -1,9 +1,12 @@
+import { LucideIcon, Mic, BarChart3, ClipboardList, Target, Headphones, RefreshCw, FileText, Rocket } from 'lucide-react'
+
 export interface FileType {
   id: string
   label: string
   description: string
   acceptedTypes: string[]
-  icon: string
+  icon: string // Keep for backward compatibility
+  IconComponent: LucideIcon
   category: 'call' | 'document' | 'planning' | 'technical'
 }
 
@@ -14,6 +17,7 @@ export const fileTypes: FileType[] = [
     description: 'Transcript from the initial demo call',
     acceptedTypes: ['.pdf', '.doc', '.docx', '.txt'],
     icon: '🎤',
+    IconComponent: Mic,
     category: 'call'
   },
   {
@@ -22,14 +26,16 @@ export const fileTypes: FileType[] = [
     description: 'Client readiness assessment document',
     acceptedTypes: ['.pdf'],
     icon: '📊',
+    IconComponent: BarChart3,
     category: 'document'
   },
   {
     id: 'scoping-prep-doc',
-    label: 'Scoping Prep',
+    label: 'Scoping Call Prep',
     description: 'Preparation document for scoping call',
     acceptedTypes: ['.pdf', '.doc', '.docx'],
     icon: '📋',
+    IconComponent: ClipboardList,
     category: 'planning'
   },
   {
@@ -38,6 +44,7 @@ export const fileTypes: FileType[] = [
     description: 'Transcript from the scoping call',
     acceptedTypes: ['.pdf', '.doc', '.docx', '.txt'],
     icon: '🎯',
+    IconComponent: Target,
     category: 'call'
   },
   {
@@ -46,6 +53,7 @@ export const fileTypes: FileType[] = [
     description: 'Developer overview of project automation',
     acceptedTypes: ['.mp3', '.wav', '.m4a', '.pdf', '.doc', '.docx'],
     icon: '🎧',
+    IconComponent: Headphones,
     category: 'technical'
   },
   {
@@ -54,14 +62,16 @@ export const fileTypes: FileType[] = [
     description: 'Natural language description of the n8n workflow',
     acceptedTypes: ['.pdf', '.doc', '.docx', '.txt'],
     icon: '🔄',
+    IconComponent: RefreshCw,
     category: 'technical'
   },
   {
     id: 'internal-client-documentation',
-    label: 'Internal & Client Scoping Document',
-    description: 'Comprehensive scoping document for both internal team and client reference',
+    label: 'Scoping Document',
+    description: 'Scoping document for team and client reference',
     acceptedTypes: ['.pdf', '.doc', '.docx'],
     icon: '📋',
+    IconComponent: ClipboardList,
     category: 'document'
   },
   {
@@ -70,6 +80,7 @@ export const fileTypes: FileType[] = [
     description: 'Project-specific engagement agreement wording',
     acceptedTypes: ['.txt', '.doc', '.docx', '.pdf'],
     icon: '📝',
+    IconComponent: FileText,
     category: 'document'
   },
   {
@@ -78,6 +89,7 @@ export const fileTypes: FileType[] = [
     description: 'Agenda document for project kickoff meeting',
     acceptedTypes: ['.pdf', '.doc', '.docx'],
     icon: '🚀',
+    IconComponent: Rocket,
     category: 'planning'
   }
 ]

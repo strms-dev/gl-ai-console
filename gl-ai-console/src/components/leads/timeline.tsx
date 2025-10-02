@@ -11,6 +11,59 @@ import { cn } from "@/lib/utils"
 import { getFileTypeById, UploadedFile } from "@/lib/file-types"
 import { FileUpload } from "@/components/leads/file-upload"
 import { SprintPricingForm } from "@/components/leads/sprint-pricing-form"
+import {
+  CheckCircle2,
+  XCircle,
+  Circle,
+  AlertTriangle,
+  Mail,
+  ClipboardList,
+  RotateCw,
+  DollarSign,
+  Rocket,
+  User,
+  FileText,
+  Zap,
+  BarChart3,
+  Copy,
+  Send,
+  Target,
+  Users,
+  Calculator,
+  TrendingUp,
+  Paperclip,
+  Lightbulb,
+  Video,
+  HelpCircle,
+  Search,
+  Headphones,
+  BookOpen,
+  Scale,
+  FileSignature,
+  Settings,
+  LucideIcon
+} from "lucide-react"
+
+// Icon mapping function for timeline stage icons
+const getStageIcon = (iconName: string): LucideIcon => {
+  const iconMap: Record<string, LucideIcon> = {
+    'video': Video,
+    'target': Target,
+    'help-circle': HelpCircle,
+    'file-text': FileText,
+    'search': Search,
+    'headphones': Headphones,
+    'book-open': BookOpen,
+    'dollar-sign': DollarSign,
+    'mail': Mail,
+    'scale': Scale,
+    'clipboard-list': ClipboardList,
+    'file-signature': FileSignature,
+    'settings': Settings,
+    'rocket': Rocket,
+  }
+  return iconMap[iconName] || Circle
+}
 
 // Import SPRINT_OPTIONS for display purposes
 const SPRINT_OPTIONS = [
@@ -50,21 +103,23 @@ const getStatusColor = (status: TimelineEvent["status"]) => {
 }
 
 const getStatusIcon = (status: TimelineEvent["status"]) => {
+  const iconClass = "w-4 h-4"
+
   switch (status) {
     case "completed":
-      return "✅"
+      return <CheckCircle2 className={iconClass} />
     case "in_progress":
-      return "🔄"
+      return <RotateCw className={`${iconClass} animate-spin`} />
     case "action-required":
-      return "⚠️"
+      return <AlertTriangle className={iconClass} />
     case "pending":
-      return "⏳"
+      return <Circle className={iconClass} />
     case "failed":
-      return "❌"
+      return <XCircle className={iconClass} />
     case "skipped":
-      return "⏭️"
+      return <Circle className={`${iconClass} opacity-50`} />
     default:
-      return "⏳"
+      return <Circle className={iconClass} />
   }
 }
 
@@ -173,6 +228,8 @@ const ActionZone = ({
             existingFile={existingFile}
             onFileUploaded={onFileUploaded}
             onFileCleared={() => onFileCleared?.('demo-call-transcript')}
+            variant="compact"
+            variant="compact"
           />
         </div>
       )
@@ -190,6 +247,8 @@ const ActionZone = ({
             existingFile={existingFile}
             onFileUploaded={onFileUploaded}
             onFileCleared={() => onFileCleared?.('scoping-call-transcript')}
+            variant="compact"
+            variant="compact"
           />
         </div>
       )
@@ -207,6 +266,7 @@ const ActionZone = ({
             existingFile={existingFile}
             onFileUploaded={onFileUploaded}
             onFileCleared={() => onFileCleared?.('developer-audio-overview')}
+            variant="compact"
           />
         </div>
       )
@@ -320,9 +380,11 @@ const ActionZone = ({
             />
 
             {/* Developer Note */}
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs text-blue-800 font-medium mb-2">💡 Developer Note:</p>
-              <p className="text-xs text-blue-700 leading-relaxed">
+            <div className="mt-4 p-3 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-lg">
+              <p className="text-xs font-medium mb-2 flex items-center gap-1.5" style={{fontFamily: 'var(--font-heading)', color: '#407B9D'}}>
+                <Lightbulb className="w-4 h-4" /> Developer Note:
+              </p>
+              <p className="text-xs text-gray-700 leading-relaxed">
                 Pass this description to a custom GPT to identify any gaps or missing edge cases that should be included.
                 Then use the updated description with Claude Desktop and the n8n MCP to get a starting point for this automation in n8n.
               </p>
@@ -345,15 +407,15 @@ const ActionZone = ({
       }
 
       return (
-        <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+        <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">✅</span>
-              <h3 className="font-bold text-lg text-gray-800">Recap</h3>
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <h3 className="font-bold text-lg text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Recap</h3>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-600">Sprint Length:</span>
@@ -361,7 +423,7 @@ const ActionZone = ({
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-600">Total Price:</span>
-                <span className="font-medium text-green-600">${sprintPricingData.price.toLocaleString()}</span>
+                <span className="font-medium" style={{color: '#407B9D'}}>${sprintPricingData.price.toLocaleString()}</span>
               </div>
               <div className="pt-2 border-t border-gray-100">
                 <p className="text-sm text-gray-700 leading-relaxed">
@@ -376,9 +438,9 @@ const ActionZone = ({
               onClick={() => onAction('clear_sprint_pricing')}
               variant="outline"
               size="sm"
-              className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+              className="bg-white border-[#95CBD7] text-[#407B9D] hover:bg-[#95CBD7]/10 transition-all duration-200 hover:scale-105 rounded-lg shadow-sm"
             >
-              🔄 Revise Estimate
+              <RotateCw className="w-4 h-4 mr-2" />Revise Estimate
             </Button>
           </div>
         </div>
@@ -391,6 +453,7 @@ const ActionZone = ({
         <div className="mt-4">
           <SprintPricingForm
             onConfirm={onSprintPricingConfirm}
+            variant="compact"
           />
         </div>
       )
@@ -413,18 +476,18 @@ const ActionZone = ({
         "Not specified"
 
       return (
-        <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+        <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">✅</span>
-              <h3 className="font-bold text-lg text-gray-800">Recap</h3>
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <h3 className="font-bold text-lg text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Recap</h3>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-lg">📧</span>
+                <Mail className="w-5 h-5 text-gray-600" />
                 <span className="font-medium text-gray-800">Proposal email sent to client</span>
               </div>
               <div className="text-sm text-gray-600">
@@ -446,9 +509,9 @@ const ActionZone = ({
               onClick={() => onAction('reset_proposal_stage')}
               variant="outline"
               size="sm"
-              className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+              className="bg-white border-[#95CBD7] text-[#407B9D] hover:bg-[#95CBD7]/10 transition-all duration-200 hover:scale-105 rounded-lg shadow-sm"
             >
-              🔄 Reset Stage
+              <RotateCw className="w-4 h-4 mr-2" />Reset Stage
             </Button>
           </div>
         </div>
@@ -497,19 +560,20 @@ Best regards,
 The GrowthLab Team`
 
       return (
-        <div className="mt-4 p-6 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+        <div className="mt-4 p-6 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">📧</span>
-              <h3 className="font-bold text-lg text-gray-800">Proposal Email Draft Ready</h3>
+              <Mail className="w-5 h-5 text-gray-600" />
+              <h3 className="font-bold text-lg text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Proposal Email Draft Ready</h3>
             </div>
-            <p className="text-sm text-gray-600 mb-4">
-              📋 Based on your sprint estimate: {sprintDuration} for ${sprintPricingData.price.toLocaleString()}
+            <p className="text-sm text-gray-600 mb-4 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Based on your sprint estimate: {sprintDuration} for ${sprintPricingData.price.toLocaleString()}
             </p>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 shadow-sm">
+            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded-lg border">
 {proposalEmailContent}
             </pre>
           </div>
@@ -522,19 +586,29 @@ The GrowthLab Team`
                 setTimeout(() => setEmailCopied(false), 2000)
               }}
               variant="outline"
-              className={`flex-1 transition-all duration-200 ${
+              className={`flex-1 transition-all duration-200 hover:scale-105 rounded-lg shadow-md ${
                 emailCopied
-                  ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-                  : "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                  ? "bg-[#C8E4BB] border-[#C8E4BB] text-gray-800 hover:bg-[#b5d6a5]"
+                  : "bg-white border-[#95CBD7] text-[#407B9D] hover:bg-[#95CBD7]/10"
               }`}
             >
-              {emailCopied ? "✅ Email Copied!" : "📋 Copy Email"}
+              {emailCopied ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Email Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy Email
+                </>
+              )}
             </Button>
             <Button
               onClick={() => onAction('proposal_email_sent')}
-              className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0"
+              className="flex-1 bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
             >
-              ✅ Email Sent
+              <Send className="w-4 h-4 mr-2" />Email Sent
             </Button>
           </div>
 
@@ -548,7 +622,7 @@ The GrowthLab Team`
       return (
         <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">⚠️</span>
+            <AlertTriangle className="w-5 h-5 text-orange-600" />
             <h3 className="font-medium text-yellow-800">Sprint Pricing Required</h3>
           </div>
           <p className="text-sm text-yellow-700">
@@ -670,11 +744,11 @@ Best regards,
 The GrowthLab Team`
 
     return (
-      <div className="mt-4 p-6 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+      <div className="mt-4 p-6 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">📧</span>
-            <h3 className="font-bold text-lg text-gray-800">Email Draft Ready</h3>
+            <Mail className="w-5 h-5 text-gray-600" />
+            <h3 className="font-bold text-lg text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Email Draft Ready</h3>
           </div>
           <p className="text-sm text-gray-600 mb-4 flex items-center gap-2">
             <img src="/hubspot-logo.svg" alt="HubSpot" className="w-4 h-4" />
@@ -682,8 +756,8 @@ The GrowthLab Team`
           </p>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border">
+        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 shadow-sm">
+          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded-lg border">
 {emailContent}
           </pre>
         </div>
@@ -697,19 +771,29 @@ The GrowthLab Team`
               setTimeout(() => setEmailCopied(false), 2000)
             }}
             variant="outline"
-            className={`flex-1 transition-all duration-200 ${
+            className={`flex-1 transition-all duration-200 hover:scale-105 rounded-lg shadow-md ${
               emailCopied
-                ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-                : "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                ? "bg-[#C8E4BB] border-[#C8E4BB] text-gray-800 hover:bg-[#b5d6a5]"
+                : "bg-white border-[#95CBD7] text-[#407B9D] hover:bg-[#95CBD7]/10"
             }`}
           >
-            {emailCopied ? "✅ Email Copied!" : "📋 Copy Email"}
+            {emailCopied ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Email Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4 mr-2" />
+                Copy Email
+              </>
+            )}
           </Button>
           <Button
             onClick={() => onAction('email_sent')}
-            className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0"
+            className="flex-1 bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
           >
-            ✅ Email Sent
+            <Send className="w-4 h-4 mr-2" />Email Sent
           </Button>
         </div>
 
@@ -740,16 +824,16 @@ Best regards,
 The GrowthLab Team`
 
     return (
-      <div className="mt-4 p-6 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg">
+      <div className="mt-4 p-6 bg-red-50 border border-red-200 rounded-xl">
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">📧</span>
-            <h3 className="font-bold text-lg text-gray-800">Not a Fit - Email Draft Ready</h3>
+            <Mail className="w-5 h-5 text-gray-600" />
+            <h3 className="font-bold text-lg text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Not a Fit - Email Draft Ready</h3>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border">
+        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 shadow-sm">
+          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded-lg border">
 {notAFitEmailContent}
           </pre>
         </div>
@@ -763,19 +847,29 @@ The GrowthLab Team`
               setTimeout(() => setEmailCopied(false), 2000)
             }}
             variant="outline"
-            className={`flex-1 transition-all duration-200 ${
+            className={`flex-1 transition-all duration-200 hover:scale-105 rounded-lg shadow-md ${
               emailCopied
-                ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-                : "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+                ? "bg-[#C8E4BB] border-[#C8E4BB] text-gray-800 hover:bg-[#b5d6a5]"
+                : "bg-white border-red-200 text-red-600 hover:bg-red-50"
             }`}
           >
-            {emailCopied ? "✅ Email Copied!" : "📋 Copy Email"}
+            {emailCopied ? (
+              <>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Email Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4 mr-2" />
+                Copy Email
+              </>
+            )}
           </Button>
           <Button
             onClick={() => onAction('not_a_fit_email_sent')}
-            className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white border-0"
+            className="flex-1 bg-red-400 hover:bg-red-500 text-white border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
           >
-            ✅ Email Sent
+            <Send className="w-4 h-4 mr-2" />Email Sent
           </Button>
         </div>
 
@@ -808,23 +902,21 @@ The GrowthLab Team`
 
   // Proposal Decision Recap - show for completed proposal-decision stage when expanded
   if (event.type === "proposal-decision" && event.status === "completed") {
-    console.log('Proposal decision completed stage - proposalDeclined:', proposalDeclined)
-
     if (proposalDeclined) {
     return (
-      <div className="mt-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg">
+      <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">❌</span>
-            <h3 className="font-bold text-lg text-gray-800">Recap</h3>
+            <XCircle className="w-5 h-5 text-red-500" />
+            <h3 className="font-bold text-lg text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Recap</h3>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-red-200 p-4 mb-4">
+        <div className="bg-white rounded-xl border border-red-200 p-4 mb-4 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
             <img src="/hubspot-logo.svg" alt="HubSpot" className="w-6 h-6" />
             <div>
-              <h4 className="font-semibold text-gray-800">Proposal Declined</h4>
+              <h4 className="font-semibold text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Proposal Declined</h4>
               <p className="text-sm text-gray-600">Client declined the proposal - HubSpot deal automatically moved to closed lost</p>
             </div>
           </div>
@@ -840,9 +932,9 @@ The GrowthLab Team`
             onClick={() => onAction('restart_proposal_decision')}
             variant="outline"
             size="sm"
-            className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+            className="bg-white border-red-200 text-red-600 hover:bg-red-50 transition-all duration-200 hover:scale-105 rounded-lg shadow-sm"
           >
-            🔄 Restart Proposal Decision
+            <RotateCw className="w-4 h-4 mr-2" />Restart Proposal Decision
           </Button>
         </div>
       </div>
@@ -852,19 +944,19 @@ The GrowthLab Team`
     // Show recap for adjusted & accepted proposal
     if (sprintPricingData && proposalWasAdjusted) {
       return (
-        <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg">
+        <div className="mt-4 p-4 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">🔄</span>
-              <h3 className="font-bold text-lg text-gray-800">Recap</h3>
+              <RotateCw className="w-5 h-5 text-[#407B9D]" />
+              <h3 className="font-bold text-lg text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Recap</h3>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-blue-200 p-4 mb-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-2xl">💰</span>
+              <DollarSign className="w-8 h-8 text-green-600" />
               <div>
-                <h4 className="font-semibold text-gray-800">Adjusted Sprint Length & Pricing</h4>
+                <h4 className="font-semibold text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Adjusted Sprint Length & Pricing</h4>
                 <p className="text-sm text-gray-600">Client accepted the proposal but requested adjustments to the original sprint length and price</p>
               </div>
             </div>
@@ -875,7 +967,7 @@ The GrowthLab Team`
               </div>
               <div className="flex justify-between">
                 <span className="font-medium">New Price:</span>
-                <span className="font-semibold text-green-600">${sprintPricingData.price.toLocaleString()}</span>
+                <span className="font-semibold" style={{color: '#407B9D'}}>${sprintPricingData.price.toLocaleString()}</span>
               </div>
               <div className="mt-3">
                 <span className="font-medium">Adjustment Reasoning:</span>
@@ -889,9 +981,9 @@ The GrowthLab Team`
               onClick={() => onAction('restart_proposal_decision')}
               variant="outline"
               size="sm"
-              className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              className="bg-white border-[#95CBD7] text-[#407B9D] hover:bg-[#95CBD7]/10 transition-all duration-200 hover:scale-105 rounded-lg shadow-sm"
             >
-              🔄 Restart Proposal Decision
+              <RotateCw className="w-4 h-4 mr-2" />Restart Proposal Decision
             </Button>
           </div>
         </div>
@@ -901,19 +993,19 @@ The GrowthLab Team`
     // Show recap for regular accepted proposal (not adjusted)
     if (sprintPricingData && !proposalWasAdjusted) {
       return (
-        <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+        <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">✅</span>
-              <h3 className="font-bold text-lg text-gray-800">Recap</h3>
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <h3 className="font-bold text-lg text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Recap</h3>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg border border-green-200 p-4 mb-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-2xl">💰</span>
+              <DollarSign className="w-8 h-8 text-green-600" />
               <div>
-                <h4 className="font-semibold text-gray-800">Proposal Accepted</h4>
+                <h4 className="font-semibold text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Proposal Accepted</h4>
                 <p className="text-sm text-gray-600">Client accepted the proposal as originally presented</p>
               </div>
             </div>
@@ -924,7 +1016,7 @@ The GrowthLab Team`
               </div>
               <div className="flex justify-between">
                 <span className="font-medium">Agreed Price:</span>
-                <span className="font-semibold text-green-600">${sprintPricingData.price.toLocaleString()}</span>
+                <span className="font-semibold" style={{color: '#407B9D'}}>${sprintPricingData.price.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -934,9 +1026,9 @@ The GrowthLab Team`
               onClick={() => onAction('restart_proposal_decision')}
               variant="outline"
               size="sm"
-              className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+              className="bg-white border-[#95CBD7] text-[#407B9D] hover:bg-[#95CBD7]/10 transition-all duration-200 hover:scale-105 rounded-lg shadow-sm"
             >
-              🔄 Restart Proposal Decision
+              <RotateCw className="w-4 h-4 mr-2" />Restart Proposal Decision
             </Button>
           </div>
         </div>
@@ -948,32 +1040,32 @@ The GrowthLab Team`
   if (event.type === "ea" && !eaConfirmed) {
     return (
       <div className="mt-4 space-y-4">
-        <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+        <div className="p-4 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
           <div className="space-y-3">
             {/* Create Contact In Anchor */}
             <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center gap-3">
-                <span className="text-xl">👤</span>
+                <User className="w-6 h-6 text-gray-600" />
                 <div>
-                  <h4 className="font-medium text-gray-800">Create Contact In Anchor</h4>
+                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create Contact In Anchor</h4>
                 </div>
               </div>
               <div className="flex items-center">
                 {anchorContactCreated ? (
                   <div className="flex items-center gap-2 text-green-600">
-                    <span className="text-lg">✅</span>
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <span className="text-sm font-medium">Complete</span>
                   </div>
                 ) : anchorContactLoading ? (
-                  <div className="flex items-center gap-2 text-blue-600">
-                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="flex items-center gap-2 text-[#407B9D]">
+                    <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
                     <span className="text-sm">Creating...</span>
                   </div>
                 ) : (
                   <Button
                     onClick={() => onAction('create_anchor_contact')}
                     size="sm"
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                   >
                     Create
                   </Button>
@@ -984,27 +1076,27 @@ The GrowthLab Team`
             {/* Create Proposal Draft In Anchor */}
             <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center gap-3">
-                <span className="text-xl">📄</span>
+                <FileText className="w-6 h-6 text-gray-600" />
                 <div>
-                  <h4 className="font-medium text-gray-800">Create Proposal Draft In Anchor</h4>
+                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create Proposal Draft In Anchor</h4>
                 </div>
               </div>
               <div className="flex items-center">
                 {anchorProposalCreated ? (
                   <div className="flex items-center gap-2 text-green-600">
-                    <span className="text-lg">✅</span>
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <span className="text-sm font-medium">Complete</span>
                   </div>
                 ) : anchorProposalLoading ? (
-                  <div className="flex items-center gap-2 text-blue-600">
-                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="flex items-center gap-2 text-[#407B9D]">
+                    <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
                     <span className="text-sm">Creating...</span>
                   </div>
                 ) : (
                   <Button
                     onClick={() => onAction('create_anchor_proposal')}
                     size="sm"
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                   >
                     Create
                   </Button>
@@ -1015,28 +1107,28 @@ The GrowthLab Team`
             {/* Generate EA Wording with AI */}
             <div className="p-3 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center gap-3 mb-3">
-                <span className="text-xl">📝</span>
+                <FileText className="w-6 h-6 text-gray-600" />
                 <div>
-                  <h4 className="font-medium text-gray-800">Project-Specific EA Wording</h4>
+                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Project-Specific EA Wording</h4>
                 </div>
               </div>
               {eaWordingGenerated ? (
-                <div className="flex items-center gap-2 text-green-600 p-2 bg-green-50 border border-green-200 rounded">
-                  <span className="text-lg">✅</span>
+                <div className="flex items-center gap-2 text-green-600 p-2 bg-[#C8E4BB]/30 border border-[#C8E4BB] rounded-lg">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
                   <span className="text-sm font-medium">EA wording generated successfully</span>
                 </div>
               ) : eaWordingGenerating ? (
-                <div className="flex items-center gap-2 text-blue-600 p-2 bg-blue-50 border border-blue-200 rounded">
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="flex items-center gap-2 text-[#407B9D] p-2 bg-[#95CBD7]/30 border border-[#95CBD7] rounded-lg">
+                  <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
                   <span className="text-sm">Generating EA wording...</span>
                 </div>
               ) : (
                 <Button
                   onClick={() => {}}
                   size="sm"
-                  className="bg-gray-900 hover:bg-gray-800 text-white flex items-center gap-2"
+                  className="bg-[#407B9D] hover:bg-[#325F7A] text-white transition-all duration-200 hover:scale-105 rounded-lg shadow-md flex items-center gap-2"
                 >
-                  <span>⚡</span>
+                  <span><Zap className="w-4 h-4" /></span>
                   Generate with AI
                 </Button>
               )}
@@ -1063,22 +1155,22 @@ The GrowthLab Team`
             {/* Confirm EA Completed */}
             <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center gap-3">
-                <span className="text-xl">✅</span>
+                <CheckCircle2 className="w-6 h-6 text-green-600" />
                 <div>
-                  <h4 className="font-medium text-gray-800">Confirm Anchor Proposal Completed and Sent</h4>
+                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Confirm Anchor Proposal Completed and Sent</h4>
                 </div>
               </div>
               <div className="flex items-center">
                 {eaConfirmed ? (
                   <div className="flex items-center gap-2 text-green-600">
-                    <span className="text-lg">✅</span>
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <span className="text-sm font-medium">Confirmed</span>
                   </div>
                 ) : (
                   <Button
                     onClick={() => onAction('confirm_ea_completed')}
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white"
+                    className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                   >
                     Confirm
                   </Button>
@@ -1095,32 +1187,32 @@ The GrowthLab Team`
   if (event.type === "setup") {
     return (
       <div className="mt-4 space-y-4">
-        <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+        <div className="p-4 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
           <div className="space-y-3">
             {/* Create ClickUp Task */}
             <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center gap-3">
-                <span className="text-xl">📋</span>
+                <ClipboardList className="w-6 h-6 text-gray-600" />
                 <div>
-                  <h4 className="font-medium text-gray-800">Create ClickUp Task</h4>
+                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create ClickUp Task</h4>
                 </div>
               </div>
               <div className="flex items-center">
                 {clickupTaskCreated ? (
                   <div className="flex items-center gap-2 text-green-600">
-                    <span className="text-lg">✅</span>
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <span className="text-sm font-medium">Complete</span>
                   </div>
                 ) : clickupTaskLoading ? (
-                  <div className="flex items-center gap-2 text-blue-600">
-                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="flex items-center gap-2 text-[#407B9D]">
+                    <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
                     <span className="text-sm">Creating...</span>
                   </div>
                 ) : (
                   <Button
                     onClick={() => onAction('create_clickup_task')}
                     size="sm"
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                   >
                     Create
                   </Button>
@@ -1131,27 +1223,27 @@ The GrowthLab Team`
             {/* Create Airtable Inventory Record */}
             <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center gap-3">
-                <span className="text-xl">📊</span>
+                <BarChart3 className="w-6 h-6 text-gray-600" />
                 <div>
-                  <h4 className="font-medium text-gray-800">Create Airtable Inventory Record</h4>
+                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create Airtable Inventory Record</h4>
                 </div>
               </div>
               <div className="flex items-center">
                 {airtableRecordCreated ? (
                   <div className="flex items-center gap-2 text-green-600">
-                    <span className="text-lg">✅</span>
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <span className="text-sm font-medium">Complete</span>
                   </div>
                 ) : airtableRecordLoading ? (
-                  <div className="flex items-center gap-2 text-blue-600">
-                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="flex items-center gap-2 text-[#407B9D]">
+                    <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
                     <span className="text-sm">Creating...</span>
                   </div>
                 ) : (
                   <Button
                     onClick={() => onAction('create_airtable_record')}
                     size="sm"
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                   >
                     Create
                   </Button>
@@ -1161,20 +1253,21 @@ The GrowthLab Team`
           </div>
 
           {/* Kickoff Email Draft */}
-          <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+          <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">📧</span>
-                  <h3 className="font-bold text-lg text-gray-800">Kickoff Email Draft Ready</h3>
+                  <Mail className="w-5 h-5 text-gray-600" />
+                  <h3 className="font-bold text-lg" style={{fontFamily: 'var(--font-heading)', color: '#407B9D'}}>Kickoff Email Draft Ready</h3>
                 </div>
-                <p className="text-sm text-gray-600 mb-4">
-                  📋 Project setup complete - time to send the kickoff email to your client
+                <p className="text-sm text-gray-600 mb-4 flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4" />
+                  Project setup complete - time to send the kickoff email to your client
                 </p>
               </div>
 
               <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
                 <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border">
-{`Subject: 🚀 Project Kickoff - Let's Get Started!
+{`Subject: Project Kickoff - Let's Get Started!
 
 Hi there!
 
@@ -1208,19 +1301,29 @@ The GrowthLab Team`}
                 <Button
                   onClick={() => onAction('copy_setup_email')}
                   variant="outline"
-                  className={`flex-1 transition-all duration-200 ${
+                  className={`flex-1 transition-all duration-200 hover:scale-105 rounded-lg shadow-md ${
                     setupEmailCopied
-                      ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-                      : "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                      ? "bg-[#C8E4BB]/30 border-[#C8E4BB] text-gray-800 hover:bg-[#C8E4BB]/50"
+                      : "bg-[#95CBD7]/30 border-[#95CBD7] text-gray-800 hover:bg-[#95CBD7]/50"
                   }`}
                 >
-                  {setupEmailCopied ? "✅ Email Copied!" : "📋 Copy Email"}
+                  {setupEmailCopied ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Email Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy Email
+                    </>
+                  )}
                 </Button>
                 <Button
                   onClick={() => onAction('setup_email_sent')}
-                  className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0"
+                  className="flex-1 bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                 >
-                  ✅ Email Sent
+                  <Send className="w-4 h-4 mr-2" />Email Sent
                 </Button>
               </div>
 
@@ -1243,20 +1346,20 @@ The GrowthLab Team`}
     }
 
     return (
-      <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+      <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">✅</span>
-            <h3 className="font-bold text-lg text-gray-800">Recap</h3>
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
+            <h3 className="font-bold text-lg text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Recap</h3>
           </div>
         </div>
 
         {decisionMade === 'reject' ? (
-          <div className="bg-white rounded-lg border border-orange-200 p-4 mb-4">
+          <div className="bg-white rounded-xl border border-red-200 p-4 mb-4 shadow-sm">
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-2xl">❌</span>
+              <XCircle className="w-8 h-8 text-red-500" />
               <div>
-                <h4 className="font-semibold text-gray-800">Not a Fit</h4>
+                <h4 className="font-semibold text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Not a Fit</h4>
                 <p className="text-sm text-gray-600">Lead was marked as not suitable for our automation services</p>
               </div>
             </div>
@@ -1266,11 +1369,11 @@ The GrowthLab Team`}
             </div>
           </div>
         ) : decisionMade?.startsWith('proceed_') ? (
-          <div className="bg-white rounded-lg border border-blue-200 p-4 mb-4">
+          <div className="bg-white rounded-xl border border-[#407B9D]/30 p-4 mb-4 shadow-sm">
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-2xl">✅</span>
+              <CheckCircle2 className="w-8 h-8 text-green-600" />
               <div>
-                <h4 className="font-semibold text-gray-800">Proceeding with Scoping</h4>
+                <h4 className="font-semibold" style={{fontFamily: 'var(--font-heading)', color: '#407B9D'}}>Proceeding with Scoping</h4>
                 <p className="text-sm text-gray-600">Lead was approved and developer assigned</p>
               </div>
             </div>
@@ -1281,8 +1384,8 @@ The GrowthLab Team`}
               return developer ? (
                 <div className="text-sm text-gray-700">
                   <p className="mb-2"><strong>Assigned Developer:</strong></p>
-                  <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                    <p className="font-medium text-blue-800">{developer.name}</p>
+                  <div className="bg-[#95CBD7]/20 p-3 rounded-lg border border-[#95CBD7]">
+                    <p className="font-medium" style={{color: '#407B9D'}}>{developer.name}</p>
                   </div>
                   <div className="mt-3">
                     <p>Email sent to schedule scoping call</p>
@@ -1298,9 +1401,9 @@ The GrowthLab Team`}
             onClick={() => onAction('restart_decision')}
             variant="outline"
             size="sm"
-            className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+            className="bg-white border-[#95CBD7] text-[#407B9D] hover:bg-[#95CBD7]/10 transition-all duration-200 hover:scale-105 rounded-lg shadow-sm"
           >
-            🔄 Restart Decision Stage
+            <RotateCw className="w-4 h-4 mr-2" />Restart Decision Stage
           </Button>
         </div>
       </div>
@@ -1341,9 +1444,10 @@ The GrowthLab Team`}
 
       {/* Decision Options - Handle both scoping decision and proposal decision */}
       {event.actions.decision && !showDeveloperSelection && !showNotAFitEmail && (
-        <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
-          <p className="text-sm font-semibold text-gray-700 mb-4 text-center">
-            {event.type === "proposal-decision" ? "📋 What's the client's response?" : "📋 Ready to make a decision?"}
+        <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
+          <p className="text-sm font-semibold text-gray-700 mb-4 text-center flex items-center justify-center gap-2" style={{fontFamily: 'var(--font-heading)'}}>
+            <ClipboardList className="w-4 h-4" />
+            {event.type === "proposal-decision" ? "What's the client's response?" : "Ready to make a decision?"}
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             {event.actions.decision.options.map((option, index) => (
@@ -1353,13 +1457,13 @@ The GrowthLab Team`}
                         option.variant === "destructive" ? "destructive" : "outline"}
                 size="default"
                 onClick={() => onAction(option.action)}
-                className={`flex-1 font-medium transition-all duration-200 hover:scale-105 shadow-md ${
+                className={`flex-1 font-medium transition-all duration-200 hover:scale-105 shadow-md rounded-lg ${
                   option.variant === "primary"
-                    ? "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0"
+                    ? "bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0"
                     : option.variant === "destructive"
-                    ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white border-0"
+                    ? "bg-red-400 hover:bg-red-500 text-white border-0"
                     : option.variant === "secondary"
-                    ? "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0"
+                    ? "bg-[#407B9D] hover:bg-[#356780] text-white border-0"
                     : "border-2 hover:bg-gray-50"
                 }`}
               >
@@ -1374,9 +1478,10 @@ The GrowthLab Team`}
 
       {/* Developer Selection */}
       {event.actions.decision && showDeveloperSelection && (
-        <div className="mt-4 p-6 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
-          <p className="text-lg font-bold text-gray-800 mb-2 text-center">
-            🎯 Choose Your Scoping Champion!
+        <div className="mt-4 p-6 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
+          <p className="text-lg font-bold text-gray-800 mb-2 text-center flex items-center justify-center gap-2" style={{fontFamily: 'var(--font-heading)'}}>
+            <Target className="w-5 h-5 text-[#407B9D]" />
+            Choose Your Scoping Champion!
           </p>
           <p className="text-sm text-gray-600 mb-6 text-center">
             Who would you like to handle this scoping call?
@@ -1384,45 +1489,47 @@ The GrowthLab Team`}
 
           <div className="grid sm:grid-cols-2 gap-4">
             {/* Nick Option */}
-            <div className="bg-white rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-all duration-200 hover:shadow-lg">
+            <div className="bg-white rounded-xl border-2 border-[#407B9D]/30 hover:border-[#407B9D] transition-all duration-200 hover:shadow-lg hover:scale-[1.02]">
               <div className="p-4 text-center">
-                <div className="text-4xl mb-3">🚀</div>
-                <h3 className="font-bold text-lg text-blue-800 mb-2">Nick</h3>
+                <div className="flex justify-center mb-3"><Rocket className="w-16 h-16 text-[#407B9D]" /></div>
+                <h3 className="font-bold text-lg mb-2" style={{fontFamily: 'var(--font-heading)', color: '#407B9D'}}>Nick</h3>
                 <p className="text-sm text-gray-600 mb-2">The Growth Architect</p>
-                <p className="text-xs text-gray-500 mb-1 font-medium">Marketing & Growth Systems</p>
-                <p className="text-xs text-gray-500 mb-4 text-left">
-                  🚀 Onboarding & client experience<br/>
-                  📧 Marketing automation<br/>
-                  🎯 CRM & sales workflows<br/>
-                  👥 Customer journey optimization
-                </p>
+                <p className="text-xs text-gray-500 mb-3 font-medium">Marketing & Growth Systems</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 mb-5 text-left px-8">
+                  <span className="flex items-start gap-1.5 text-xs text-gray-500 leading-relaxed"><Rocket className="w-3 h-3 flex-shrink-0 mt-0.5" /> Onboarding & client experience</span>
+                  <span className="flex items-start gap-1.5 text-xs text-gray-500 leading-relaxed"><Mail className="w-3 h-3 flex-shrink-0 mt-0.5" /> Marketing automation</span>
+                  <span className="flex items-start gap-1.5 text-xs text-gray-500 leading-relaxed"><Target className="w-3 h-3 flex-shrink-0 mt-0.5" /> CRM & sales workflows</span>
+                  <span className="flex items-start gap-1.5 text-xs text-gray-500 leading-relaxed"><Users className="w-3 h-3 flex-shrink-0 mt-0.5" /> Customer journey optimization</span>
+                </div>
                 <Button
                   onClick={() => onAction('select_developer_nick')}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0 transition-all duration-200 hover:scale-105"
+                  className="w-full bg-[#407B9D] hover:bg-[#356780] text-white border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                 >
-                  Choose Nick 🎯
+                  <Target className="w-4 h-4 mr-2 inline" />
+                  Choose Nick
                 </Button>
               </div>
             </div>
 
             {/* Gon Option */}
-            <div className="bg-white rounded-lg border-2 border-green-200 hover:border-green-400 transition-all duration-200 hover:shadow-lg">
+            <div className="bg-white rounded-xl border-2 border-[#C8E4BB]/50 hover:border-[#C8E4BB] transition-all duration-200 hover:shadow-lg hover:scale-[1.02]">
               <div className="p-4 text-center">
-                <div className="text-4xl mb-3">🥷</div>
-                <h3 className="font-bold text-lg text-green-800 mb-2">Gon</h3>
+                <div className="flex justify-center mb-3"><User className="w-16 h-16 text-gray-700" /></div>
+                <h3 className="font-bold text-lg mb-2" style={{fontFamily: 'var(--font-heading)', color: '#407B9D'}}>Gon</h3>
                 <p className="text-sm text-gray-600 mb-2">The Numbers Ninja</p>
-                <p className="text-xs text-gray-500 mb-1 font-medium">Finance & Operations Systems</p>
-                <p className="text-xs text-gray-500 mb-4 text-left">
-                  💰 Accounting integrations<br/>
-                  📊 Financial reporting<br/>
-                  🧮 Invoice & payment automation<br/>
-                  📈 Revenue operations
-                </p>
+                <p className="text-xs text-gray-500 mb-3 font-medium">Finance & Operations Systems</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 mb-5 text-left px-8">
+                  <span className="flex items-start gap-1.5 text-xs text-gray-500 leading-relaxed"><DollarSign className="w-3 h-3 flex-shrink-0 mt-0.5" /> Accounting integrations</span>
+                  <span className="flex items-start gap-1.5 text-xs text-gray-500 leading-relaxed"><BarChart3 className="w-3 h-3 flex-shrink-0 mt-0.5" /> Financial reporting</span>
+                  <span className="flex items-start gap-1.5 text-xs text-gray-500 leading-relaxed"><Calculator className="w-3 h-3 flex-shrink-0 mt-0.5" /> Invoice & payment automation</span>
+                  <span className="flex items-start gap-1.5 text-xs text-gray-500 leading-relaxed"><TrendingUp className="w-3 h-3 flex-shrink-0 mt-0.5" /> Revenue operations</span>
+                </div>
                 <Button
                   onClick={() => onAction('select_developer_gon')}
-                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0 transition-all duration-200 hover:scale-105"
+                  className="w-full bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                 >
-                  Choose Gon 💰
+                  <DollarSign className="w-4 h-4 mr-2 inline" />
+                  Choose Gon
                 </Button>
               </div>
             </div>
@@ -1453,21 +1560,21 @@ const ArtifactsSection = ({ event }: { event: TimelineEvent }) => {
 
   return (
     <div className="mt-3">
-      <p className="text-sm font-medium text-foreground mb-2">📁 Artifacts:</p>
+      <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-1"><FileText className="w-4 h-4" /> Artifacts:</p>
       <div className="space-y-1">
         {event.artifacts.map((artifact, idx) => (
           <div key={idx} className="flex items-center space-x-2 text-sm">
             {artifact.type === "score" ? (
               <div className="flex items-center space-x-2">
-                <span className="text-lg">📊</span>
+                <BarChart3 className="w-5 h-5 text-gray-600" />
                 <span className="font-medium text-blue-600">{artifact.name}</span>
               </div>
             ) : (
               <Button variant="ghost" size="sm" className="h-auto p-1 justify-start">
                 <span className="mr-1">
-                  {artifact.type === "pdf" ? "📄" :
-                   artifact.type === "audio" ? "🎵" :
-                   artifact.type === "document" ? "📝" : "📎"}
+                  {artifact.type === "pdf" ? <FileText className="w-4 h-4 inline" /> :
+                   artifact.type === "audio" ? <Zap className="w-4 h-4 inline" /> :
+                   artifact.type === "document" ? <FileText className="w-4 h-4 inline" /> : <Paperclip className="w-4 h-4 inline" />}
                 </span>
                 {artifact.name}
               </Button>
@@ -1578,7 +1685,10 @@ const StageCard = ({
           "border-gray-300 bg-gray-50",
           isActive && "animate-pulse"
         )}>
-          <span className="text-lg">{event.icon}</span>
+          {(() => {
+            const StageIcon = getStageIcon(event.icon)
+            return <StageIcon className="w-6 h-6" />
+          })()}
         </div>
 
         {/* Main Content */}
@@ -1606,7 +1716,7 @@ const StageCard = ({
                     ? "bg-[#C8E4BB]/20 text-[#5A8A4A] border-[#C8E4BB]/40"
                     : "bg-[#407B9D]/10 text-[#407B9D] border-[#407B9D]/30"
                 )}>
-                  {event.automationLevel === "fully-automated" ? "⚡ Automated" : "👤 Manual"}
+                  {event.automationLevel === "fully-automated" ? <><Zap className="w-4 h-4 inline mr-1" /> Automated</> : <><User className="w-4 h-4 inline mr-1" /> Manual</>}
                 </span>
                 <Button
                   variant="ghost"
@@ -1621,7 +1731,7 @@ const StageCard = ({
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
                 getStatusColor(event.status)
               )}>
-                {getStatusIcon(event.status)} {event.status.replace(/[-_]/g, " ")}
+                {getStatusIcon(event.status)} {event.status.replace(/[-_]/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())}
               </span>
             </div>
 
@@ -1699,62 +1809,62 @@ const StageCard = ({
 
                 {/* EA Recap - show for completed EA stage when expanded */}
                 {event.type === "ea" && event.status === "completed" && !event.isCollapsed && eaConfirmed && (
-                  <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+                  <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
                     <div className="mb-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">✅</span>
-                        <h3 className="font-bold text-lg text-gray-800">Recap</h3>
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        <h3 className="font-bold text-lg" style={{fontFamily: 'var(--font-heading)', color: '#407B9D'}}>Recap</h3>
                       </div>
                     </div>
 
                     <div className="space-y-3">
                       {/* Contact Creation Status */}
-                      <div className="flex items-center justify-between p-3 bg-white/60 border border-purple-100 rounded-lg">
+                      <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <span className="text-lg">👤</span>
+                          <User className="w-5 h-5 text-gray-600" />
                           <span className="font-medium text-gray-700">Contact Created in Anchor</span>
                         </div>
                         {anchorContactCreated ? (
                           <div className="flex items-center gap-2 text-green-600">
-                            <span className="text-lg">✅</span>
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
                             <span className="text-sm font-medium">Complete</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 text-gray-500">
-                            <span className="text-lg">⭕</span>
+                            <Circle className="w-5 h-5 text-gray-400" />
                             <span className="text-sm font-medium">Not Created</span>
                           </div>
                         )}
                       </div>
 
                       {/* Proposal Draft Status */}
-                      <div className="flex items-center justify-between p-3 bg-white/60 border border-purple-100 rounded-lg">
+                      <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <span className="text-lg">📄</span>
+                          <FileText className="w-5 h-5 text-gray-600" />
                           <span className="font-medium text-gray-700">Proposal Draft Created in Anchor</span>
                         </div>
                         {anchorProposalCreated ? (
                           <div className="flex items-center gap-2 text-green-600">
-                            <span className="text-lg">✅</span>
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
                             <span className="text-sm font-medium">Complete</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 text-gray-500">
-                            <span className="text-lg">⭕</span>
+                            <Circle className="w-5 h-5 text-gray-400" />
                             <span className="text-sm font-medium">Not Created</span>
                           </div>
                         )}
                       </div>
 
                       {/* EA Wording Status */}
-                      <div className="p-3 bg-white/60 border border-purple-100 rounded-lg">
+                      <div className="p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
                         <div className="flex items-center gap-3 mb-3">
-                          <span className="text-lg">📝</span>
+                          <FileText className="w-5 h-5 text-gray-600" />
                           <span className="font-medium text-gray-700">Project-Specific EA Wording</span>
                         </div>
                         {eaWordingGenerated ? (
                           <div className="flex items-center gap-2 text-green-600 text-sm">
-                            <span>✅</span>
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
                             <span>Generated with AI</span>
                           </div>
                         ) : (
@@ -1773,7 +1883,7 @@ const StageCard = ({
                               }
                               return (
                                 <div className="flex items-center gap-2 text-red-500 text-sm">
-                                  <span>⚠️</span>
+                                  <AlertTriangle className="w-4 h-4 text-orange-600" />
                                   <span>File type not found</span>
                                 </div>
                               )
@@ -1783,13 +1893,13 @@ const StageCard = ({
                       </div>
 
                       {/* Confirmation Status */}
-                      <div className="flex items-center justify-between p-3 bg-white/60 border border-purple-100 rounded-lg">
+                      <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <span className="text-lg">✅</span>
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
                           <span className="font-medium text-gray-700">EA Completed and Sent to Customer</span>
                         </div>
                         <div className="flex items-center gap-2 text-green-600">
-                          <span className="text-lg">✅</span>
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
                           <span className="text-sm font-medium">Confirmed</span>
                         </div>
                       </div>
@@ -1800,9 +1910,9 @@ const StageCard = ({
                         onClick={() => onAction(event.id, 'reset_ea_stage')}
                         variant="outline"
                         size="sm"
-                        className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+                        className="bg-white border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D]/10 hover:scale-105 transition-all duration-200"
                       >
-                        🔄 Reset Stage
+                        <RotateCw className="w-4 h-4 mr-2" />Reset Stage
                       </Button>
                     </div>
 
@@ -1811,61 +1921,61 @@ const StageCard = ({
 
                 {/* Project Setup Recap - show for completed setup stage when expanded */}
                 {event.type === "setup" && event.status === "completed" && !event.isCollapsed && setupEmailSent && (
-                  <div className="mt-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+                  <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
                     <div className="mb-4">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">✅</span>
-                        <h3 className="font-bold text-lg text-gray-800">Recap</h3>
+                        <CheckCircle2 className="w-5 h-5 text-green-600" />
+                        <h3 className="font-bold text-lg" style={{fontFamily: 'var(--font-heading)', color: '#407B9D'}}>Recap</h3>
                       </div>
                     </div>
 
                     <div className="space-y-3">
                       {/* ClickUp Task Status */}
-                      <div className="flex items-center justify-between p-3 bg-white/60 border border-green-100 rounded-lg">
+                      <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <span className="text-lg">📋</span>
+                          <ClipboardList className="w-5 h-5 text-gray-600" />
                           <span className="font-medium text-gray-700">ClickUp Task Created</span>
                         </div>
                         {clickupTaskCreated ? (
                           <div className="flex items-center gap-2 text-green-600">
-                            <span className="text-lg">✅</span>
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
                             <span className="text-sm font-medium">Complete</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 text-gray-500">
-                            <span className="text-lg">⭕</span>
+                            <Circle className="w-5 h-5 text-gray-400" />
                             <span className="text-sm font-medium">Not Created</span>
                           </div>
                         )}
                       </div>
 
                       {/* Airtable Record Status */}
-                      <div className="flex items-center justify-between p-3 bg-white/60 border border-green-100 rounded-lg">
+                      <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <span className="text-lg">📊</span>
+                          <BarChart3 className="w-5 h-5 text-gray-600" />
                           <span className="font-medium text-gray-700">Airtable Inventory Record Created</span>
                         </div>
                         {airtableRecordCreated ? (
                           <div className="flex items-center gap-2 text-green-600">
-                            <span className="text-lg">✅</span>
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
                             <span className="text-sm font-medium">Complete</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 text-gray-500">
-                            <span className="text-lg">⭕</span>
+                            <Circle className="w-5 h-5 text-gray-400" />
                             <span className="text-sm font-medium">Not Created</span>
                           </div>
                         )}
                       </div>
 
                       {/* Kickoff Email Status */}
-                      <div className="flex items-center justify-between p-3 bg-white/60 border border-green-100 rounded-lg">
+                      <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <span className="text-lg">📧</span>
+                          <Mail className="w-5 h-5 text-gray-600" />
                           <span className="font-medium text-gray-700">Kickoff Email Sent to Client</span>
                         </div>
                         <div className="flex items-center gap-2 text-green-600">
-                          <span className="text-lg">✅</span>
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
                           <span className="text-sm font-medium">Sent</span>
                         </div>
                       </div>
@@ -1876,9 +1986,9 @@ const StageCard = ({
                         onClick={() => onAction('setup', 'reset_setup_stage')}
                         variant="outline"
                         size="sm"
-                        className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+                        className="bg-white border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D]/10 hover:scale-105 transition-all duration-200"
                       >
-                        🔄 Reset Stage
+                        <RotateCw className="w-4 h-4 mr-2" />Reset Stage
                       </Button>
                     </div>
                   </div>
@@ -2212,8 +2322,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       setCompletedStages(prev => new Set(prev).add('proposal-decision'))
 
       if (action === 'accept') {
-        console.log('Proposal accepted - proceeding to Internal & Client Scoping Document')
-        // Advance to Internal & Client Scoping Document
+        console.log('Proposal accepted - proceeding to Scoping Document')
+        // Advance to Scoping Document
         setCollapsedItems(prev => {
           const newSet = new Set(prev)
           newSet.add('proposal-decision') // Collapse proposal-decision stage
@@ -2322,8 +2432,6 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
     // Handle reset proposal stage
     if (eventId === 'proposal' && action === 'reset_proposal_stage') {
-      console.log('Resetting proposal stage')
-
       // Reset proposal stage to pending
       setCompletedStages(prev => {
         const newSet = new Set(prev)
@@ -2331,12 +2439,13 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         return newSet
       })
 
-      // Expand the proposal stage and reset any related state
+      // Expand the proposal stage
       setCollapsedItems(prev => {
         const newSet = new Set(prev)
         newSet.delete('proposal')
         return newSet
       })
+
       return
     }
 
@@ -2492,9 +2601,9 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       })
     }
 
-    // If Internal & Client Scoping Document is uploaded, mark internal-client-docs stage as completed
+    // If Scoping Document is uploaded, mark internal-client-docs stage as completed
     if (file.fileTypeId === 'internal-client-documentation') {
-      console.log('Internal & Client Scoping Document uploaded - marking stage as completed')
+      console.log('Scoping Document uploaded - marking stage as completed')
 
       // Mark internal-client-docs stage as completed
       setCompletedStages(prev => new Set(prev).add('internal-client-docs'))
@@ -2615,7 +2724,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         console.log('Airtable inventory record created')
       }, 3000)
     } else if (action === 'copy_setup_email') {
-      const emailContent = `Subject: 🚀 Project Kickoff - Let's Get Started!
+      const emailContent = `Subject: Project Kickoff - Let's Get Started!
 
 Hi there!
 
@@ -2820,9 +2929,9 @@ The GrowthLab Team`
       })
     }
 
-    // If Internal & Client Scoping Document is cleared, mark internal-client-docs stage as pending
+    // If Scoping Document is cleared, mark internal-client-docs stage as pending
     if (fileTypeId === 'internal-client-documentation') {
-      console.log('Internal & Client Scoping Document cleared - marking stage as pending')
+      console.log('Scoping Document cleared - marking stage as pending')
 
       // Remove internal-client-docs stage from completed stages
       setCompletedStages(prev => {
@@ -2888,7 +2997,7 @@ The GrowthLab Team`
     return {
       ...event,
       isCollapsed: collapsedItems.has(event.id),
-      status: completedStages.has(event.id) ? "completed" as const : event.status
+      status: completedStages.has(event.id) ? "completed" as const : (event.status === "completed" ? "pending" as const : event.status)
     }
   })
 
@@ -2987,13 +3096,13 @@ The GrowthLab Team`
         <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-gray-100">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#C8E4BB]/20 text-[#5A8A4A] border border-[#C8E4BB]/40">
-              ⚡ Automated
+              <Zap className="w-4 h-4" /> Automated
             </span>
             <span className="text-xs text-muted-foreground">7 stages</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30">
-              👤 Manual
+              <User className="w-4 h-4 mr-1" /> Manual
             </span>
             <span className="text-xs text-muted-foreground">7 stages</span>
           </div>

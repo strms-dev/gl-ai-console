@@ -1,10 +1,11 @@
 import { ComingSoon } from "@/components/layout/coming-soon"
+import { Megaphone } from "lucide-react"
 
 export default function MarketingPage() {
   return (
     <ComingSoon
       departmentName="Marketing"
-      departmentIcon="📢"
+      departmentIcon={Megaphone}
       description="Intelligent marketing automation and campaign optimization"
       features={[
         "Automated campaign management",

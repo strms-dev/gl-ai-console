@@ -107,7 +107,7 @@ export function ChatInterface({ title = "AI Agent Assistant", className, hideHea
                 )}
               >
                 <p className="text-sm break-words">{message.content}</p>
-                <p className="text-xs opacity-70 mt-1">
+                <p className="text-xs opacity-70 mt-1" suppressHydrationWarning>
                   {message.timestamp.toLocaleTimeString()}
                 </p>
               </div>
@@ -192,7 +192,7 @@ export function ChatInterface({ title = "AI Agent Assistant", className, hideHea
                 )}
               >
                 <p className="text-sm break-words">{message.content}</p>
-                <p className="text-xs opacity-70 mt-1">
+                <p className="text-xs opacity-70 mt-1" suppressHydrationWarning>
                   {message.timestamp.toLocaleTimeString()}
                 </p>
               </div>

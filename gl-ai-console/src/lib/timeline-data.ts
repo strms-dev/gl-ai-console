@@ -1,3 +1,5 @@
+import { LucideIcon } from 'lucide-react'
+
 export interface TimelineEvent {
   id: string
   type: "demo" | "readiness" | "decision" | "scoping" | "scoping-prep" | "dev-overview" | "workflow-docs" | "sprint-pricing" | "proposal" | "proposal-decision" | "internal-client-docs" | "ea" | "setup" | "kickoff"
@@ -5,7 +7,7 @@ export interface TimelineEvent {
   description: string
   timestamp: string
   status: "pending" | "in_progress" | "action-required" | "completed" | "failed" | "skipped"
-  icon: string
+  icon: string // Icon name string for mapping
   automationLevel: "fully-automated" | "manual-intervention"
   artifacts?: {
     name: string
@@ -63,43 +65,43 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       id: "demo",
       type: "demo",
       title: "Demo Call",
-      description: "⚡ This stage runs automatically. Demo call transcript is usually uploaded automatically via automation. When uploaded, it will automatically populate the project name (which can be edited afterwards). If not received automatically, manually upload to complete this stage.\n\n📋 Note for existing customers: This can be the meeting transcript where the new project was discussed at a high level, or a brief document prepared by the developer outlining the new project. For new customers, this is the formal demo call transcript.",
+      description: "Demo call transcript is usually uploaded automatically via automation. When uploaded, it will automatically populate the project name (which can be edited afterwards). If not received automatically, manually upload to complete this stage.\n\nNote for existing customers: This can be the meeting transcript where the new project was discussed at a high level, or a brief document prepared by the developer outlining the new project. For new customers, this is the formal demo call transcript.",
       timestamp: "",
       status: "pending",
-      icon: "🎥",
+      icon: "video",
       automationLevel: "fully-automated",
       actions: {
-        manual: { label: "📄 Upload Demo Transcript" }
+        manual: { label: "Upload Demo Transcript" }
       }
     },
     {
       id: "readiness",
       type: "readiness",
       title: "Readiness Assessment",
-      description: "⚡ This stage runs automatically. The readiness assessment should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
+      description: "The readiness assessment should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
       timestamp: "",
       status: "pending",
-      icon: "🎯",
+      icon: "target",
       automationLevel: "fully-automated",
       actions: {
-        automated: { label: "⚡ Generate with AI" },
-        manual: { label: "📊 Upload Manually" }
+        automated: { label: "Generate with AI" },
+        manual: { label: "Upload Manually" }
       }
     },
     {
       id: "decision",
       type: "decision",
       title: "Scoping Decision Point",
-      description: "👤 This stage requires your action. Based on readiness assessment, decide whether to proceed with scoping",
+      description: "Based on readiness assessment, decide whether to proceed with scoping",
       timestamp: "",
       status: "pending",
-      icon: "🤔",
+      icon: "help-circle",
       automationLevel: "manual-intervention",
       actions: {
         decision: {
           options: [
-            { label: "✅ Schedule Scoping", action: "proceed", variant: "primary" },
-            { label: "❌ Not a Fit", action: "reject", variant: "destructive" }
+            { label: "Schedule Scoping", action: "proceed", variant: "primary" },
+            { label: "Not a Fit", action: "reject", variant: "destructive" }
           ]
         }
       }
@@ -107,83 +109,83 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
     {
       id: "scoping-prep",
       type: "scoping-prep",
-      title: "Scoping Prep",
-      description: "⚡ This stage runs automatically. The scoping prep document should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
+      title: "Scoping Call Prep",
+      description: "The scoping call prep document should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
       timestamp: "",
       status: "pending",
-      icon: "📄",
+      icon: "file-text",
       automationLevel: "fully-automated",
       actions: {
-        automated: { label: "⚡ Generate with AI" },
-        manual: { label: "📝 Create Manually" }
+        automated: { label: "Generate with AI" },
+        manual: { label: "Create Manually" }
       }
     },
     {
       id: "scoping",
       type: "scoping",
       title: "Scoping Call",
-      description: "⚡ This stage runs automatically. Scoping call transcript is usually uploaded automatically via automation. If not received automatically, manually upload to complete this stage.\n\n📋 Note for existing customers: This should be a transcript of a detailed technical meeting between the existing customer and developer to discuss the new project in depth, including mappings, edge cases, error handling, and technical specifications. For new customers, this is the formal scoping call transcript.",
+      description: "Scoping call transcript is usually uploaded automatically via automation. If not received automatically, manually upload to complete this stage.\n\nNote for existing customers: This should be a transcript of a detailed technical meeting between the existing customer and developer to discuss the new project in depth, including mappings, edge cases, error handling, and technical specifications. For new customers, this is the formal scoping call transcript.",
       timestamp: "",
       status: "pending",
-      icon: "🔍",
+      icon: "search",
       automationLevel: "fully-automated",
       actions: {
-        manual: { label: "📄 Upload Scoping Transcript" }
+        manual: { label: "Upload Scoping Transcript" }
       }
     },
     {
       id: "dev-overview",
       type: "dev-overview",
       title: "Developer Overview",
-      description: "👤 This stage requires your action. Developer creates detailed overview of the lead's automation (audio recording or written document) and uploads it manually",
+      description: "Developer creates detailed overview of the lead's automation (audio recording or written document) and uploads it manually",
       timestamp: "",
       status: "pending",
-      icon: "🎧",
+      icon: "headphones",
       automationLevel: "manual-intervention",
       actions: {
-        manual: { label: "📄 Upload Developer Overview (Audio or Document)" }
+        manual: { label: "Upload Developer Overview (Audio or Document)" }
       }
     },
     {
       id: "workflow-docs",
       type: "workflow-docs",
       title: "N8N Workflow Description",
-      description: "⚡ This stage runs automatically. The n8n workflow description should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
+      description: "The n8n workflow description should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
       timestamp: "",
       status: "pending",
-      icon: "📚",
+      icon: "book-open",
       automationLevel: "fully-automated",
       actions: {
-        automated: { label: "⚡ Generate with AI" },
-        manual: { label: "📝 Upload Manually" }
+        automated: { label: "Generate with AI" },
+        manual: { label: "Upload Manually" }
       }
     },
     {
       id: "sprint-pricing",
       type: "sprint-pricing",
       title: "Review Sprint Length & Price Estimate",
-      description: "👤 This stage requires your action. Review and finalize sprint planning and pricing estimates for the project",
+      description: "Review and finalize sprint planning and pricing estimates for the project",
       timestamp: "",
       status: "pending",
-      icon: "💰",
+      icon: "dollar-sign",
       automationLevel: "manual-intervention",
       actions: {
-        automated: { label: "⚡ Generate with AI" },
-        manual: { label: "📝 Upload Manually" }
+        automated: { label: "Generate with AI" },
+        manual: { label: "Upload Manually" }
       }
     },
     {
       id: "proposal",
       type: "proposal",
       title: "Generate & Send Proposal Email",
-      description: "👤 This stage requires your action. Generate comprehensive proposal email based on scoping results and send to client",
+      description: "Generate comprehensive proposal email based on scoping results and send to client",
       timestamp: "",
       status: "pending",
-      icon: "📧",
+      icon: "mail",
       automationLevel: "manual-intervention",
       actions: {
-        automated: { label: "⚡ Auto-generate Proposal" },
-        manual: { label: "📄 Create Manually" }
+        automated: { label: "Auto-generate Proposal" },
+        manual: { label: "Create Manually" }
       }
     },
     {
@@ -193,13 +195,13 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       description: "Client's response to the proposal - track acceptance, decline, or adjustments",
       timestamp: "",
       status: "pending",
-      icon: "⚖️",
+      icon: "scale",
       actions: {
         decision: {
           options: [
-            { label: "✅ Accepted Proposal", action: "accept", variant: "primary" },
-            { label: "❌ Declined Proposal", action: "decline", variant: "destructive" },
-            { label: "🔄 Adjusted & Accepted Proposal", action: "adjust", variant: "secondary" }
+            { label: "Accepted Proposal", action: "accept", variant: "primary" },
+            { label: "Declined Proposal", action: "decline", variant: "destructive" },
+            { label: "Adjusted & Accepted Proposal", action: "adjust", variant: "secondary" }
           ]
         }
       }
@@ -207,57 +209,57 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
     {
       id: "internal-client-docs",
       type: "internal-client-docs",
-      title: "Internal & Client Scoping Document",
-      description: "⚡ This stage runs automatically. The internal & client scoping document should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually.\n\n📋 Note for existing customers: This AI-generated document can be added to the existing customer's scoping documentation or kept as a separate project-specific document, based on customer preference.",
+      title: "Scoping Document",
+      description: "The scoping document should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually.\n\nNote for existing customers: This AI-generated document can be added to the existing customer's scoping documentation or kept as a separate project-specific document, based on customer preference.",
       timestamp: "",
       status: "pending",
-      icon: "📋",
+      icon: "clipboard-list",
       automationLevel: "fully-automated",
       actions: {
-        automated: { label: "⚡ Generate with AI" },
-        manual: { label: "📝 Upload Manually" }
+        automated: { label: "Generate with AI" },
+        manual: { label: "Upload Manually" }
       }
     },
     {
       id: "ea",
       type: "ea",
       title: "Engagement Agreement",
-      description: "👤 This stage requires your action. The contact and proposal draft, as well as the project specific EA wording should automatically be completed and attached, then you just must make the final touches in the Anchor proposal and send to the client, then click the confirm completed button. If any of those items are not done automatically you have the option to trigger the creation of the contact and proposal draft in Anchor and can also manually trigger the generation of the project specific EA wording or can manually upload your own file.\n\n📋 Note for existing customers: The project-specific wording can be added to the existing engagement agreement's custom wording section rather than creating a separate agreement.",
+      description: "The contact and proposal draft, as well as the project specific EA wording should automatically be completed and attached, then you just must make the final touches in the Anchor proposal and send to the client, then click the confirm completed button. If any of those items are not done automatically you have the option to trigger the creation of the contact and proposal draft in Anchor and can also manually trigger the generation of the project specific EA wording or can manually upload your own file.\n\nNote for existing customers: The project-specific wording can be added to the existing engagement agreement's custom wording section rather than creating a separate agreement.",
       timestamp: "",
       status: "pending",
-      icon: "📝",
+      icon: "file-signature",
       automationLevel: "manual-intervention",
       actions: {
-        automated: { label: "⚡ Auto-generate EA" },
-        manual: { label: "✍️ Create Manually" }
+        automated: { label: "Auto-generate EA" },
+        manual: { label: "Create Manually" }
       }
     },
     {
       id: "setup",
       type: "setup",
       title: "Project Setup",
-      description: "👤 This stage requires your action. The ClickUp task and Airtable inventory record should automatically be created, then you just must use the kickoff email draft to send an email to the lead and then click email sent to complete this stage. You can also trigger the creation of the ClickUp task and Airtable inventory record if needed.",
+      description: "The ClickUp task and Airtable inventory record should automatically be created, then you just must use the kickoff email draft to send an email to the lead and then click email sent to complete this stage. You can also trigger the creation of the ClickUp task and Airtable inventory record if needed.",
       timestamp: "",
       status: "pending",
-      icon: "⚙️",
+      icon: "settings",
       automationLevel: "manual-intervention",
       actions: {
-        automated: { label: "⚡ Create ClickUp Task" },
-        manual: { label: "📊 Create Airtable Inventory Record" }
+        automated: { label: "Create ClickUp Task" },
+        manual: { label: "Create Airtable Inventory Record" }
       }
     },
     {
       id: "kickoff",
       type: "kickoff",
       title: "Kickoff Meeting Agenda",
-      description: "⚡ This stage runs automatically. The kickoff meeting agenda should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
+      description: "The kickoff meeting agenda should be automatically generated and attached, but if not then you can click the 'Generate with AI' button to generate it, or upload the file manually",
       timestamp: "",
       status: "pending",
-      icon: "🚀",
+      icon: "rocket",
       automationLevel: "fully-automated",
       actions: {
-        automated: { label: "⚡ Generate with AI" },
-        manual: { label: "📝 Upload Manually" }
+        automated: { label: "Generate with AI" },
+        manual: { label: "Upload Manually" }
       }
     }
   ]

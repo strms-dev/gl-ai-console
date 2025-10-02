@@ -1,4 +1,5 @@
 import { ComingSoon } from "@/components/layout/coming-soon"
+import { Briefcase } from "lucide-react"
 
 interface SalesCatchAllProps {
   params: Promise<{
@@ -10,7 +11,7 @@ export default async function SalesCatchAll({ params }: SalesCatchAllProps) {
   return (
     <ComingSoon
       departmentName="Sales"
-      departmentIcon="💼"
+      departmentIcon={Briefcase}
       description="AI-driven sales automation and pipeline intelligence"
       features={[
         "Lead scoring and qualification",
