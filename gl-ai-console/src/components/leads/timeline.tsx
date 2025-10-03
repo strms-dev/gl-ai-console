@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { getFileTypeById, UploadedFile } from "@/lib/file-types"
 import { FileUpload } from "@/components/leads/file-upload"
 import { SprintPricingForm } from "@/components/leads/sprint-pricing-form"
+import { getStageData, setStageData, deleteAllStageData } from "@/lib/supabase/stage-data"
 import {
   CheckCircle2,
   XCircle,
@@ -2105,6 +2106,103 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     explanation: string
   } | null>(null)
 
+  // Load stage data from Supabase on mount
+  useEffect(() => {
+    const loadStageData = async () => {
+      try {
+        const stagesToComplete: string[] = []
+
+        // Load decision stage data
+        const decisionData = await getStageData(leadId, 'decision', 'decision_made')
+        if (decisionData) {
+          setDecisionMade(decisionData as string)
+          if (decisionData === 'reject') {
+            setLeadRejected(true)
+          }
+          // Mark decision stage as completed
+          stagesToComplete.push('decision')
+        }
+
+        // Load proposal decision stage data
+        const proposalDecisionData = await getStageData(leadId, 'proposal-decision', 'decision_made')
+        if (proposalDecisionData) {
+          if (proposalDecisionData === 'decline') {
+            setProposalDeclined(true)
+          }
+          // Mark proposal-decision stage as completed if a decision was made
+          stagesToComplete.push('proposal-decision')
+        }
+
+        const proposalAdjusted = await getStageData(leadId, 'proposal-decision', 'was_adjusted')
+        if (proposalAdjusted === true) {
+          setProposalWasAdjusted(true)
+        }
+
+        // Load EA stage data
+        const eaWordingGen = await getStageData(leadId, 'ea', 'wording_generated')
+        if (eaWordingGen === true) {
+          setEaWordingGenerated(true)
+        }
+
+        const eaConf = await getStageData(leadId, 'ea', 'confirmed')
+        if (eaConf === true) {
+          setEaConfirmed(true)
+          // Mark EA stage as completed when confirmed
+          stagesToComplete.push('ea')
+        }
+
+        const anchorContact = await getStageData(leadId, 'ea', 'anchor_contact_created')
+        if (anchorContact === true) {
+          setAnchorContactCreated(true)
+        }
+
+        const anchorProposal = await getStageData(leadId, 'ea', 'anchor_proposal_created')
+        if (anchorProposal === true) {
+          setAnchorProposalCreated(true)
+        }
+
+        // Load Setup stage data
+        const clickupTask = await getStageData(leadId, 'setup', 'clickup_task_created')
+        if (clickupTask === true) {
+          setClickupTaskCreated(true)
+        }
+
+        const airtableRecord = await getStageData(leadId, 'setup', 'airtable_record_created')
+        if (airtableRecord === true) {
+          setAirtableRecordCreated(true)
+        }
+
+        const emailSent = await getStageData(leadId, 'setup', 'setup_email_sent')
+        if (emailSent === true) {
+          setSetupEmailSent(true)
+          // Mark Setup stage as completed when email is sent
+          stagesToComplete.push('setup')
+        }
+
+        // Load Sprint Pricing data
+        const sprintData = await getStageData(leadId, 'sprint-pricing', 'pricing_data')
+        if (sprintData && typeof sprintData === 'object') {
+          setSprintPricingData(sprintData as { sprintLength: string; price: number; explanation: string })
+          // Mark sprint-pricing stage as completed when data exists
+          stagesToComplete.push('sprint-pricing')
+        }
+
+        // Update completedStages with all stages that should be marked as completed
+        if (stagesToComplete.length > 0) {
+          setCompletedStages(prev => {
+            const newSet = new Set(prev)
+            stagesToComplete.forEach(stage => newSet.add(stage))
+            return newSet
+          })
+        }
+      } catch (error) {
+        console.error("Failed to load stage data from Supabase:", error)
+      }
+    }
+
+    loadStageData()
+  }, [leadId])
+
   const completedCount = completedStages.size
   const totalCount = events.length
   const progressPercentage = (completedCount / totalCount) * 100
@@ -2174,6 +2272,12 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         newSet.delete('ea')
         return newSet
       })
+
+      // Delete all EA stage data from Supabase
+      deleteAllStageData(leadId, 'ea').catch(error => {
+        console.error("Failed to delete EA stage data from Supabase:", error)
+      })
+
       return
     }
 
@@ -2202,6 +2306,12 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         newSet.delete('setup')
         return newSet
       })
+
+      // Delete all Setup stage data from Supabase
+      deleteAllStageData(leadId, 'setup').catch(error => {
+        console.error("Failed to delete Setup stage data from Supabase:", error)
+      })
+
       return
     }
 
@@ -2224,8 +2334,14 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     // Handle email sent
     if (action === 'email_sent' && eventId === 'decision') {
       setShowEmailDraft(false)
-      setDecisionMade(`proceed_${selectedDeveloper}`) // Track the decision with developer
+      const decisionValue = `proceed_${selectedDeveloper}`
+      setDecisionMade(decisionValue) // Track the decision with developer
       setSelectedDeveloper(null)
+
+      // Save decision to Supabase
+      setStageData(leadId, 'decision', 'decision_made', decisionValue).catch(error => {
+        console.error("Failed to save decision to Supabase:", error)
+      })
 
       // Mark decision stage as completed and advance to scoping
       setCompletedStages(prev => new Set(prev).add('decision'))
@@ -2251,6 +2367,12 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       setShowNotAFitEmail(false)
       setLeadRejected(true)
       setDecisionMade('reject') // Track the rejection decision
+
+      // Save rejection decision to Supabase
+      setStageData(leadId, 'decision', 'decision_made', 'reject').catch(error => {
+        console.error("Failed to save decision to Supabase:", error)
+      })
+
       setCompletedStages(prev => new Set(prev).add('decision'))
       return
     }
@@ -2269,6 +2391,12 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         newSet.delete('decision') // Mark as not completed
         return newSet
       })
+
+      // Delete all decision stage data from Supabase
+      deleteAllStageData(leadId, 'decision').catch(error => {
+        console.error("Failed to delete decision stage data from Supabase:", error)
+      })
+
       return
     }
 
@@ -2290,6 +2418,12 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         newSet.delete('proposal-decision') // Expand proposal-decision stage
         return newSet
       })
+
+      // Delete all proposal-decision stage data from Supabase
+      deleteAllStageData(leadId, 'proposal-decision').catch(error => {
+        console.error("Failed to delete proposal-decision stage data from Supabase:", error)
+      })
+
       return
     }
 
@@ -2323,6 +2457,12 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
       if (action === 'accept') {
         console.log('Proposal accepted - proceeding to Scoping Document')
+
+        // Save accept decision to Supabase
+        setStageData(leadId, 'proposal-decision', 'decision_made', 'accept').catch(error => {
+          console.error("Failed to save proposal decision to Supabase:", error)
+        })
+
         // Advance to Scoping Document
         setCollapsedItems(prev => {
           const newSet = new Set(prev)
@@ -2333,6 +2473,12 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       } else if (action === 'decline') {
         console.log('Proposal declined - marking remaining stages as skipped')
         setProposalDeclined(true)
+
+        // Save decline decision to Supabase
+        setStageData(leadId, 'proposal-decision', 'decision_made', 'decline').catch(error => {
+          console.error("Failed to save proposal decision to Supabase:", error)
+        })
+
         // All remaining stages will be marked as skipped in the updatedEvents logic
       } else if (action === 'adjust') {
         console.log('Proposal adjustment requested - showing adjustment form')
@@ -2369,6 +2515,12 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         newSet.add('proposal') // Collapse proposal stage
         return newSet
       })
+
+      // Delete sprint pricing data from Supabase
+      deleteAllStageData(leadId, 'sprint-pricing').catch(error => {
+        console.error("Failed to delete sprint-pricing stage data from Supabase:", error)
+      })
+
       return
     }
 
@@ -2637,6 +2789,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     console.log('Sprint pricing confirmed:', data)
     setSprintPricingData(data)
 
+    // Save sprint pricing data to Supabase
+    setStageData(leadId, 'sprint-pricing', 'pricing_data', data).catch(error => {
+      console.error("Failed to save sprint pricing to Supabase:", error)
+    })
+
     // Mark sprint-pricing stage as completed
     setCompletedStages(prev => new Set(prev).add('sprint-pricing'))
 
@@ -2654,6 +2811,16 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     setSprintPricingData(data)
     setShowProposalAdjustment(false)
     setProposalWasAdjusted(true) // Mark that an adjustment was made
+
+    // Save adjusted sprint pricing to Supabase
+    setStageData(leadId, 'sprint-pricing', 'pricing_data', data).catch(error => {
+      console.error("Failed to save adjusted sprint pricing to Supabase:", error)
+    })
+
+    // Save that proposal was adjusted
+    setStageData(leadId, 'proposal-decision', 'was_adjusted', true).catch(error => {
+      console.error("Failed to save proposal adjustment flag to Supabase:", error)
+    })
 
     // Mark proposal-decision stage as completed
     setCompletedStages(prev => new Set(prev).add('proposal-decision'))
@@ -2676,6 +2843,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         setAnchorContactLoading(false)
         setAnchorContactCreated(true)
         console.log('Contact created in Anchor')
+
+        // Save to Supabase
+        setStageData(leadId, 'ea', 'anchor_contact_created', true).catch(error => {
+          console.error("Failed to save EA data to Supabase:", error)
+        })
       }, 3000)
     } else if (action === 'create_anchor_proposal') {
       setAnchorProposalLoading(true)
@@ -2684,6 +2856,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         setAnchorProposalLoading(false)
         setAnchorProposalCreated(true)
         console.log('Proposal draft created in Anchor')
+
+        // Save to Supabase
+        setStageData(leadId, 'ea', 'anchor_proposal_created', true).catch(error => {
+          console.error("Failed to save EA data to Supabase:", error)
+        })
       }, 3000)
     } else if (action === 'generate_ea_wording') {
       setEaWordingGenerating(true)
@@ -2692,10 +2869,20 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         setEaWordingGenerating(false)
         setEaWordingGenerated(true)
         console.log('EA wording generated with AI')
+
+        // Save to Supabase
+        setStageData(leadId, 'ea', 'wording_generated', true).catch(error => {
+          console.error("Failed to save EA data to Supabase:", error)
+        })
       }, 4000)
     } else if (action === 'confirm_ea_completed') {
       setEaConfirmed(true)
       console.log('EA confirmed as completed and sent to customer')
+
+      // Save to Supabase
+      setStageData(leadId, 'ea', 'confirmed', true).catch(error => {
+        console.error("Failed to save EA data to Supabase:", error)
+      })
 
       // Mark the engagement agreement stage as completed
       setCompletedStages(prev => new Set(prev).add('ea'))
@@ -2714,6 +2901,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         setClickupTaskLoading(false)
         setClickupTaskCreated(true)
         console.log('ClickUp task created')
+
+        // Save to Supabase
+        setStageData(leadId, 'setup', 'clickup_task_created', true).catch(error => {
+          console.error("Failed to save Setup data to Supabase:", error)
+        })
       }, 3000)
     } else if (action === 'create_airtable_record') {
       setAirtableRecordLoading(true)
@@ -2722,6 +2914,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         setAirtableRecordLoading(false)
         setAirtableRecordCreated(true)
         console.log('Airtable inventory record created')
+
+        // Save to Supabase
+        setStageData(leadId, 'setup', 'airtable_record_created', true).catch(error => {
+          console.error("Failed to save Setup data to Supabase:", error)
+        })
       }, 3000)
     } else if (action === 'copy_setup_email') {
       const emailContent = `Subject: Project Kickoff - Let's Get Started!
@@ -2759,6 +2956,11 @@ The GrowthLab Team`
     } else if (action === 'setup_email_sent') {
       setSetupEmailSent(true)
       console.log('Setup kickoff email sent to client')
+
+      // Save to Supabase
+      setStageData(leadId, 'setup', 'setup_email_sent', true).catch(error => {
+        console.error("Failed to save Setup data to Supabase:", error)
+      })
 
       // Mark the project setup stage as completed
       setCompletedStages(prev => new Set(prev).add('setup'))

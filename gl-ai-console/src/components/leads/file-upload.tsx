@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { fileTypes, FileType, UploadedFile } from "@/lib/file-types"
 import { Download, RotateCw, Trash2, Paperclip } from "lucide-react"
+import { getFileDownloadUrl } from "@/lib/supabase/files"
 
 interface FileUploadProps {
   fileType: FileType
@@ -120,9 +121,30 @@ export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFi
     onFileUploaded?.(uploadedFile)
   }
 
-  const handleDownload = useCallback(() => {
+  const handleDownload = useCallback(async () => {
     const fileToDownload = uploadedFile || existingFile
     if (fileToDownload) {
+      // If this file has a storage path, it's from Supabase - get the signed URL
+      if (fileToDownload.storagePath && !fileToDownload.isDemoFile) {
+        try {
+          const downloadUrl = await getFileDownloadUrl(fileToDownload.storagePath)
+
+          // Create a temporary link and trigger download
+          const link = document.createElement('a')
+          link.href = downloadUrl
+          link.download = fileToDownload.fileName
+          link.target = '_blank'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          return
+        } catch (error) {
+          console.error("Failed to download file from Supabase:", error)
+          alert("Failed to download file. Please try again.")
+          return
+        }
+      }
+
       // If this is a user-uploaded file with actual file data, download the original file
       if (fileToDownload.fileData && !fileToDownload.isDemoFile) {
         const url = URL.createObjectURL(fileToDownload.fileData)

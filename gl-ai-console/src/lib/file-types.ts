@@ -103,6 +103,7 @@ export interface UploadedFile {
   uploadedBy: string
   fileData?: File | Blob // Store the actual file data for user uploads
   isDemoFile?: boolean // Flag to identify demo files vs user uploads
+  storagePath?: string // Supabase storage path for downloading files
 }
 
 export const getFileTypeById = (id: string): FileType | undefined => {

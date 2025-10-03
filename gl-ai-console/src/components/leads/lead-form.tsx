@@ -24,25 +24,27 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Update form data when initialData changes (for edit mode)
+  // Update form data when initialData changes or when dialog opens
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        projectName: initialData.projectName || "",
-        company: initialData.company || "",
-        contact: initialData.contact || "",
-        email: initialData.email || ""
-      })
-    } else {
-      // Reset form for create mode
-      setFormData({
-        projectName: "",
-        company: "",
-        contact: "",
-        email: ""
-      })
+    if (open) {
+      if (initialData) {
+        setFormData({
+          projectName: initialData.projectName || "",
+          company: initialData.company || "",
+          contact: initialData.contact || "",
+          email: initialData.email || ""
+        })
+      } else {
+        // Reset form for create mode
+        setFormData({
+          projectName: "",
+          company: "",
+          contact: "",
+          email: ""
+        })
+      }
     }
-  }, [initialData])
+  }, [initialData, open])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}

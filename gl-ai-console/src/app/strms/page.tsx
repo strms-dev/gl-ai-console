@@ -27,9 +27,13 @@ export default function STRMSPage() {
     assistant: false
   })
 
-  // Load leads from localStorage on mount
+  // Load leads from Supabase on mount
   useEffect(() => {
-    setLeads(getLeads())
+    const loadLeads = async () => {
+      const fetchedLeads = await getLeads()
+      setLeads(fetchedLeads)
+    }
+    loadLeads()
   }, [])
 
   // Helper function to convert relative time to sortable number
@@ -54,23 +58,33 @@ export default function STRMSPage() {
   }
 
   // Handle creating a new lead
-  const handleCreateLead = (leadData: Omit<Lead, "id" | "stage" | "lastActivity">) => {
-    const newLead: Lead = {
-      ...leadData,
-      id: generateLeadId(),
-      stage: "demo", // Set to first stage (demo)
-      lastActivity: "Just now"
+  const handleCreateLead = async (leadData: Omit<Lead, "id" | "stage" | "lastActivity">) => {
+    try {
+      const newLead = await addLead({
+        ...leadData,
+        stage: "demo", // Set to first stage (demo)
+        lastActivity: "Just now"
+      })
+      const updatedLeads = await getLeads()
+      setLeads(updatedLeads)
+    } catch (error) {
+      console.error("Failed to create lead:", error)
+      alert("Failed to create project. Please try again.")
     }
-    addLead(newLead)
-    setLeads(getLeads()) // Refresh local state
   }
 
   // Handle editing an existing lead
-  const handleEditLead = (leadData: Omit<Lead, "id" | "stage" | "lastActivity">) => {
+  const handleEditLead = async (leadData: Omit<Lead, "id" | "stage" | "lastActivity">) => {
     if (editingLead) {
-      updateLead(editingLead.id, leadData)
-      setLeads(getLeads()) // Refresh local state
-      setEditingLead(null)
+      try {
+        await updateLead(editingLead.id, leadData)
+        const updatedLeads = await getLeads()
+        setLeads(updatedLeads)
+        setEditingLead(null)
+      } catch (error) {
+        console.error("Failed to update lead:", error)
+        alert("Failed to update project. Please try again.")
+      }
     }
   }
 
@@ -81,9 +95,15 @@ export default function STRMSPage() {
   }
 
   // Handle deleting a lead
-  const handleDeleteLead = (id: string) => {
-    deleteLead(id)
-    setLeads(getLeads()) // Refresh local state
+  const handleDeleteLead = async (id: string) => {
+    try {
+      await deleteLead(id)
+      const updatedLeads = await getLeads()
+      setLeads(updatedLeads)
+    } catch (error) {
+      console.error("Failed to delete lead:", error)
+      alert("Failed to delete project. Please try again.")
+    }
   }
 
   const toggleSection = (section: keyof typeof collapsedSections) => {
@@ -170,7 +190,10 @@ export default function STRMSPage() {
             <CardContent className="pt-0">
               <div className="mb-4">
                 <div className="flex justify-end mb-4">
-                  <Button onClick={() => setShowLeadForm(true)}>Add New Project</Button>
+                  <Button onClick={() => {
+                    setEditingLead(null)
+                    setShowLeadForm(true)
+                  }}>Add New Project</Button>
                 </div>
 
                 {/* Search and Sort Controls */}

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { FileUpload } from "@/components/leads/file-upload"
 import { fileTypes, UploadedFile } from "@/lib/file-types"
 import { getLeadById, updateLead } from "@/lib/leads-store"
+import { uploadFile, deleteFilesByType, getProjectFiles } from "@/lib/supabase/files"
 import { use, useState, useEffect, useMemo } from "react"
 import { Zap, User } from "lucide-react"
 
@@ -25,7 +26,8 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
   const { id } = use(params)
 
   // Reactive lead state that updates when lead data changes
-  const [lead, setLead] = useState<Lead | undefined>(() => getLeadById(id))
+  const [lead, setLead] = useState<Lead | undefined>(undefined)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Generate timeline based on current lead stage
   const timeline = useMemo(() => {
@@ -65,23 +67,85 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
   })
 
 
+  // Scroll to top when page loads
+  useEffect(() => {
+    // Use setTimeout to ensure scroll happens after React has finished rendering
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'instant' })
+    }, 0)
+  }, [id])
+
   // Monitor for lead data changes
   useEffect(() => {
-    const checkForLeadUpdates = () => {
-      const updatedLead = getLeadById(id)
+    let isInitialLoad = true
+
+    const checkForLeadUpdates = async () => {
+      // Only show loading on initial load
+      if (isInitialLoad) {
+        setIsLoading(true)
+      }
+
+      const updatedLead = await getLeadById(id)
       setLead(updatedLead)
+
+      if (isInitialLoad) {
+        setIsLoading(false)
+        isInitialLoad = false
+      }
     }
 
     // Check immediately
     checkForLeadUpdates()
 
-    // Set up an interval to check for updates
-    const interval = setInterval(checkForLeadUpdates, 100)
+    // Set up an interval to check for updates (every 5 seconds)
+    // This will update in the background without showing loading state
+    const interval = setInterval(checkForLeadUpdates, 5000)
 
     return () => clearInterval(interval)
   }, [id])
 
-  const handleFileUploaded = (file: UploadedFile) => {
+  // Load existing files from Supabase on mount
+  useEffect(() => {
+    const loadFiles = async () => {
+      try {
+        const files = await getProjectFiles(id)
+        const filesMap: Record<string, UploadedFile> = {}
+
+        files.forEach(file => {
+          filesMap[file.file_type_id] = {
+            id: file.id,
+            fileTypeId: file.file_type_id,
+            fileName: file.file_name,
+            uploadDate: file.uploaded_at,
+            fileSize: Number(file.file_size),
+            uploadedBy: file.uploaded_by,
+            isDemoFile: false,
+            storagePath: file.storage_path // Include storage path for downloading
+          }
+        })
+
+        setUploadedFiles(filesMap)
+      } catch (error) {
+        console.error("Failed to load files from Supabase:", error)
+      }
+    }
+
+    loadFiles()
+  }, [id])
+
+  const handleFileUploaded = async (file: UploadedFile) => {
+    // Upload to Supabase Storage first
+    if (file.fileData) {
+      try {
+        await uploadFile(id, file.fileTypeId, file.fileData as File, 'User')
+      } catch (error) {
+        console.error("Failed to upload file to Supabase:", error)
+        alert("Failed to upload file. Please try again.")
+        return
+      }
+    }
+
+    // Update local state
     setUploadedFiles(prev => ({
       ...prev,
       [file.fileTypeId]: file
@@ -105,18 +169,29 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
 
     if (nextStage) {
       // Small delay for stage automation to not interfere with UI
-      setTimeout(() => {
-        const currentLead = getLeadById(id)
+      setTimeout(async () => {
+        const currentLead = await getLeadById(id)
         if (currentLead) {
-          updateLead(id, { stage: nextStage }) // Move to next stage
+          await updateLead(id, { stage: nextStage }) // Move to next stage
           // Force refresh of lead data
-          setLead(getLeadById(id))
+          const refreshedLead = await getLeadById(id)
+          setLead(refreshedLead)
         }
       }, 100)
     }
   }
 
-  const handleFileCleared = (fileTypeId: string) => {
+  const handleFileCleared = async (fileTypeId: string) => {
+    // Delete from Supabase Storage first
+    try {
+      await deleteFilesByType(id, fileTypeId)
+    } catch (error) {
+      console.error("Failed to delete file from Supabase:", error)
+      alert("Failed to delete file. Please try again.")
+      return
+    }
+
+    // Update local state
     setUploadedFiles(prev => {
       const updated = { ...prev }
       delete updated[fileTypeId]
@@ -141,12 +216,16 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
 
     if (resetStage) {
       // Reset the lead stage back to the stage that requires this file
-      const currentLead = getLeadById(id)
-      if (currentLead) {
-        updateLead(id, { stage: resetStage }) // Move back to required stage
-        // Force refresh of lead data
-        setLead(getLeadById(id))
+      const asyncReset = async () => {
+        const currentLead = await getLeadById(id)
+        if (currentLead) {
+          await updateLead(id, { stage: resetStage }) // Move back to required stage
+          // Force refresh of lead data
+          const refreshedLead = await getLeadById(id)
+          setLead(refreshedLead)
+        }
       }
+      asyncReset()
     }
   }
 
@@ -155,6 +234,16 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
       ...prev,
       [section]: !prev[section]
     }))
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-8 bg-muted/30">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-foreground mb-4">Loading...</h1>
+        </div>
+      </div>
+    )
   }
 
   if (!lead) {
