@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils"
 import { FileUpload } from "@/components/leads/file-upload"
 import { fileTypes, UploadedFile } from "@/lib/file-types"
 import { getLeadById, updateLead } from "@/lib/leads-store"
-import { uploadFile, deleteFilesByType, getProjectFiles } from "@/lib/supabase/files"
+import { uploadFile, replaceFile, deleteFilesByType, getProjectFiles, getFileUploadDate } from "@/lib/supabase/files"
+import { getStageCompletionDate } from "@/lib/supabase/stage-data"
 import { use, useState, useEffect, useMemo } from "react"
 import { Zap, User } from "lucide-react"
 
@@ -37,6 +38,9 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
   // State to track uploaded files
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedFile>>({})
 
+  // State to track completion dates for each stage
+  const [completionDates, setCompletionDates] = useState<Record<string, string>>({})
+
   // Calculate actual timeline progress based on lead stage and uploaded files
   const calculateTimelineProgress = () => {
     if (!lead) return { completed: 0, total: timeline.length }
@@ -53,6 +57,11 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
       completedCount++
     }
 
+    // Special case: if we're at kickoff stage and the kickoff file has been uploaded, count it as completed
+    if (lead.stage === 'kickoff' && uploadedFiles['kickoff-meeting-brief']) {
+      completedCount++
+    }
+
     return { completed: completedCount, total: timeline.length }
   }
 
@@ -65,15 +74,6 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
     assistant: false,
     documents: false
   })
-
-
-  // Scroll to top when page loads
-  useEffect(() => {
-    // Use setTimeout to ensure scroll happens after React has finished rendering
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'instant' })
-    }, 0)
-  }, [id])
 
   // Monitor for lead data changes
   useEffect(() => {
@@ -133,23 +133,100 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
     loadFiles()
   }, [id])
 
-  const handleFileUploaded = async (file: UploadedFile) => {
-    // Upload to Supabase Storage first
-    if (file.fileData) {
-      try {
-        await uploadFile(id, file.fileTypeId, file.fileData as File, 'User')
-      } catch (error) {
-        console.error("Failed to upload file to Supabase:", error)
-        alert("Failed to upload file. Please try again.")
-        return
-      }
-    }
+  // Function to load completion dates for stages
+  const loadCompletionDates = async () => {
+    try {
+      const dates: Record<string, string> = {}
 
-    // Update local state
+      // Define which stages use file upload dates vs stage data dates
+      const fileBasedStages = ['demo', 'readiness', 'scoping-prep', 'scoping', 'dev-overview', 'workflow-docs', 'internal-client-docs', 'kickoff']
+      const fileTypeMapping: Record<string, string> = {
+        'demo': 'demo-call-transcript',
+        'readiness': 'readiness-pdf',
+        'scoping-prep': 'scoping-prep-doc',
+        'scoping': 'scoping-call-transcript',
+        'dev-overview': 'developer-audio-overview',
+        'workflow-docs': 'workflow-description',
+        'internal-client-docs': 'internal-client-documentation',
+        'kickoff': 'kickoff-meeting-brief'
+      }
+
+      // Load dates for all stages in timeline
+      for (const event of timeline) {
+        if (fileBasedStages.includes(event.type)) {
+          // Get file upload date
+          const fileTypeId = fileTypeMapping[event.type]
+          if (fileTypeId) {
+            const date = await getFileUploadDate(id, fileTypeId)
+            if (date) {
+              dates[event.id] = date
+            }
+          }
+        } else {
+          // Get stage data completion date
+          const date = await getStageCompletionDate(id, event.id)
+          if (date) {
+            dates[event.id] = date
+          }
+        }
+      }
+
+      setCompletionDates(dates)
+    } catch (error) {
+      console.error("Failed to load completion dates:", error)
+    }
+  }
+
+  // Load completion dates on mount and when timeline changes
+  useEffect(() => {
+    if (timeline.length > 0) {
+      loadCompletionDates()
+    }
+  }, [id, timeline])
+
+  const handleFileUploaded = async (file: UploadedFile) => {
+    // Optimistic update - update UI immediately
     setUploadedFiles(prev => ({
       ...prev,
       [file.fileTypeId]: file
     }))
+
+    // Replace file in Supabase Storage in the background (deletes old file if exists, uploads new)
+    if (file.fileData) {
+      try {
+        await replaceFile(id, file.fileTypeId, file.fileData as File, 'User')
+
+        // Reload files from Supabase to get the correct storage path and metadata
+        const files = await getProjectFiles(id)
+        const filesMap: Record<string, UploadedFile> = {}
+        files.forEach(f => {
+          filesMap[f.file_type_id] = {
+            id: f.id,
+            fileTypeId: f.file_type_id,
+            fileName: f.file_name,
+            uploadDate: f.uploaded_at,
+            fileSize: Number(f.file_size),
+            uploadedBy: f.uploaded_by,
+            isDemoFile: false,
+            storagePath: f.storage_path
+          }
+        })
+        setUploadedFiles(filesMap)
+
+        // Reload completion dates to show the new completion date immediately
+        await loadCompletionDates()
+      } catch (error) {
+        console.error("Failed to upload file to Supabase:", error)
+        alert("Failed to upload file. Please try again.")
+        // Revert the optimistic update
+        setUploadedFiles(prev => {
+          const updated = { ...prev }
+          delete updated[file.fileTypeId]
+          return updated
+        })
+        return
+      }
+    }
 
     // Define file to stage transition mappings
     const fileStageMap: Record<string, Lead['stage']> = {
@@ -182,21 +259,31 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
   }
 
   const handleFileCleared = async (fileTypeId: string) => {
-    // Delete from Supabase Storage first
-    try {
-      await deleteFilesByType(id, fileTypeId)
-    } catch (error) {
-      console.error("Failed to delete file from Supabase:", error)
-      alert("Failed to delete file. Please try again.")
-      return
-    }
+    // Store the old file in case we need to revert
+    const oldFile = uploadedFiles[fileTypeId]
 
-    // Update local state
+    // Optimistic update - update UI immediately
     setUploadedFiles(prev => {
       const updated = { ...prev }
       delete updated[fileTypeId]
       return updated
     })
+
+    // Delete from Supabase Storage in the background
+    try {
+      await deleteFilesByType(id, fileTypeId)
+    } catch (error) {
+      console.error("Failed to delete file from Supabase:", error)
+      alert("Failed to delete file. Please try again.")
+      // Revert the optimistic update
+      if (oldFile) {
+        setUploadedFiles(prev => ({
+          ...prev,
+          [fileTypeId]: oldFile
+        }))
+      }
+      return
+    }
 
     // Define file to stage reset mappings (back to the stage that requires the file)
     const fileResetStageMap: Record<string, Lead['stage']> = {
@@ -239,8 +326,107 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
   if (isLoading) {
     return (
       <div className="p-8 bg-muted/30">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-4">Loading...</h1>
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-4">
+            <div className="w-32 h-9 bg-gray-200 rounded-md animate-pulse"></div>
+            <div>
+              <div className="w-64 h-9 bg-gray-200 rounded animate-pulse mb-2"></div>
+              <div className="w-48 h-5 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+          <div className="w-32 h-10 bg-gray-200 rounded-full animate-pulse"></div>
+        </div>
+
+        <div className="space-y-8">
+          {/* Project Summary Skeleton */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="w-40 h-7 bg-gray-200 rounded animate-pulse"></div>
+                <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i}>
+                    <div className="w-24 h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
+                    <div className="w-32 h-5 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Onboarding Timeline Skeleton */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="w-48 h-7 bg-gray-200 rounded animate-pulse"></div>
+                <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="border rounded-lg p-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse"></div>
+                      <div className="flex-1">
+                        <div className="w-48 h-6 bg-gray-200 rounded animate-pulse mb-2"></div>
+                        <div className="w-full h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
+                        <div className="w-3/4 h-4 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Two-column layout for Assistant and Documents */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* AI Assistant Skeleton */}
+            <Card className="h-[600px]">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="w-32 h-7 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="w-3/4 h-16 bg-gray-200 rounded-lg animate-pulse"></div>
+                  <div className="w-2/3 h-16 bg-gray-200 rounded-lg animate-pulse ml-auto"></div>
+                  <div className="w-3/4 h-16 bg-gray-200 rounded-lg animate-pulse"></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Project Documents Skeleton */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="w-40 h-7 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 border rounded-lg">
+                      <div className="w-10 h-10 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="flex-1">
+                        <div className="w-32 h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
+                        <div className="w-24 h-3 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     )
@@ -251,7 +437,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
       <div className="p-8 bg-muted/30">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-foreground mb-4">Lead Not Found</h1>
-          <Link href="/strms" scroll={false}>
+          <Link href="/strms">
             <Button>Back to STRMS Projects</Button>
           </Link>
         </div>
@@ -263,7 +449,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
     <div className="p-8 bg-muted/30">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center space-x-4">
-          <Link href="/strms" scroll={false}>
+          <Link href="/strms">
             <Button variant="outline" size="sm">← Back to Projects</Button>
           </Link>
           <div>
@@ -394,6 +580,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
               onFileUploaded={handleFileUploaded}
               onFileCleared={handleFileCleared}
               leadStage={lead?.stage}
+              completionDates={completionDates}
             />
           )}
         </Card>

@@ -244,3 +244,29 @@ export async function getProposalEmailDraft(projectId: string): Promise<string |
   const data = await getStageData(projectId, 'proposal', 'email_draft')
   return data as string | null
 }
+
+/**
+ * Get completion date for a stage
+ * Returns the updated_at timestamp from stage_data if it exists
+ */
+export async function getStageCompletionDate(projectId: string, stageId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('strms_project_stage_data')
+    .select('updated_at')
+    .eq('project_id', projectId)
+    .eq('stage_id', stageId)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // No rows returned - stage has no data yet
+      return null
+    }
+    console.error('Error getting stage completion date:', error)
+    return null
+  }
+
+  return data?.updated_at || null
+}

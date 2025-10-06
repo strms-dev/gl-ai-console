@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -39,15 +39,6 @@ export function ChatInterface({ title = "AI Agent Assistant", className, hideHea
   ])
   const [inputValue, setInputValue] = useState("")
   const [isTyping, setIsTyping] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages, isTyping])
 
   const sendMessage = async (content: string) => {
     if (!content.trim()) return
@@ -125,7 +116,6 @@ export function ChatInterface({ title = "AI Agent Assistant", className, hideHea
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         <div className="border-t p-4 space-y-3 flex-shrink-0">
@@ -210,7 +200,6 @@ export function ChatInterface({ title = "AI Agent Assistant", className, hideHea
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         <div className="border-t p-4 space-y-3 flex-shrink-0">

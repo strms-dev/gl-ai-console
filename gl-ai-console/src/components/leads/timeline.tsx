@@ -42,6 +42,7 @@ import {
   Scale,
   FileSignature,
   Settings,
+  Calendar,
   LucideIcon
 } from "lucide-react"
 
@@ -82,6 +83,7 @@ interface TimelineProps {
   onFileUploaded?: (file: UploadedFile) => void
   onFileCleared?: (fileTypeId: string) => void
   leadStage?: string
+  completionDates?: Record<string, string>
 }
 
 const getStatusColor = (status: TimelineEvent["status"]) => {
@@ -279,7 +281,7 @@ const ActionZone = ({
     const readinessPdfFileType = getFileTypeById('readiness-pdf')
     if (readinessPdfFileType) {
       return (
-        <div className="mt-4 p-3 bg-muted/30 rounded-lg border">
+        <div className="mt-4">
           {/* AI Generation Button */}
           {event.actions.automated && (
             <div className="mb-4">
@@ -287,8 +289,10 @@ const ActionZone = ({
                 variant="default"
                 size="sm"
                 onClick={() => onAction('automated')}
-                className="w-full sm:w-auto"
+                disabled={!!existingFile}
+                className="w-full sm:w-auto flex items-center gap-2"
               >
+                <Zap className="w-4 h-4" />
                 {event.actions.automated.label}
               </Button>
             </div>
@@ -304,6 +308,7 @@ const ActionZone = ({
               existingFile={existingFile}
               onFileUploaded={onFileUploaded}
               onFileCleared={() => onFileCleared?.('readiness-pdf')}
+              variant="compact"
             />
           </div>
         </div>
@@ -316,7 +321,7 @@ const ActionZone = ({
     const scopingPrepFileType = getFileTypeById('scoping-prep-doc')
     if (scopingPrepFileType) {
       return (
-        <div className="mt-4 p-3 bg-muted/30 rounded-lg border">
+        <div className="mt-4">
           {/* AI Generation Button */}
           {event.actions.automated && (
             <div className="mb-4">
@@ -324,8 +329,10 @@ const ActionZone = ({
                 variant="default"
                 size="sm"
                 onClick={() => onAction('automated')}
-                className="w-full sm:w-auto"
+                disabled={!!existingFile}
+                className="w-full sm:w-auto flex items-center gap-2"
               >
+                <Zap className="w-4 h-4" />
                 {event.actions.automated.label}
               </Button>
             </div>
@@ -341,6 +348,7 @@ const ActionZone = ({
               existingFile={existingFile}
               onFileUploaded={onFileUploaded}
               onFileCleared={() => onFileCleared?.('scoping-prep-doc')}
+              variant="compact"
             />
           </div>
         </div>
@@ -353,7 +361,7 @@ const ActionZone = ({
     const workflowDescriptionFileType = getFileTypeById('workflow-description')
     if (workflowDescriptionFileType) {
       return (
-        <div className="mt-4 p-3 bg-muted/30 rounded-lg border">
+        <div className="mt-4">
           {/* AI Generation Button */}
           {event.actions.automated && (
             <div className="mb-4">
@@ -361,8 +369,10 @@ const ActionZone = ({
                 variant="default"
                 size="sm"
                 onClick={() => onAction('automated')}
-                className="w-full sm:w-auto"
+                disabled={!!existingFile}
+                className="w-full sm:w-auto flex items-center gap-2"
               >
+                <Zap className="w-4 h-4" />
                 {event.actions.automated.label}
               </Button>
             </div>
@@ -378,6 +388,7 @@ const ActionZone = ({
               existingFile={existingFile}
               onFileUploaded={onFileUploaded}
               onFileCleared={() => onFileCleared?.('workflow-description')}
+              variant="compact"
             />
 
             {/* Developer Note */}
@@ -561,7 +572,7 @@ Best regards,
 The GrowthLab Team`
 
       return (
-        <div className="mt-4 p-6 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
+        <div className="mt-4">
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
               <Mail className="w-5 h-5 text-gray-600" />
@@ -573,8 +584,8 @@ The GrowthLab Team`
             </p>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 shadow-sm">
-            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded-lg border">
+          <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
+            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
 {proposalEmailContent}
             </pre>
           </div>
@@ -639,7 +650,7 @@ The GrowthLab Team`
     const internalClientDocsFileType = getFileTypeById('internal-client-documentation')
     if (internalClientDocsFileType) {
       return (
-        <div className="mt-4 p-3 bg-muted/30 rounded-lg border">
+        <div className="mt-4">
           {/* AI Generation Button */}
           {event.actions.automated && (
             <div className="mb-4">
@@ -647,8 +658,10 @@ The GrowthLab Team`
                 variant="default"
                 size="sm"
                 onClick={() => onAction('automated')}
-                className="w-full sm:w-auto"
+                disabled={!!existingFile}
+                className="w-full sm:w-auto flex items-center gap-2"
               >
+                <Zap className="w-4 h-4" />
                 {event.actions.automated.label}
               </Button>
             </div>
@@ -664,6 +677,7 @@ The GrowthLab Team`
               existingFile={existingFile}
               onFileUploaded={onFileUploaded}
               onFileCleared={() => onFileCleared?.('internal-client-documentation')}
+              variant="compact"
             />
           </div>
         </div>
@@ -676,7 +690,7 @@ The GrowthLab Team`
     const kickoffAgendaFileType = getFileTypeById('kickoff-meeting-brief')
     if (kickoffAgendaFileType) {
       return (
-        <div className="mt-4 p-3 bg-muted/30 rounded-lg border">
+        <div className="mt-4">
           {/* AI Generation Button */}
           {event.actions.automated && (
             <div className="mb-4">
@@ -684,8 +698,10 @@ The GrowthLab Team`
                 variant="default"
                 size="sm"
                 onClick={() => onAction('automated')}
-                className="w-full sm:w-auto"
+                disabled={!!existingFile}
+                className="w-full sm:w-auto flex items-center gap-2"
               >
+                <Zap className="w-4 h-4" />
                 {event.actions.automated.label}
               </Button>
             </div>
@@ -701,6 +717,7 @@ The GrowthLab Team`
               existingFile={existingFile}
               onFileUploaded={onFileUploaded}
               onFileCleared={() => onFileCleared?.('kickoff-meeting-brief')}
+              variant="compact"
             />
           </div>
         </div>
@@ -745,7 +762,7 @@ Best regards,
 The GrowthLab Team`
 
     return (
-      <div className="mt-4 p-6 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
+      <div className="mt-4">
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <Mail className="w-5 h-5 text-gray-600" />
@@ -757,8 +774,8 @@ The GrowthLab Team`
           </p>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 shadow-sm">
-          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded-lg border">
+        <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
+          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
 {emailContent}
           </pre>
         </div>
@@ -825,7 +842,7 @@ Best regards,
 The GrowthLab Team`
 
     return (
-      <div className="mt-4 p-6 bg-red-50 border border-red-200 rounded-xl">
+      <div className="mt-4">
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <Mail className="w-5 h-5 text-gray-600" />
@@ -833,8 +850,8 @@ The GrowthLab Team`
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 shadow-sm">
-          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded-lg border">
+        <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
+          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
 {notAFitEmailContent}
           </pre>
         </div>
@@ -1127,6 +1144,7 @@ The GrowthLab Team`
                 <Button
                   onClick={() => {}}
                   size="sm"
+                  disabled={!!existingFile}
                   className="bg-[#407B9D] hover:bg-[#325F7A] text-white transition-all duration-200 hover:scale-105 rounded-lg shadow-md flex items-center gap-2"
                 >
                   <span><Zap className="w-4 h-4" /></span>
@@ -1145,6 +1163,7 @@ The GrowthLab Team`
                         onFileUploaded={onFileUploaded}
                         onFileCleared={() => onFileCleared?.('ea-wording')}
                         existingFile={existingFile}
+                        variant="compact"
                       />
                     )
                   }
@@ -1254,7 +1273,7 @@ The GrowthLab Team`
           </div>
 
           {/* Kickoff Email Draft */}
-          <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
+          <div className="mt-4">
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Mail className="w-5 h-5 text-gray-600" />
@@ -1266,8 +1285,8 @@ The GrowthLab Team`
                 </p>
               </div>
 
-              <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border">
+              <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
+                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
 {`Subject: Project Kickoff - Let's Get Started!
 
 Hi there!
@@ -1417,7 +1436,7 @@ The GrowthLab Team`}
   }
 
   return (
-    <div className="mt-4 p-3 bg-muted/30 rounded-lg border">
+    <div className="mt-4">
       {/* Automated Action */}
       {event.actions.automated && (
         <div className="mb-3">
@@ -1425,7 +1444,7 @@ The GrowthLab Team`}
             variant={event.actions.automated.inProgress ? "outline" : "default"}
             size="sm"
             onClick={() => onAction('automated')}
-            disabled={event.actions.automated.inProgress}
+            disabled={event.actions.automated.inProgress || !!existingFile}
             className="w-full sm:w-auto"
           >
             {event.actions.automated.inProgress ? (
@@ -1437,7 +1456,10 @@ The GrowthLab Team`}
                 )}
               </div>
             ) : (
-              event.actions.automated.label
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4" />
+                {event.actions.automated.label}
+              </div>
             )}
           </Button>
         </div>
@@ -1445,7 +1467,7 @@ The GrowthLab Team`}
 
       {/* Decision Options - Handle both scoping decision and proposal decision */}
       {event.actions.decision && !showDeveloperSelection && !showNotAFitEmail && (
-        <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
+        <div className="mt-4 p-4">
           <p className="text-sm font-semibold text-gray-700 mb-4 text-center flex items-center justify-center gap-2" style={{fontFamily: 'var(--font-heading)'}}>
             <ClipboardList className="w-4 h-4" />
             {event.type === "proposal-decision" ? "What's the client's response?" : "Ready to make a decision?"}
@@ -1620,7 +1642,8 @@ const StageCard = ({
   airtableRecordCreated,
   airtableRecordLoading,
   setupEmailCopied,
-  setupEmailSent
+  setupEmailSent,
+  completionDate
 }: {
   event: TimelineEvent
   index: number
@@ -1655,6 +1678,7 @@ const StageCard = ({
   airtableRecordLoading?: boolean
   setupEmailCopied?: boolean
   setupEmailSent?: boolean
+  completionDate?: string
 }) => {
   const isActive = event.status === "in_progress" || event.status === "action-required"
 
@@ -1728,12 +1752,32 @@ const StageCard = ({
                   {event.isCollapsed ? "+" : "−"}
                 </Button>
               </div>
-              <span className={cn(
-                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                getStatusColor(event.status)
-              )}>
-                {getStatusIcon(event.status)} {event.status.replace(/[-_]/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                  getStatusColor(event.status)
+                )}>
+                  {getStatusIcon(event.status)} {event.status.replace(/[-_]/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())}
+                </span>
+                {/* Completion Date Icon with Tooltip */}
+                {event.status === "completed" && completionDate && (
+                  <div className="group relative">
+                    <Calendar className="w-4 h-4 text-gray-400 cursor-help" />
+                    <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-50 w-max max-w-xs">
+                      <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-lg">
+                        Completed: {new Date(completionDate).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Content - show when not collapsed */}
@@ -1745,14 +1789,6 @@ const StageCard = ({
                 )}>
                   {event.description}
                 </p>
-
-                {event.timestamp && (
-                  <div className="flex items-center space-x-4 text-sm text-muted-foreground mb-2">
-                    <span>
-                      {new Date(event.timestamp).toLocaleString()}
-                    </span>
-                  </div>
-                )}
 
                 {/* Readiness Score Display */}
                 {event.readinessScore && (
@@ -1879,6 +1915,7 @@ const StageCard = ({
                                     onFileUploaded={onFileUploaded}
                                     onFileCleared={() => onFileCleared?.('ea-wording')}
                                     existingFile={existingFile}
+                                    variant="compact"
                                   />
                                 )
                               }
@@ -2006,7 +2043,7 @@ const StageCard = ({
   )
 }
 
-export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: propUploadedFiles, onFileUploaded, onFileCleared, leadStage }: TimelineProps) {
+export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: propUploadedFiles, onFileUploaded, onFileCleared, leadStage, completionDates = {} }: TimelineProps) {
   const [collapsedItems, setCollapsedItems] = useState<Set<string>>(
     new Set(events.filter(e => e.isCollapsed).map(e => e.id))
   )
@@ -2527,6 +2564,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     // Handle proposal email sent
     if (eventId === 'proposal' && action === 'proposal_email_sent') {
       console.log('Proposal email sent - completing proposal stage')
+
+      // Save to Supabase
+      setStageData(leadId, 'proposal', 'email_sent', true).catch(error => {
+        console.error("Failed to save proposal email sent to Supabase:", error)
+      })
 
       // Mark proposal stage as completed
       setCompletedStages(prev => new Set(prev).add('proposal'))
@@ -3278,6 +3320,7 @@ The GrowthLab Team`
                 airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
                 setupEmailCopied={event.id === "setup" ? setupEmailCopied : false}
                 setupEmailSent={event.id === "setup" ? setupEmailSent : false}
+                completionDate={completionDates[event.id]}
               />
             )
           })}
@@ -3373,6 +3416,7 @@ The GrowthLab Team`
                 airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
                 setupEmailCopied={event.id === "setup" ? setupEmailCopied : false}
                 setupEmailSent={event.id === "setup" ? setupEmailSent : false}
+                completionDate={completionDates[event.id]}
               />
             )
           })}

@@ -41,8 +41,8 @@ export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFi
     if (isUploading) {
       setUploadProgress(0)
 
-      // Simulate gradual progress over 1.5 seconds
-      const duration = 1500
+      // Simulate gradual progress over 0.75 seconds (2x faster)
+      const duration = 750
       const interval = 50 // Update every 50ms
       const totalSteps = duration / interval
       let currentStep = 0
@@ -95,14 +95,14 @@ export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFi
   const handleFileUpload = async (file: File) => {
     setIsUploading(true)
 
-    // Simulate upload delay
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    // Simulate upload delay (2x faster)
+    await new Promise(resolve => setTimeout(resolve, 750))
 
     // Complete the progress bar to 100%
     setUploadProgress(100)
 
     // Brief pause to show 100% completion
-    await new Promise(resolve => setTimeout(resolve, 200))
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     // Create uploaded file object with actual file data
     const uploadedFile: UploadedFile = {

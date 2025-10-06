@@ -212,3 +212,29 @@ export async function deleteFilesByType(projectId: string, fileTypeId: string): 
     }
   }
 }
+
+/**
+ * Get the upload date for a specific file type
+ * Returns the uploaded_at timestamp
+ */
+export async function getFileUploadDate(projectId: string, fileTypeId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('strms_project_files')
+    .select('uploaded_at')
+    .eq('project_id', projectId)
+    .eq('file_type_id', fileTypeId)
+    .order('uploaded_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // No file uploaded yet
+      return null
+    }
+    console.error('Error getting file upload date:', error)
+    return null
+  }
+
+  return data?.uploaded_at || null
+}

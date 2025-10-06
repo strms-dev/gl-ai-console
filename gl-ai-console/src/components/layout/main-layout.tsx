@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { usePathname } from "next/navigation"
+import { useState } from "react"
 import { Header } from "./header"
 import { Sidebar } from "./sidebar"
 
@@ -11,33 +10,28 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const mainRef = useRef<HTMLElement>(null)
-  const pathname = usePathname()
-
-  // Reset scroll position for STRMS pages (both main page and lead details)
-  useEffect(() => {
-    if (pathname.startsWith('/strms')) {
-      // Use requestAnimationFrame to ensure this runs after any scroll restoration
-      requestAnimationFrame(() => {
-        if (mainRef.current) {
-          mainRef.current.scrollTop = 0
-        }
-      })
-    }
-  }, [pathname])
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar
-        isCollapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main ref={mainRef} className="flex-1 overflow-auto">
+    <>
+      <div className="fixed top-0 left-0 h-screen z-40">
+        <Sidebar
+          isCollapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
+      </div>
+      <div
+        className="min-h-screen bg-background transition-all duration-300"
+        style={{
+          marginLeft: sidebarCollapsed ? '4rem' : '16rem'
+        }}
+      >
+        <div className="sticky top-0 z-30">
+          <Header />
+        </div>
+        <main>
           {children}
         </main>
       </div>
-    </div>
+    </>
   )
 }
