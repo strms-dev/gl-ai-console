@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Lead, stageLabels, stageColors } from "@/lib/dummy-data"
 import { cn } from "@/lib/utils"
 import { Pencil, Trash2, AlertTriangle } from "lucide-react"
+import { getProjectStatusInfo, getStageDisplayName, getStatusBadgeClasses } from "@/lib/project-status"
 
 type SortField = "stage" | "lastActivity"
 type SortOrder = "asc" | "desc"
@@ -48,7 +49,7 @@ export function LeadsTable({
     if ((event.target as HTMLElement).closest('button')) {
       return
     }
-    router.push(`/strms/leads/${leadId}`)
+    router.push(`/strms/sales-pipeline/projects/${leadId}`)
   }
 
   const handleDeleteClick = (lead: Lead) => {
@@ -103,12 +104,31 @@ export function LeadsTable({
                 <p className="font-medium">{lead.contact || "—"}</p>
               </td>
               <td className="py-3 px-4">
-                <span className={cn(
-                  "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                  stageColors[lead.stage]
-                )}>
-                  {stageLabels[lead.stage]}
-                </span>
+                {(() => {
+                  const status = lead.projectStatus || 'active'
+
+                  // For active projects, just show the stage with standard styling
+                  if (status === 'active') {
+                    return (
+                      <span className={cn(
+                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                        stageColors[lead.stage]
+                      )}>
+                        {stageLabels[lead.stage]}
+                      </span>
+                    )
+                  }
+
+                  // For terminal statuses, show status badge
+                  const statusInfo = getProjectStatusInfo(status)
+                  const displayName = getStageDisplayName(stageLabels[lead.stage], status)
+
+                  return (
+                    <span className={getStatusBadgeClasses(status)}>
+                      {displayName}
+                    </span>
+                  )
+                })()}
               </td>
               <td className="py-3 px-4">
                 <span className="text-sm text-muted-foreground">{lead.lastActivity}</span>

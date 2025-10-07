@@ -5,21 +5,22 @@ import { usePathname } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Wrench, RotateCw, LucideIcon } from "lucide-react"
+import { Wrench, RotateCw, Home, LucideIcon } from "lucide-react"
 
 const departments = [
-  { name: "STRMS", href: "/strms", icon: "wrench", active: true },
+  { name: "STRMS", href: "/strms/home", icon: "wrench", active: true },
 ]
 
 const departmentNavigation: Record<string, Array<{ name: string; href: string; icon: string }>> = {
   strms: [
-    { name: "Sales Pipeline", href: "/strms", icon: "rotate-cw" },
+    { name: "Sales Pipeline", href: "/strms/sales-pipeline", icon: "rotate-cw" },
   ],
 }
 
 // Icon mapping function
 const getIconComponent = (iconName: string): LucideIcon => {
   const iconMap: Record<string, LucideIcon> = {
+    'home': Home,
     'wrench': Wrench,
     'rotate-cw': RotateCw,
   }
@@ -42,6 +43,9 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
 
   const currentDepartment = getCurrentDepartment()
   const currentNavigation = currentDepartment ? departmentNavigation[currentDepartment] : []
+
+  // Check if we're on home page
+  const isHomePage = pathname === '/home'
 
   return (
     <div className={cn(
@@ -72,6 +76,36 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
       </div>
 
       <div className="flex-1 flex flex-col">
+        {/* Home Button */}
+        <div className={cn(
+          "pt-4 pb-4 border-b border-border",
+          isCollapsed ? "px-2" : "px-4"
+        )}>
+          <ul className="space-y-1">
+            <li>
+              <Link
+                href="/home"
+                className={cn(
+                  "flex items-center text-sm font-semibold rounded-lg transition-all duration-200",
+                  isCollapsed ? "justify-center p-2" : "px-3 py-2.5",
+                  isHomePage
+                    ? "bg-[#407B9D] text-white shadow-md"
+                    : "text-[#463939] hover:bg-[#95CBD7]/20 hover:text-[#407B9D]"
+                )}
+                style={{fontFamily: 'var(--font-heading)'}}
+                title={isCollapsed ? "Home" : undefined}
+              >
+                <Home className={cn(
+                  "w-5 h-5",
+                  isCollapsed ? "" : "mr-3"
+                )} />
+                {!isCollapsed && "Home"}
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        {/* Departments Section */}
         <div className={cn(
           "pt-4 pb-4 border-b border-border",
           isCollapsed ? "px-2" : "px-4"
@@ -81,7 +115,8 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           )}
           <ul className="space-y-1">
             {departments.map((dept) => {
-              const isActive = pathname.startsWith(dept.href)
+              // Only highlight department button when on department home, not sub-pages
+              const isActive = pathname === dept.href
               return (
                 <li key={dept.name}>
                   <Link
@@ -128,7 +163,9 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
             )}
             <ul className="space-y-1">
               {currentNavigation.map((item) => {
-                const isActive = pathname === item.href
+                // Highlight sales pipeline when on the page OR on project details pages
+                const isActive = pathname === item.href ||
+                  (item.href === '/strms/sales-pipeline' && pathname.startsWith('/strms/sales-pipeline/projects/'))
                 const IconComponent = getIconComponent(item.icon)
                 return (
                   <li key={item.name}>

@@ -5,7 +5,10 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 
 const departmentTitles = {
-  "/strms": "STRMS"
+  "/strms/home": "STRMS Home",
+  "/strms/sales-pipeline": "Sales Pipeline",
+  "/strms": "STRMS",
+  "/home": "Home"
 }
 
 export function Header() {
@@ -22,14 +25,15 @@ export function Header() {
 
   const renderTitle = () => {
     const title = getPageTitle()
-    if (title === "STRMS") {
-      return null // Don't render anything for STRMS page
+    if (title === "STRMS" || title === "Home" || title === "STRMS Home" || title === "Sales Pipeline") {
+      return null // Don't render anything for STRMS pages or Home page
     }
     return title
   }
 
-  // Don't render header for STRMS page
-  if (getPageTitle() === "STRMS") {
+  // Don't render header for STRMS pages or Home page
+  const title = getPageTitle()
+  if (title === "STRMS" || title === "Home" || title === "STRMS Home" || title === "Sales Pipeline") {
     return null
   }
 
