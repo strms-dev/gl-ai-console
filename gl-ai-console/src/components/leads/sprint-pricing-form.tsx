@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,15 @@ import { Select } from "@/components/ui/select"
 import { RefreshCw, CheckCircle2, Sparkles } from "lucide-react"
 
 interface SprintPricingFormProps {
-  onConfirm: (data: { sprintLength: string; price: number; explanation: string }) => void
+  onConfirm: (data: {
+    sprintLength: string
+    price: number
+    explanation: string
+    // For initial confirmation, these will be the AI-generated values shown to user
+    initialAiSprintLength?: string
+    initialAiPrice?: number
+    initialAiExplanation?: string
+  }) => void
   onCancel?: () => void
   initialData?: { sprintLength: string; price: number; explanation: string }
   isAdjustmentMode?: boolean
@@ -38,20 +46,49 @@ export function SprintPricingForm({ onConfirm, onCancel, initialData, isAdjustme
   const [price, setPrice] = useState(4000)
   const [explanation, setExplanation] = useState(generateRandomExplanation("1"))
 
+  // Track the initial AI-generated values (what was shown when form first loaded)
+  const [initialAiSprintLength, setInitialAiSprintLength] = useState("1")
+  const [initialAiPrice, setInitialAiPrice] = useState(4000)
+  const [initialAiExplanation, setInitialAiExplanation] = useState(generateRandomExplanation("1"))
+
+  // Track if we've already initialized to prevent re-initialization
+  const isInitialized = useRef(false)
+
   // Initialize with provided data or randomly select initial values on client side
+  // Only run once when component mounts
   useEffect(() => {
+    // Skip if already initialized
+    if (isInitialized.current) return
+    isInitialized.current = true
+
     if (initialData) {
       // Use provided initial data
       setSprintLength(initialData.sprintLength)
       setPrice(initialData.price)
       setExplanation(isAdjustmentMode ? "" : initialData.explanation)
+
+      // Only set initial AI values on first load (not in adjustment mode)
+      if (!isAdjustmentMode) {
+        setInitialAiSprintLength(initialData.sprintLength)
+        setInitialAiPrice(initialData.price)
+        setInitialAiExplanation(initialData.explanation)
+      }
     } else {
       // Randomly select initial values
       const randomIndex = Math.floor(Math.random() * SPRINT_OPTIONS.length)
       const initialOption = SPRINT_OPTIONS[randomIndex]
+      const randomExplanation = generateRandomExplanation(initialOption.value)
+
       setSprintLength(initialOption.value)
       setPrice(initialOption.price)
-      setExplanation(isAdjustmentMode ? "" : generateRandomExplanation(initialOption.value))
+      setExplanation(isAdjustmentMode ? "" : randomExplanation)
+
+      // Store initial AI values
+      if (!isAdjustmentMode) {
+        setInitialAiSprintLength(initialOption.value)
+        setInitialAiPrice(initialOption.price)
+        setInitialAiExplanation(randomExplanation)
+      }
     }
   }, [initialData, isAdjustmentMode])
 
@@ -70,7 +107,11 @@ export function SprintPricingForm({ onConfirm, onCancel, initialData, isAdjustme
     onConfirm({
       sprintLength,
       price,
-      explanation
+      explanation,
+      // Pass back initial AI values only in non-adjustment mode
+      initialAiSprintLength: !isAdjustmentMode ? initialAiSprintLength : undefined,
+      initialAiPrice: !isAdjustmentMode ? initialAiPrice : undefined,
+      initialAiExplanation: !isAdjustmentMode ? initialAiExplanation : undefined
     })
   }
 

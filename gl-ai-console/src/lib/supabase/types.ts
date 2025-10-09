@@ -20,6 +20,7 @@ export interface Database {
           contact_name: string
           email: string
           current_stage: string
+          project_status: string
           last_activity: string
           created_at: string
           updated_at: string
@@ -31,6 +32,7 @@ export interface Database {
           contact_name: string
           email: string
           current_stage?: string
+          project_status?: string
           last_activity?: string
           created_at?: string
           updated_at?: string
@@ -42,6 +44,7 @@ export interface Database {
           contact_name?: string
           email?: string
           current_stage?: string
+          project_status?: string
           last_activity?: string
           created_at?: string
           updated_at?: string
@@ -181,4 +184,18 @@ export interface ProjectWithDetails extends Project {
   files?: ProjectFile[]
   stageData?: StageData[]
   sprintPricing?: SprintPricing | null
+}
+
+// Project status types
+export type ProjectStatus =
+  | 'active'           // Currently going through pipeline stages
+  | 'not-a-fit'        // Stopped at scoping decision - not a fit
+  | 'proposal-declined' // Stopped at proposal decision - declined
+  | 'onboarding-complete' // All onboarding stages completed
+
+export interface ProjectStatusInfo {
+  status: ProjectStatus
+  displayName: string
+  color: 'blue' | 'red' | 'orange' | 'green'
+  icon: string
 }

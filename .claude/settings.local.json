@@ -16,7 +16,11 @@
       "Bash(git remote add:*)",
       "Bash(git push:*)",
       "Bash(npm run lint:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(node:*)",
+      "Bash(npx playwright install:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

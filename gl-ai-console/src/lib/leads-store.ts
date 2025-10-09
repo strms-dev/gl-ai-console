@@ -13,6 +13,7 @@ function projectToLead(project: Project): Lead {
     contact: project.contact_name,
     email: project.email,
     stage: project.current_stage as Lead['stage'],
+    projectStatus: (project.project_status as Lead['projectStatus']) || 'active',
     lastActivity: formatTimestamp(project.last_activity)
   }
 }

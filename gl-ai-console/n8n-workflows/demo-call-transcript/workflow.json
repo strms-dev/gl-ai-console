@@ -1,0 +1,442 @@
+{
+  "name": "Fireflies Transcript Processing - STRMS Demo Automation",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "Fireflies Webhook - Transcript Complete",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "parameters": {
+        "path": "fireflies-transcript-complete",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "fireflies-transcript-webhook"
+    },
+    {
+      "id": "get-transcript-details",
+      "name": "Get Transcript Title from Fireflies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.fireflies.ai/graphql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"query Transcript($transcriptId: String!) { transcript(id: $transcriptId) { id title date transcript_url sentences { text speaker_name } } }\",\n  \"variables\": {\n    \"transcriptId\": \"{{ $json.body.meetingId }}\"\n  }\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fireflies_api",
+          "name": "Fireflies API Key"
+        }
+      }
+    },
+    {
+      "id": "extract-transcript-data",
+      "name": "Extract Transcript Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Extract transcript from GraphQL response\nconst transcript = $input.item.json.data.transcript;\n\nif (!transcript) {\n  throw new Error('No transcript data found');\n}\n\n// Combine sentences into full transcript text\nconst transcriptText = transcript.sentences\n  .map(s => `${s.speaker_name}: ${s.text}`)\n  .join('\\n');\n\nreturn {\n  json: {\n    transcript_id: transcript.id,\n    title: transcript.title,\n    meeting_date: transcript.date,\n    transcript_url: transcript.transcript_url,\n    transcript_text: transcriptText\n  }\n};"
+      }
+    },
+    {
+      "id": "filter-strms-demos",
+      "name": "Filter STRMS Demo Meetings",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [900, 300],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.title }}",
+              "operation": "contains",
+              "value2": "STRMS Demo"
+            }
+          ]
+        },
+        "combineOperation": "all",
+        "options": {
+          "ignoreCase": true
+        }
+      }
+    },
+    {
+      "id": "webhook-response",
+      "name": "Webhook Response - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 500],
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseData": "{\n  \"status\": \"received\",\n  \"message\": \"Webhook received successfully\"\n}"
+        }
+      }
+    },
+    {
+      "id": "ai-extract-project-data",
+      "name": "AI Extract Project Data",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.1,
+      "position": [1120, 200],
+      "parameters": {
+        "resource": "chat",
+        "operation": "complete",
+        "model": "gpt-4o-mini",
+        "prompt": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a data extraction assistant specializing in sales call analysis. You extract structured data from meeting transcripts and return ONLY valid JSON."
+            },
+            {
+              "role": "user",
+              "content": "=Analyze this sales demo transcript and extract:\n1. Project Name: Generate a descriptive name (e.g., \"{Company} STRMS Implementation\" or \"STRMS Demo - {Date}\" if company unclear)\n2. Company Name: Extract if mentioned (otherwise return \"Unknown Company\")\n3. Contact Name: Extract primary client contact if mentioned (otherwise return \"Unknown Contact\")\n4. Email: Extract if mentioned (otherwise return \"no-email@pending.com\")\n\nReturn ONLY valid JSON with this structure:\n{\n  \"project_name\": \"extracted or generated project name\",\n  \"company\": \"company name or Unknown Company\",\n  \"contact_name\": \"contact name or Unknown Contact\",\n  \"email\": \"email or no-email@pending.com\"\n}\n\nTranscript:\n{{ $json.transcript_text }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 500,
+          "temperature": 0.3
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "openai_api",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "id": "parse-ai-response",
+      "name": "Parse and Validate AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 200],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Parse AI extraction results\nconst aiResponseContent = $input.item.json.choices[0].message.content;\nlet extractedData;\n\ntry {\n  extractedData = JSON.parse(aiResponseContent);\n} catch (error) {\n  const prevNode = $node('Extract Transcript Data').item.json;\n  const meetingDate = new Date(prevNode.meeting_date);\n  extractedData = {\n    project_name: 'STRMS Demo - ' + meetingDate.toISOString().split('T')[0],\n    company: 'Unknown Company',\n    contact_name: 'Unknown Contact',\n    email: 'no-email@pending.com'\n  };\n}\n\nif (!extractedData.project_name || extractedData.project_name === '') {\n  const prevNode = $node('Extract Transcript Data').item.json;\n  const meetingDate = new Date(prevNode.meeting_date);\n  extractedData.project_name = 'STRMS Demo - ' + meetingDate.toISOString().split('T')[0];\n}\n\nextractedData.company = extractedData.company || 'Unknown Company';\nextractedData.contact_name = extractedData.contact_name || 'Unknown Contact';\nextractedData.email = extractedData.email || 'no-email@pending.com';\n\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (!emailRegex.test(extractedData.email)) {\n  extractedData.email = 'no-email@pending.com';\n}\n\nconst prevNode = $node('Extract Transcript Data').item.json;\nreturn {\n  json: {\n    project_name: extractedData.project_name,\n    company: extractedData.company,\n    contact_name: extractedData.contact_name,\n    email: extractedData.email,\n    current_stage: 'demo',\n    project_status: 'active',\n    transcript_id: prevNode.transcript_id,\n    transcript_text: prevNode.transcript_text,\n    meeting_date: prevNode.meeting_date,\n    title: prevNode.title\n  }\n};"
+      }
+    },
+    {
+      "id": "create-project-record",
+      "name": "Create Project in Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1560, 200],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "strms_projects",
+        "dataMode": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "project_name",
+              "fieldValue": "={{ $json.project_name }}"
+            },
+            {
+              "fieldId": "company",
+              "fieldValue": "={{ $json.company }}"
+            },
+            {
+              "fieldId": "contact_name",
+              "fieldValue": "={{ $json.contact_name }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "current_stage",
+              "fieldValue": "demo"
+            },
+            {
+              "fieldId": "project_status",
+              "fieldValue": "active"
+            }
+          ]
+        },
+        "options": {
+          "returnFields": "id"
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase_api",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "id": "prepare-file-upload",
+      "name": "Prepare File for Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 200],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Get project ID from previous step\nconst projectId = $input.item.json.id;\nconst transcriptText = $node('Parse and Validate AI Response').item.json.transcript_text;\nconst projectName = $node('Parse and Validate AI Response').item.json.project_name;\nconst meetingDate = new Date($node('Parse and Validate AI Response').item.json.meeting_date);\n\n// Generate filesystem-safe filename\nconst timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];\nconst sanitizedProjectName = projectName\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '_')\n  .replace(/^_+|_+$/g, '')\n  .substring(0, 50); // Limit length\n\nconst filename = `${sanitizedProjectName}_demo_transcript_${timestamp}.txt`;\n\n// Generate storage path\nconst storagePath = `${projectId}/transcripts/${filename}`;\n\n// Calculate file size\nconst fileSizeBytes = new TextEncoder().encode(transcriptText).length;\n\n// Generate human-readable file name for database\nconst monthNames = [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\",\n  \"Jul\", \"Aug\", \"Sep\", \"Oct\", \"Nov\", \"Dec\"];\nconst company = $node('Parse and Validate AI Response').item.json.company;\nconst humanReadableName = `${company} STRMS Demo Call - ${monthNames[meetingDate.getMonth()]} ${meetingDate.getDate()}, ${meetingDate.getFullYear()}`;\n\n// Convert text to base64 for binary data\nconst base64Data = btoa(unescape(encodeURIComponent(transcriptText)));\n\nreturn {\n  json: {\n    project_id: projectId,\n    filename: filename,\n    storage_path: storagePath,\n    file_size: fileSizeBytes,\n    human_readable_file_name: humanReadableName,\n    transcript_text: transcriptText\n  },\n  binary: {\n    data: {\n      data: base64Data,\n      mimeType: 'text/plain',\n      fileName: filename\n    }\n  }\n};"
+      }
+    },
+    {
+      "id": "upload-to-supabase-storage",
+      "name": "Upload File to Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/strms-project-files/{{ $json.storage_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseServiceRoleKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "text/plain"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "specifyBody": "binaryData",
+        "bodyBinaryPropertyName": "data",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "includeResponseHeaders": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "supabase_storage_auth",
+          "name": "Supabase Storage Auth"
+        }
+      }
+    },
+    {
+      "id": "create-file-record",
+      "name": "Create File Record in Database",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [2220, 200],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "strms_project_files",
+        "dataMode": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "project_id",
+              "fieldValue": "={{ $node('Prepare File for Upload').item.json.project_id }}"
+            },
+            {
+              "fieldId": "file_type_id",
+              "fieldValue": "demo-call-transcript"
+            },
+            {
+              "fieldId": "file_name",
+              "fieldValue": "={{ $node('Prepare File for Upload').item.json.human_readable_file_name }}"
+            },
+            {
+              "fieldId": "file_path",
+              "fieldValue": "={{ $node('Prepare File for Upload').item.json.storage_path }}"
+            },
+            {
+              "fieldId": "file_size",
+              "fieldValue": "={{ $node('Prepare File for Upload').item.json.file_size }}"
+            },
+            {
+              "fieldId": "uploaded_by",
+              "fieldValue": "fireflies-integration"
+            },
+            {
+              "fieldId": "storage_bucket",
+              "fieldValue": "strms-project-files"
+            },
+            {
+              "fieldId": "storage_path",
+              "fieldValue": "={{ $node('Prepare File for Upload').item.json.storage_path }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase_api",
+          "name": "Supabase API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Fireflies Webhook - Transcript Complete": {
+      "main": [
+        [
+          {
+            "node": "Get Transcript Title from Fireflies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Transcript Title from Fireflies": {
+      "main": [
+        [
+          {
+            "node": "Extract Transcript Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Transcript Data": {
+      "main": [
+        [
+          {
+            "node": "Filter STRMS Demo Meetings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter STRMS Demo Meetings": {
+      "main": [
+        [
+          {
+            "node": "AI Extract Project Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Webhook Response - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Extract Project Data": {
+      "main": [
+        [
+          {
+            "node": "Parse and Validate AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse and Validate AI Response": {
+      "main": [
+        [
+          {
+            "node": "Create Project in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Project in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Prepare File for Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare File for Upload": {
+      "main": [
+        [
+          {
+            "node": "Upload File to Supabase Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload File to Supabase Storage": {
+      "main": [
+        [
+          {
+            "node": "Create File Record in Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "executionTimeout": 300,
+    "timezone": "America/New_York"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-15T00:00:00.000Z",
+      "updatedAt": "2025-01-15T00:00:00.000Z",
+      "id": "1",
+      "name": "STRMS"
+    },
+    {
+      "createdAt": "2025-01-15T00:00:00.000Z",
+      "updatedAt": "2025-01-15T00:00:00.000Z",
+      "id": "2",
+      "name": "Automation"
+    },
+    {
+      "createdAt": "2025-01-15T00:00:00.000Z",
+      "updatedAt": "2025-01-15T00:00:00.000Z",
+      "id": "3",
+      "name": "AI"
+    }
+  ],
+  "pinData": {},
+  "meta": {
+    "instanceId": "your-n8n-instance-id"
+  }
+}

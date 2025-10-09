@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import confetti from "canvas-confetti"
 import { TimelineEvent, determineCurrentStage } from "@/lib/timeline-data"
 import { updateLead, getLeadById } from "@/lib/leads-store"
 import { Lead } from "@/lib/dummy-data"
@@ -12,6 +11,8 @@ import { getFileTypeById, UploadedFile } from "@/lib/file-types"
 import { FileUpload } from "@/components/leads/file-upload"
 import { SprintPricingForm } from "@/components/leads/sprint-pricing-form"
 import { getStageData, setStageData, deleteAllStageData } from "@/lib/supabase/stage-data"
+import { confirmSprintPricing, updateConfirmedPricing, getSprintPricing, deleteSprintPricing } from "@/lib/supabase/sprint-pricing"
+import { updateProjectStatus } from "@/lib/supabase/project-status"
 import {
   CheckCircle2,
   XCircle,
@@ -196,8 +197,15 @@ const ActionZone = ({
   selectedDeveloper?: string | null,
   showNotAFitEmail?: boolean,
   decisionMade?: string | null,
-  onSprintPricingConfirm?: (data: { sprintLength: string; price: number; explanation: string }) => void,
-  sprintPricingData?: { sprintLength: string; price: number; explanation: string } | null,
+  onSprintPricingConfirm?: (data: {
+    sprintLength: string
+    price: number
+    explanation: string
+    initialAiSprintLength?: string
+    initialAiPrice?: number
+    initialAiExplanation?: string
+  }) => void,
+  sprintPricingData?: { sprintLength: string; price: number; aiExplanation: string; adjustmentReasoning?: string } | null,
   proposalDeclined?: boolean,
   showProposalAdjustment?: boolean,
   proposalWasAdjusted?: boolean,
@@ -439,7 +447,7 @@ const ActionZone = ({
               </div>
               <div className="pt-2 border-t border-gray-100">
                 <p className="text-sm text-gray-700 leading-relaxed">
-                  <strong>Explanation:</strong> {sprintPricingData.explanation}
+                  <strong>Explanation:</strong> {sprintPricingData.aiExplanation}
                 </p>
               </div>
             </div>
@@ -555,7 +563,7 @@ We've carefully reviewed your requirements and believe we can deliver an excelle
 **Sprint Duration:** ${sprintDuration}
 **Total Investment:** $${sprintPricingData.price.toLocaleString()}
 
-${sprintPricingData.explanation}
+${sprintPricingData.aiExplanation}
 
 ## What's Included
 • Complete automation development and implementation
@@ -900,18 +908,22 @@ The GrowthLab Team`
 
   // Proposal Adjustment Form - show when adjusting proposal
   if (event.type === "proposal-decision" && showProposalAdjustment && onProposalAdjustmentConfirm) {
-    // If no sprint pricing data, create default data
-    const defaultData = sprintPricingData || {
+    // Map sprint pricing data to form format (use current sprint/price, but empty explanation for adjustment mode)
+    const initialData = sprintPricingData ? {
+      sprintLength: sprintPricingData.sprintLength,
+      price: sprintPricingData.price,
+      explanation: "" // Start with empty adjustment reasoning
+    } : {
       sprintLength: "1",
       price: 4000,
-      explanation: "A full sprint is recommended for this project due to moderate complexity requirements."
+      explanation: ""
     }
     return (
       <div className="mt-4">
         <SprintPricingForm
           onConfirm={onProposalAdjustmentConfirm}
           onCancel={() => onAction('cancel_proposal_adjustment')}
-          initialData={defaultData}
+          initialData={initialData}
           isAdjustmentMode={true}
         />
       </div>
@@ -989,7 +1001,7 @@ The GrowthLab Team`
               </div>
               <div className="mt-3">
                 <span className="font-medium">Adjustment Reasoning:</span>
-                <p className="mt-1 text-gray-600 italic">"{sprintPricingData.explanation}"</p>
+                <p className="mt-1 text-gray-600 italic">"{sprintPricingData.adjustmentReasoning}"</p>
               </div>
             </div>
           </div>
@@ -1659,8 +1671,15 @@ const StageCard = ({
   selectedDeveloper?: string | null
   showNotAFitEmail?: boolean
   decisionMade?: string | null
-  onSprintPricingConfirm?: (data: { sprintLength: string; price: number; explanation: string }) => void
-  sprintPricingData?: { sprintLength: string; price: number; explanation: string } | null
+  onSprintPricingConfirm?: (data: {
+    sprintLength: string
+    price: number
+    explanation: string
+    initialAiSprintLength?: string
+    initialAiPrice?: number
+    initialAiExplanation?: string
+  }) => void
+  sprintPricingData?: { sprintLength: string; price: number; aiExplanation: string; adjustmentReasoning?: string } | null
   proposalDeclined?: boolean
   showProposalAdjustment?: boolean
   proposalWasAdjusted?: boolean
@@ -2140,7 +2159,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [sprintPricingData, setSprintPricingData] = useState<{
     sprintLength: string
     price: number
-    explanation: string
+    aiExplanation: string
+    adjustmentReasoning?: string
   } | null>(null)
 
   // Load stage data from Supabase on mount
@@ -2216,10 +2236,20 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
           stagesToComplete.push('setup')
         }
 
-        // Load Sprint Pricing data
-        const sprintData = await getStageData(leadId, 'sprint-pricing', 'pricing_data')
-        if (sprintData && typeof sprintData === 'object') {
-          setSprintPricingData(sprintData as { sprintLength: string; price: number; explanation: string })
+        // Load Sprint Pricing data from dedicated sprint_pricing table
+        const sprintPricing = await getSprintPricing(leadId)
+        if (sprintPricing) {
+          // Map database fields to UI state
+          // Use confirmed values if available (after adjustment), otherwise use AI values
+          const sprintLength = sprintPricing.confirmed_sprint_length || sprintPricing.ai_sprint_length || '1'
+          const price = sprintPricing.confirmed_price || sprintPricing.ai_price || 0
+
+          setSprintPricingData({
+            sprintLength,
+            price,
+            aiExplanation: sprintPricing.ai_explanation || '',
+            adjustmentReasoning: sprintPricing.adjustment_reasoning || undefined
+          })
           // Mark sprint-pricing stage as completed when data exists
           stagesToComplete.push('sprint-pricing')
         }
@@ -2244,22 +2274,15 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const totalCount = events.length
   const progressPercentage = (completedCount / totalCount) * 100
 
-  // Trigger confetti when all stages are completed
+  // Update project status to "onboarding-complete" when all stages are completed
   useEffect(() => {
-    if (completedCount === totalCount && totalCount > 0) {
-      const fireConfetti = () => {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 }
-        })
-      }
-
-      // Small delay to ensure the UI has updated
-      const timer = setTimeout(fireConfetti, 300)
-      return () => clearTimeout(timer)
+    if (completedCount === totalCount && totalCount > 0 && !leadRejected && !proposalDeclined) {
+      updateProjectStatus(leadId, 'onboarding-complete').catch(error => {
+        console.error("Failed to update project status to onboarding-complete:", error)
+      })
     }
-  }, [completedCount, totalCount])
+  }, [completedCount, totalCount, leadId, leadRejected, proposalDeclined])
+
 
 
   const handleToggleCollapse = (id: string) => {
@@ -2410,6 +2433,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         console.error("Failed to save decision to Supabase:", error)
       })
 
+      // Update project status to "not-a-fit"
+      updateProjectStatus(leadId, 'not-a-fit').catch(error => {
+        console.error("Failed to update project status:", error)
+      })
+
       setCompletedStages(prev => new Set(prev).add('decision'))
       return
     }
@@ -2423,6 +2451,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       setShowEmailDraft(false)
       setShowNotAFitEmail(false)
       setSelectedDeveloper(null)
+
+      // Reset project status back to active
+      updateProjectStatus(leadId, 'active').catch(error => {
+        console.error("Failed to reset project status:", error)
+      })
       setCompletedStages(prev => {
         const newSet = new Set(prev)
         newSet.delete('decision') // Mark as not completed
@@ -2441,6 +2474,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     if (action === 'restart_proposal_decision' && eventId === 'proposal-decision') {
       console.log('Restarting proposal decision stage - action handler called')
       setProposalDeclined(false)
+
+      // Reset project status back to active
+      updateProjectStatus(leadId, 'active').catch(error => {
+        console.error("Failed to reset project status:", error)
+      })
 
       // Mark proposal-decision stage as not completed
       setCompletedStages(prev => {
@@ -2516,6 +2554,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
           console.error("Failed to save proposal decision to Supabase:", error)
         })
 
+        // Update project status to "proposal-declined"
+        updateProjectStatus(leadId, 'proposal-declined').catch(error => {
+          console.error("Failed to update project status:", error)
+        })
+
         // All remaining stages will be marked as skipped in the updatedEvents logic
       } else if (action === 'adjust') {
         console.log('Proposal adjustment requested - showing adjustment form')
@@ -2553,9 +2596,9 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         return newSet
       })
 
-      // Delete sprint pricing data from Supabase
-      deleteAllStageData(leadId, 'sprint-pricing').catch(error => {
-        console.error("Failed to delete sprint-pricing stage data from Supabase:", error)
+      // Delete sprint pricing data from Supabase (from dedicated sprint_pricing table)
+      deleteSprintPricing(leadId).catch(error => {
+        console.error("Failed to delete sprint pricing from Supabase:", error)
       })
 
       return
@@ -2827,12 +2870,31 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     }
   }
 
-  const handleSprintPricingConfirm = (data: { sprintLength: string; price: number; explanation: string }) => {
+  const handleSprintPricingConfirm = (data: {
+    sprintLength: string
+    price: number
+    explanation: string
+    initialAiSprintLength?: string
+    initialAiPrice?: number
+    initialAiExplanation?: string
+  }) => {
     console.log('Sprint pricing confirmed:', data)
-    setSprintPricingData(data)
+    setSprintPricingData({
+      sprintLength: data.sprintLength,
+      price: data.price,
+      aiExplanation: data.initialAiExplanation || data.explanation,
+      adjustmentReasoning: undefined
+    })
 
-    // Save sprint pricing data to Supabase
-    setStageData(leadId, 'sprint-pricing', 'pricing_data', data).catch(error => {
+    // Save both AI values (what was initially shown) and confirmed values (what user selected)
+    confirmSprintPricing(
+      leadId,
+      data.initialAiSprintLength || data.sprintLength, // AI values
+      data.initialAiPrice || data.price,
+      data.initialAiExplanation || data.explanation,
+      data.sprintLength, // Confirmed values (may be same or different from AI)
+      data.price
+    ).catch(error => {
       console.error("Failed to save sprint pricing to Supabase:", error)
     })
 
@@ -2850,12 +2912,24 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
   const handleProposalAdjustmentConfirm = (data: { sprintLength: string; price: number; explanation: string }) => {
     console.log('Proposal adjustment confirmed:', data)
-    setSprintPricingData(data)
+    // Keep the original AI explanation and add the adjustment reasoning
+    setSprintPricingData(prev => ({
+      sprintLength: data.sprintLength,
+      price: data.price,
+      aiExplanation: prev?.aiExplanation || '', // Preserve original AI explanation
+      adjustmentReasoning: data.explanation
+    }))
     setShowProposalAdjustment(false)
     setProposalWasAdjusted(true) // Mark that an adjustment was made
 
-    // Save adjusted sprint pricing to Supabase
-    setStageData(leadId, 'sprint-pricing', 'pricing_data', data).catch(error => {
+    // Save confirmed pricing with adjustment reasoning to Supabase
+    // This preserves the original AI explanation and saves the adjustment reasoning separately
+    updateConfirmedPricing(
+      leadId,
+      data.sprintLength,
+      data.price,
+      data.explanation // This is adjustment reasoning, will be saved to adjustment_reasoning field
+    ).catch(error => {
       console.error("Failed to save adjusted sprint pricing to Supabase:", error)
     })
 

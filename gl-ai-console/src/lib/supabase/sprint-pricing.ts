@@ -125,14 +125,21 @@ export async function saveAISprintPricing(
 }
 
 /**
- * Confirm sprint pricing (copy AI values to confirmed or set custom values)
+ * Confirm sprint pricing - saves both AI values (initial) and confirmed values (what user actually selected)
+ * This is called when user confirms the estimate in "Review Sprint Length & Price Estimate" stage
  */
 export async function confirmSprintPricing(
   projectId: string,
+  aiSprintLength: string,
+  aiPrice: number,
+  aiExplanation: string,
   confirmedSprintLength: string,
   confirmedPrice: number
 ): Promise<SprintPricing> {
   return saveSprintPricing(projectId, {
+    aiSprintLength,
+    aiPrice,
+    aiExplanation,
     confirmedSprintLength,
     confirmedPrice
   })

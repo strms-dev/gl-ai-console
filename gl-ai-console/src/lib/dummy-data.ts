@@ -1,3 +1,5 @@
+import { ProjectStatus } from './supabase/types'
+
 export interface Lead {
   id: string
   projectName: string
@@ -5,6 +7,7 @@ export interface Lead {
   contact: string
   email: string
   stage: "new" | "demo" | "readiness" | "decision" | "scoping" | "scoping-prep" | "dev-overview" | "workflow-docs" | "sprint-pricing" | "proposal" | "proposal-decision" | "internal-client-docs" | "ea" | "setup" | "kickoff"
+  projectStatus?: ProjectStatus  // Status of the project (active, not-a-fit, proposal-declined, onboarding-complete)
   lastActivity: string
   readinessScore?: number
   estimatedValue?: number
