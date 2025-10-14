@@ -180,6 +180,7 @@ const ActionZone = ({
   eaWordingGenerated,
   eaWordingGenerating,
   eaConfirmed,
+  readinessGenerating,
   clickupTaskCreated,
   clickupTaskLoading,
   airtableRecordCreated,
@@ -217,6 +218,7 @@ const ActionZone = ({
   eaWordingGenerated?: boolean,
   eaWordingGenerating?: boolean,
   eaConfirmed?: boolean,
+  readinessGenerating?: boolean,
   clickupTaskCreated?: boolean,
   clickupTaskLoading?: boolean,
   airtableRecordCreated?: boolean,
@@ -297,12 +299,26 @@ const ActionZone = ({
                 variant="default"
                 size="sm"
                 onClick={() => onAction('automated')}
-                disabled={!!existingFile}
+                disabled={!!existingFile || readinessGenerating}
                 className="w-full sm:w-auto flex items-center gap-2"
               >
-                <Zap className="w-4 h-4" />
-                {event.actions.automated.label}
+                {readinessGenerating ? (
+                  <>
+                    <RotateCw className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    {event.actions.automated.label}
+                  </>
+                )}
               </Button>
+              {readinessGenerating && (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  AI is generating your readiness assessment. This typically takes 1-2 minutes. Please refresh the page to see the result.
+                </p>
+              )}
             </div>
           )}
 
@@ -1649,6 +1665,7 @@ const StageCard = ({
   eaWordingGenerated,
   eaWordingGenerating,
   eaConfirmed,
+  readinessGenerating,
   clickupTaskCreated,
   clickupTaskLoading,
   airtableRecordCreated,
@@ -1691,6 +1708,7 @@ const StageCard = ({
   eaWordingGenerated?: boolean
   eaWordingGenerating?: boolean
   eaConfirmed?: boolean
+  readinessGenerating?: boolean
   clickupTaskCreated?: boolean
   clickupTaskLoading?: boolean
   airtableRecordCreated?: boolean
@@ -1854,6 +1872,7 @@ const StageCard = ({
                     eaWordingGenerated={event.id === "ea" ? eaWordingGenerated : false}
                     eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
                     eaConfirmed={event.id === "ea" ? eaConfirmed : false}
+                    readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
                     clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                     clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                     airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
@@ -2148,6 +2167,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [eaWordingGenerated, setEaWordingGenerated] = useState(false)
   const [eaWordingGenerating, setEaWordingGenerating] = useState(false)
   const [eaConfirmed, setEaConfirmed] = useState(false)
+  // Readiness Assessment state
+  const [readinessGenerating, setReadinessGenerating] = useState(false)
   // Project Setup state
   const [clickupTaskCreated, setClickupTaskCreated] = useState(false)
   const [clickupTaskLoading, setClickupTaskLoading] = useState(false)
@@ -2682,6 +2703,37 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         newSet.delete('proposal')
         return newSet
       })
+
+      return
+    }
+
+    // Handle automated action for readiness assessment
+    if (action === 'automated' && eventId === 'readiness') {
+      console.log('Triggering AI generation for readiness assessment')
+
+      // Set loading state
+      setReadinessGenerating(true)
+
+      // Send POST request to n8n webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/readiness-assessment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('Readiness assessment workflow triggered successfully')
+          } else {
+            console.error('Failed to trigger readiness assessment workflow:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering readiness assessment workflow:', error)
+        })
 
       return
     }
@@ -3388,6 +3440,7 @@ The GrowthLab Team`
                 eaWordingGenerated={event.id === "ea" ? eaWordingGenerated : false}
                 eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
                 eaConfirmed={event.id === "ea" ? eaConfirmed : false}
+                readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                 clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
@@ -3484,6 +3537,7 @@ The GrowthLab Team`
                 eaWordingGenerated={event.id === "ea" ? eaWordingGenerated : false}
                 eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
                 eaConfirmed={event.id === "ea" ? eaConfirmed : false}
+                readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                 clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}

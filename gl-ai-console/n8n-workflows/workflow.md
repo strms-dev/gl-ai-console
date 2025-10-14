@@ -34,4 +34,4 @@ For each node in the workflow:
 - Check if all required fields are present
 - Verify OAuth is used where available
 Report any issues found. Fix workflow.json if needed.
-Once all validations pass, deploy by deleting any existing workflow and creating new.
+Once all validations pass, deploy the worklow to n8n.

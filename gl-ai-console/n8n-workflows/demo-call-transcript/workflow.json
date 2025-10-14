@@ -315,6 +315,30 @@
       "id": "89c60eb8-9e57-42b4-b1f0-8cb322f6a68f",
       "name": "Wait For File Upload",
       "webhookId": "fa3e5092-6adc-4cec-9f39-a42a258f8446"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.srv1055749.hstgr.cloud/webhook/readiness-assessment",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "project_id",
+              "value": "={{ $('Create Project in Supabase').item.json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2432,
+        352
+      ],
+      "id": "3cf31073-4aac-4959-a195-ae243137706f",
+      "name": "Call Generate Readiness Assessment"
     }
   ],
   "pinData": {
@@ -461,6 +485,17 @@
           }
         ]
       ]
+    },
+    "Create File Record in Database": {
+      "main": [
+        [
+          {
+            "node": "Call Generate Readiness Assessment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -473,7 +508,7 @@
     "saveExecutionProgress": true,
     "executionTimeout": 300
   },
-  "versionId": "124af192-8567-48de-bd2b-bee41a51e3d5",
+  "versionId": "0c38b88f-4583-4f04-be66-8b63c1d54dc6",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
