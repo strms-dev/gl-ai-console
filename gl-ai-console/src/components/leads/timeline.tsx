@@ -2102,6 +2102,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [proposalWasAdjusted, setProposalWasAdjusted] = useState(false)
   const [anchorContactCreated, setAnchorContactCreated] = useState(false)
   const [anchorProposalCreated, setAnchorProposalCreated] = useState(false)
+  const [dealCreated, setDealCreated] = useState(false)
 
   // Sync Timeline internal state with external changes (like file clearing from documents section)
   useEffect(() => {
@@ -2199,6 +2200,12 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
           }
           // Mark decision stage as completed
           stagesToComplete.push('decision')
+        }
+
+        // Load deal creation status
+        const dealCreationStatus = await getStageData(leadId, 'decision', 'deal_created')
+        if (dealCreationStatus === true) {
+          setDealCreated(true)
         }
 
         // Load proposal decision stage data
@@ -2318,6 +2325,43 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     })
   }
 
+  // Create sales pipeline deal via n8n webhook (silent background operation)
+  const createSalesPipelineDeal = async (projectId: string) => {
+    // Check if deal was already created for this project
+    if (dealCreated) {
+      console.log('Sales pipeline deal already created for this project, skipping...')
+      return
+    }
+
+    try {
+      const response = await fetch('https://n8n.srv1055749.hstgr.cloud/webhook/create-sales-pipeline-deal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: projectId
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to create deal: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log('Sales pipeline deal created successfully:', data)
+
+      // Mark as created in state and save to Supabase
+      setDealCreated(true)
+      await setStageData(leadId, 'decision', 'deal_created', true)
+
+      return data
+    } catch (error) {
+      console.error('Error creating sales pipeline deal:', error)
+      // Silent failure - don't interrupt user flow
+    }
+  }
+
   const handleAction = (eventId: string, action: string) => {
     console.log(`Action triggered: ${action} for event ${eventId}`)
 
@@ -2409,6 +2453,17 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       setSelectedDeveloper(developer)
       setShowDeveloperSelection(false)
       setShowEmailDraft(true)
+
+      // Create sales pipeline deal via n8n webhook
+      createSalesPipelineDeal(leadId)
+        .then(() => {
+          console.log('Sales pipeline deal created successfully')
+        })
+        .catch((error) => {
+          console.error('Failed to create sales pipeline deal:', error)
+          // Continue with the flow even if webhook fails
+        })
+
       return
     }
 
@@ -2472,6 +2527,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       setShowEmailDraft(false)
       setShowNotAFitEmail(false)
       setSelectedDeveloper(null)
+      // Don't reset dealCreated - we want to preserve this across stage resets
 
       // Reset project status back to active
       updateProjectStatus(leadId, 'active').catch(error => {
@@ -2483,9 +2539,16 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         return newSet
       })
 
-      // Delete all decision stage data from Supabase
+      // Delete decision stage data from Supabase, but preserve deal_created flag
       deleteAllStageData(leadId, 'decision').catch(error => {
         console.error("Failed to delete decision stage data from Supabase:", error)
+      }).then(() => {
+        // Re-save the deal_created flag if it was set
+        if (dealCreated) {
+          setStageData(leadId, 'decision', 'deal_created', true).catch(error => {
+            console.error("Failed to preserve deal_created flag:", error)
+          })
+        }
       })
 
       return
