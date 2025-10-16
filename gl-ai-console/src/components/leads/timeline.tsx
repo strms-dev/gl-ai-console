@@ -13,6 +13,7 @@ import { SprintPricingForm } from "@/components/leads/sprint-pricing-form"
 import { getStageData, setStageData, deleteAllStageData } from "@/lib/supabase/stage-data"
 import { confirmSprintPricing, updateConfirmedPricing, getSprintPricing, deleteSprintPricing } from "@/lib/supabase/sprint-pricing"
 import { updateProjectStatus } from "@/lib/supabase/project-status"
+import { getFileByType } from "@/lib/supabase/files"
 import {
   CheckCircle2,
   XCircle,
@@ -181,6 +182,7 @@ const ActionZone = ({
   eaWordingGenerating,
   eaConfirmed,
   readinessGenerating,
+  scopingPrepGenerating,
   clickupTaskCreated,
   clickupTaskLoading,
   airtableRecordCreated,
@@ -219,6 +221,7 @@ const ActionZone = ({
   eaWordingGenerating?: boolean,
   eaConfirmed?: boolean,
   readinessGenerating?: boolean,
+  scopingPrepGenerating?: boolean,
   clickupTaskCreated?: boolean,
   clickupTaskLoading?: boolean,
   airtableRecordCreated?: boolean,
@@ -314,11 +317,6 @@ const ActionZone = ({
                   </>
                 )}
               </Button>
-              {readinessGenerating && (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  AI is generating your readiness assessment. This typically takes 1-2 minutes. Please refresh the page to see the result.
-                </p>
-              )}
             </div>
           )}
 
@@ -353,11 +351,20 @@ const ActionZone = ({
                 variant="default"
                 size="sm"
                 onClick={() => onAction('automated')}
-                disabled={!!existingFile}
+                disabled={!!existingFile || scopingPrepGenerating}
                 className="w-full sm:w-auto flex items-center gap-2"
               >
-                <Zap className="w-4 h-4" />
-                {event.actions.automated.label}
+                {scopingPrepGenerating ? (
+                  <>
+                    <RotateCw className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    {event.actions.automated.label}
+                  </>
+                )}
               </Button>
             </div>
           )}
@@ -1666,6 +1673,7 @@ const StageCard = ({
   eaWordingGenerating,
   eaConfirmed,
   readinessGenerating,
+  scopingPrepGenerating,
   clickupTaskCreated,
   clickupTaskLoading,
   airtableRecordCreated,
@@ -1709,6 +1717,7 @@ const StageCard = ({
   eaWordingGenerating?: boolean
   eaConfirmed?: boolean
   readinessGenerating?: boolean
+  scopingPrepGenerating?: boolean
   clickupTaskCreated?: boolean
   clickupTaskLoading?: boolean
   airtableRecordCreated?: boolean
@@ -1873,6 +1882,7 @@ const StageCard = ({
                     eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
                     eaConfirmed={event.id === "ea" ? eaConfirmed : false}
                     readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
+                    scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
                     clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                     clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                     airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
@@ -2170,6 +2180,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [eaConfirmed, setEaConfirmed] = useState(false)
   // Readiness Assessment state
   const [readinessGenerating, setReadinessGenerating] = useState(false)
+  // Scoping Call Prep state
+  const [scopingPrepGenerating, setScopingPrepGenerating] = useState(false)
   // Project Setup state
   const [clickupTaskCreated, setClickupTaskCreated] = useState(false)
   const [clickupTaskLoading, setClickupTaskLoading] = useState(false)
@@ -2478,6 +2490,30 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       setStageData(leadId, 'decision', 'decision_made', decisionValue).catch(error => {
         console.error("Failed to save decision to Supabase:", error)
       })
+
+      // Trigger scoping call prep generation via n8n webhook
+      console.log('Triggering scoping call prep generation workflow')
+      setScopingPrepGenerating(true)
+
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/scoping-call-prep', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('Scoping call prep workflow triggered successfully')
+          } else {
+            console.error('Failed to trigger scoping call prep workflow:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering scoping call prep workflow:', error)
+        })
 
       // Mark decision stage as completed and advance to scoping
       setCompletedStages(prev => new Set(prev).add('decision'))
@@ -2796,6 +2832,37 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         })
         .catch(error => {
           console.error('Error triggering readiness assessment workflow:', error)
+        })
+
+      return
+    }
+
+    // Handle automated action for scoping call prep
+    if (action === 'automated' && eventId === 'scoping-prep') {
+      console.log('Triggering AI generation for scoping call prep')
+
+      // Set loading state
+      setScopingPrepGenerating(true)
+
+      // Send POST request to n8n webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/scoping-call-prep', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('Scoping call prep workflow triggered successfully')
+          } else {
+            console.error('Failed to trigger scoping call prep workflow:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering scoping call prep workflow:', error)
         })
 
       return
@@ -3444,6 +3511,96 @@ The GrowthLab Team`
     }
   }, [leadId, updatedEvents])
 
+  // Poll for readiness assessment file when generating
+  useEffect(() => {
+    if (!readinessGenerating) return
+
+    console.log('Starting polling for readiness assessment file...')
+
+    const checkForFile = async () => {
+      try {
+        const file = await getFileByType(leadId, 'readiness-pdf')
+        if (file) {
+          console.log('Readiness assessment file detected:', file)
+          setReadinessGenerating(false)
+
+          // Trigger file uploaded callback to update UI
+          if (onFileUploaded) {
+            const uploadedFile: UploadedFile = {
+              id: file.id,
+              fileTypeId: 'readiness-pdf',
+              fileName: file.file_name,
+              uploadDate: file.uploaded_at,
+              fileSize: file.file_size,
+              uploadedBy: file.uploaded_by,
+              storagePath: file.storage_path
+            }
+            onFileUploaded(uploadedFile)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for readiness file:', error)
+      }
+    }
+
+    // Check immediately
+    checkForFile()
+
+    // Then poll every 5 seconds
+    const interval = setInterval(checkForFile, 5000)
+
+    // Cleanup on unmount or when generating stops
+    return () => {
+      console.log('Stopping readiness assessment polling')
+      clearInterval(interval)
+    }
+  }, [readinessGenerating, leadId, onFileUploaded])
+
+  // Poll for scoping prep file when generating
+  useEffect(() => {
+    if (!scopingPrepGenerating) return
+
+    console.log('Starting polling for scoping prep file...')
+
+    const checkForFile = async () => {
+      try {
+        const file = await getFileByType(leadId, 'scoping-prep-doc')
+        if (file) {
+          console.log('Scoping prep file detected:', file)
+          setScopingPrepGenerating(false)
+
+          // Trigger file uploaded callback to update UI
+          if (onFileUploaded) {
+            const uploadedFile: UploadedFile = {
+              id: file.id,
+              fileTypeId: 'scoping-prep-doc',
+              fileName: file.file_name,
+              uploadDate: file.uploaded_at,
+              fileSize: file.file_size,
+              uploadedBy: file.uploaded_by,
+              storagePath: file.storage_path
+            }
+            onFileUploaded(uploadedFile)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for scoping prep file:', error)
+      }
+    }
+
+    // Check immediately
+    checkForFile()
+
+    // Then poll every 5 seconds
+    const interval = setInterval(checkForFile, 5000)
+
+    // Cleanup on unmount or when generating stops
+    return () => {
+      console.log('Stopping scoping prep polling')
+      clearInterval(interval)
+    }
+  }, [scopingPrepGenerating, leadId, onFileUploaded])
+
   return hideHeader ? (
     // When hideHeader is true, return just the content without Card wrapper
     <div className="space-y-8 p-6">
@@ -3504,6 +3661,7 @@ The GrowthLab Team`
                 eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
                 eaConfirmed={event.id === "ea" ? eaConfirmed : false}
                 readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
+                scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                 clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
@@ -3601,6 +3759,7 @@ The GrowthLab Team`
                 eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
                 eaConfirmed={event.id === "ea" ? eaConfirmed : false}
                 readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
+                scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                 clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
