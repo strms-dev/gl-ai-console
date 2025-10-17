@@ -185,6 +185,8 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
   }, [id, timeline])
 
   const handleFileUploaded = async (file: UploadedFile) => {
+    console.log('=== handleFileUploaded called ===', file.fileTypeId)
+
     // Optimistic update - update UI immediately
     setUploadedFiles(prev => ({
       ...prev,
@@ -227,6 +229,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
         return
       }
     }
+
 
     // Define file to stage transition mappings
     const fileStageMap: Record<string, Lead['stage']> = {

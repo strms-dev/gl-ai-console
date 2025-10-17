@@ -183,6 +183,7 @@ const ActionZone = ({
   eaConfirmed,
   readinessGenerating,
   scopingPrepGenerating,
+  workflowDocsGenerating,
   clickupTaskCreated,
   clickupTaskLoading,
   airtableRecordCreated,
@@ -222,6 +223,7 @@ const ActionZone = ({
   eaConfirmed?: boolean,
   readinessGenerating?: boolean,
   scopingPrepGenerating?: boolean,
+  workflowDocsGenerating?: boolean,
   clickupTaskCreated?: boolean,
   clickupTaskLoading?: boolean,
   airtableRecordCreated?: boolean,
@@ -400,11 +402,20 @@ const ActionZone = ({
                 variant="default"
                 size="sm"
                 onClick={() => onAction('automated')}
-                disabled={!!existingFile}
+                disabled={!!existingFile || workflowDocsGenerating}
                 className="w-full sm:w-auto flex items-center gap-2"
               >
-                <Zap className="w-4 h-4" />
-                {event.actions.automated.label}
+                {workflowDocsGenerating ? (
+                  <>
+                    <RotateCw className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    {event.actions.automated.label}
+                  </>
+                )}
               </Button>
             </div>
           )}
@@ -428,8 +439,7 @@ const ActionZone = ({
                 <Lightbulb className="w-4 h-4" /> Developer Note:
               </p>
               <p className="text-xs text-gray-700 leading-relaxed">
-                Pass this description to a custom GPT to identify any gaps or missing edge cases that should be included.
-                Then use the updated description with Claude Desktop and the n8n MCP to get a starting point for this automation in n8n.
+                Use this n8n workflow description with Claude Code and the n8n MCP to get a starting point for this automation in n8n.
               </p>
             </div>
           </div>
@@ -1674,6 +1684,7 @@ const StageCard = ({
   eaConfirmed,
   readinessGenerating,
   scopingPrepGenerating,
+  workflowDocsGenerating,
   clickupTaskCreated,
   clickupTaskLoading,
   airtableRecordCreated,
@@ -1718,6 +1729,7 @@ const StageCard = ({
   eaConfirmed?: boolean
   readinessGenerating?: boolean
   scopingPrepGenerating?: boolean
+  workflowDocsGenerating?: boolean
   clickupTaskCreated?: boolean
   clickupTaskLoading?: boolean
   airtableRecordCreated?: boolean
@@ -1883,6 +1895,7 @@ const StageCard = ({
                     eaConfirmed={event.id === "ea" ? eaConfirmed : false}
                     readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
                     scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
+                    workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
                     clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                     clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                     airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
@@ -2154,21 +2167,25 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
           // Capture current completed stages to check
           setCompletedStages(currentCompleted => {
             const newCompleted = new Set(currentCompleted)
+            const wasJustCompleted = !currentCompleted.has(stage) // Check if this is a NEW completion
             newCompleted.add(stage)
 
-            // Also update collapsed items, but only expand next stage if it's not completed
-            setCollapsedItems(prev => {
-              const newSet = new Set(prev)
-              newSet.add(stage) // Collapse current stage
-              // Only expand next stage if it hasn't been manually completed yet
-              if (nextStage && !newCompleted.has(nextStage)) {
-                newSet.delete(nextStage) // Expand next stage
-              }
-              return newSet
-            })
+            // Only update collapsed items if the stage was JUST completed (not already completed)
+            if (wasJustCompleted) {
+              setCollapsedItems(prev => {
+                const newSet = new Set(prev)
+                newSet.add(stage) // Collapse current stage
+                // Only expand next stage if it hasn't been manually completed yet
+                if (nextStage && !newCompleted.has(nextStage)) {
+                  newSet.delete(nextStage) // Expand next stage
+                }
+                return newSet
+              })
+            }
 
             return newCompleted
           })
+
         }, 100) // Small delay to let animation start
       }
     })
@@ -2182,6 +2199,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [readinessGenerating, setReadinessGenerating] = useState(false)
   // Scoping Call Prep state
   const [scopingPrepGenerating, setScopingPrepGenerating] = useState(false)
+  // N8N Workflow Docs state
+  const [workflowDocsGenerating, setWorkflowDocsGenerating] = useState(false)
   // Project Setup state
   const [clickupTaskCreated, setClickupTaskCreated] = useState(false)
   const [clickupTaskLoading, setClickupTaskLoading] = useState(false)
@@ -2868,6 +2887,37 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       return
     }
 
+    // Handle automated action for n8n workflow description
+    if (action === 'automated' && eventId === 'workflow-docs') {
+      console.log('Triggering AI generation for n8n workflow description')
+
+      // Set loading state
+      setWorkflowDocsGenerating(true)
+
+      // Send POST request to n8n webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/generate-n8n-workflow-description', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('N8N workflow description generation triggered successfully')
+          } else {
+            console.error('Failed to trigger n8n workflow description generation:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering n8n workflow description generation:', error)
+        })
+
+      return
+    }
+
     // Simulate automation delay for demo purposes
     if (action === 'automated') {
       setTimeout(() => {
@@ -2892,6 +2942,34 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
   const handleFileUploaded = (file: UploadedFile) => {
     console.log(`File uploaded: ${file.fileName} for ${file.fileTypeId}`)
+
+    // Handle developer overview special case - trigger workflow docs generation
+    // This needs to happen BEFORE early return so it runs even with parent callback
+    if (file.fileTypeId === 'developer-audio-overview') {
+      console.log('Developer overview uploaded - triggering workflow docs generation')
+      setWorkflowDocsGenerating(true)
+
+      // Send POST request to n8n webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/generate-n8n-workflow-description', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('N8N workflow description generation triggered successfully')
+          } else {
+            console.error('Failed to trigger n8n workflow description generation:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering n8n workflow description generation:', error)
+        })
+    }
 
     // Store the uploaded file
     if (onFileUploaded) {
@@ -3601,6 +3679,51 @@ The GrowthLab Team`
     }
   }, [scopingPrepGenerating, leadId, onFileUploaded])
 
+  // Poll for workflow docs file when generating
+  useEffect(() => {
+    if (!workflowDocsGenerating) return
+
+    console.log('Starting polling for workflow docs file...')
+
+    const checkForFile = async () => {
+      try {
+        const file = await getFileByType(leadId, 'workflow-description')
+        if (file) {
+          console.log('Workflow docs file detected:', file)
+          setWorkflowDocsGenerating(false)
+
+          // Trigger file uploaded callback to update UI
+          if (onFileUploaded) {
+            const uploadedFile: UploadedFile = {
+              id: file.id,
+              fileTypeId: 'workflow-description',
+              fileName: file.file_name,
+              uploadDate: file.uploaded_at,
+              fileSize: file.file_size,
+              uploadedBy: file.uploaded_by,
+              storagePath: file.storage_path
+            }
+            onFileUploaded(uploadedFile)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for workflow docs file:', error)
+      }
+    }
+
+    // Check immediately
+    checkForFile()
+
+    // Then poll every 5 seconds
+    const interval = setInterval(checkForFile, 5000)
+
+    // Cleanup on unmount or when generating stops
+    return () => {
+      console.log('Stopping workflow docs polling')
+      clearInterval(interval)
+    }
+  }, [workflowDocsGenerating, leadId, onFileUploaded])
+
   return hideHeader ? (
     // When hideHeader is true, return just the content without Card wrapper
     <div className="space-y-8 p-6">
@@ -3662,6 +3785,7 @@ The GrowthLab Team`
                 eaConfirmed={event.id === "ea" ? eaConfirmed : false}
                 readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
                 scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
+                workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                 clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
@@ -3760,6 +3884,7 @@ The GrowthLab Team`
                 eaConfirmed={event.id === "ea" ? eaConfirmed : false}
                 readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
                 scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
+                workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                 clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}

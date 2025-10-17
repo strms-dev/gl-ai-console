@@ -137,13 +137,13 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       id: "dev-overview",
       type: "dev-overview",
       title: "Developer Overview",
-      description: "Developer creates detailed overview of the lead's automation (audio recording or written document) and uploads it manually",
+      description: "Developer creates a written overview document describing the lead's automation and uploads it manually",
       timestamp: "",
       status: "pending",
-      icon: "headphones",
+      icon: "file-text",
       automationLevel: "manual-intervention",
       actions: {
-        manual: { label: "Upload Developer Overview (Audio or Document)" }
+        manual: { label: "Upload Developer Overview Document" }
       }
     },
     {

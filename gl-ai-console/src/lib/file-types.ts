@@ -1,4 +1,4 @@
-import { LucideIcon, Mic, BarChart3, ClipboardList, Target, Headphones, RefreshCw, FileText, Rocket } from 'lucide-react'
+import { LucideIcon, Mic, BarChart3, ClipboardList, Target, FileText, RefreshCw, Rocket } from 'lucide-react'
 
 export interface FileType {
   id: string
@@ -50,10 +50,10 @@ export const fileTypes: FileType[] = [
   {
     id: 'developer-audio-overview',
     label: 'Developer Overview',
-    description: 'Developer overview of project automation',
-    acceptedTypes: ['.mp3', '.wav', '.m4a', '.pdf', '.doc', '.docx'],
-    icon: '🎧',
-    IconComponent: Headphones,
+    description: 'Written overview document of project automation approach',
+    acceptedTypes: ['.pdf', '.doc', '.docx', '.txt'],
+    icon: '📄',
+    IconComponent: FileText,
     category: 'technical'
   },
   {
