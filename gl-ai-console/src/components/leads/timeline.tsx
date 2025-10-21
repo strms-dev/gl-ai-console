@@ -188,8 +188,12 @@ const ActionZone = ({
   clickupTaskLoading,
   airtableRecordCreated,
   airtableRecordLoading,
+  hubspotDealMoved,
+  hubspotDealMoving,
   setupEmailCopied,
-  setupEmailSent
+  setupEmailSent,
+  aiSprintEstimatesLoading,
+  aiSprintEstimatesAvailable
 }: {
   event: TimelineEvent,
   onAction: (action: string) => void,
@@ -228,8 +232,12 @@ const ActionZone = ({
   clickupTaskLoading?: boolean,
   airtableRecordCreated?: boolean,
   airtableRecordLoading?: boolean,
+  hubspotDealMoved?: boolean,
+  hubspotDealMoving?: boolean,
   setupEmailCopied?: boolean,
-  setupEmailSent?: boolean
+  setupEmailSent?: boolean,
+  aiSprintEstimatesLoading?: boolean,
+  aiSprintEstimatesAvailable?: boolean
 }) => {
   const [emailCopied, setEmailCopied] = useState(false)
 
@@ -500,13 +508,41 @@ const ActionZone = ({
       )
     }
 
+    // Show loading animation if AI estimates are being generated
+    if (aiSprintEstimatesLoading) {
+      return (
+        <div className="mt-4 p-6 bg-gradient-to-r from-[#407B9D]/10 to-[#95CBD7]/10 border border-[#407B9D]/30 rounded-xl">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-[#95CBD7]/30 border-t-[#407B9D] rounded-full animate-spin"></div>
+              <Calculator className="w-6 h-6 text-[#407B9D] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+            </div>
+            <div className="text-center">
+              <h3 className="font-bold text-lg text-gray-800 mb-2" style={{fontFamily: 'var(--font-heading)'}}>
+                Generating AI Sprint Estimates...
+              </h3>
+              <p className="text-sm text-gray-600">
+                Our AI is analyzing your workflow documentation to estimate sprint length and pricing.
+                <br />
+                This usually takes 30-60 seconds.
+              </p>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     // Show the custom pricing form for pending/in-progress stage
     if (onSprintPricingConfirm) {
       return (
         <div className="mt-4">
           <SprintPricingForm
             onConfirm={onSprintPricingConfirm}
-            variant="compact"
+            initialData={sprintPricingData ? {
+              sprintLength: sprintPricingData.sprintLength,
+              price: sprintPricingData.price,
+              explanation: sprintPricingData.aiExplanation
+            } : undefined}
           />
         </div>
       )
@@ -1315,6 +1351,44 @@ The GrowthLab Team`
                 )}
               </div>
             </div>
+
+            {/* Move HubSpot Deal To Closed Won */}
+            <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="w-6 h-6 text-gray-600" />
+                <div>
+                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Move HubSpot Deal To Closed Won</h4>
+                </div>
+              </div>
+              <div className="flex items-center">
+                {(() => {
+                  console.log('HubSpot UI - hubspotDealMoved:', hubspotDealMoved, 'hubspotDealMoving:', hubspotDealMoving)
+                  return null
+                })()}
+                {hubspotDealMoved ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    <span className="text-sm font-medium">Moved</span>
+                  </div>
+                ) : hubspotDealMoving ? (
+                  <div className="flex items-center gap-2 text-[#407B9D]">
+                    <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm">Moving...</span>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      console.log('Move button clicked - calling onAction')
+                      onAction('move_hubspot_deal')
+                    }}
+                    size="sm"
+                    className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
+                  >
+                    Move
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Kickoff Email Draft */}
@@ -1689,8 +1763,12 @@ const StageCard = ({
   clickupTaskLoading,
   airtableRecordCreated,
   airtableRecordLoading,
+  hubspotDealMoved,
+  hubspotDealMoving,
   setupEmailCopied,
   setupEmailSent,
+  aiSprintEstimatesLoading,
+  aiSprintEstimatesAvailable,
   completionDate
 }: {
   event: TimelineEvent
@@ -1734,8 +1812,12 @@ const StageCard = ({
   clickupTaskLoading?: boolean
   airtableRecordCreated?: boolean
   airtableRecordLoading?: boolean
+  hubspotDealMoved?: boolean
+  hubspotDealMoving?: boolean
   setupEmailCopied?: boolean
   setupEmailSent?: boolean
+  aiSprintEstimatesLoading?: boolean
+  aiSprintEstimatesAvailable?: boolean
   completionDate?: string
 }) => {
   const isActive = event.status === "in_progress" || event.status === "action-required"
@@ -1900,8 +1982,12 @@ const StageCard = ({
                     clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                     airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
                     airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
+                    hubspotDealMoved={event.id === "setup" ? hubspotDealMoved : false}
+                    hubspotDealMoving={event.id === "setup" ? hubspotDealMoving : false}
                     setupEmailCopied={event.id === "setup" ? setupEmailCopied : false}
                     setupEmailSent={event.id === "setup" ? setupEmailSent : false}
+                    aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
+                    aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
                   />
                 ) : null}
 
@@ -2067,6 +2153,25 @@ const StageCard = ({
                         )}
                       </div>
 
+                      {/* HubSpot Deal Status */}
+                      <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <TrendingUp className="w-5 h-5 text-gray-600" />
+                          <span className="font-medium text-gray-700">HubSpot Deal Moved to Closed Won</span>
+                        </div>
+                        {hubspotDealMoved ? (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
+                            <span className="text-sm font-medium">Moved</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <Circle className="w-5 h-5 text-gray-400" />
+                            <span className="text-sm font-medium">Not Moved</span>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Kickoff Email Status */}
                       <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
                         <div className="flex items-center gap-3">
@@ -2206,6 +2311,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [clickupTaskLoading, setClickupTaskLoading] = useState(false)
   const [airtableRecordCreated, setAirtableRecordCreated] = useState(false)
   const [airtableRecordLoading, setAirtableRecordLoading] = useState(false)
+  const [hubspotDealMoved, setHubspotDealMoved] = useState(false)
+  const [hubspotDealMoving, setHubspotDealMoving] = useState(false)
   const [setupEmailCopied, setSetupEmailCopied] = useState(false)
   const [setupEmailSent, setSetupEmailSent] = useState(false)
   // Sprint pricing form is always shown for sprint-pricing stage
@@ -2215,6 +2322,9 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     aiExplanation: string
     adjustmentReasoning?: string
   } | null>(null)
+  // AI Sprint Pricing state - for polling n8n workflow results
+  const [aiSprintEstimatesLoading, setAiSprintEstimatesLoading] = useState(false)
+  const [aiSprintEstimatesAvailable, setAiSprintEstimatesAvailable] = useState(false)
 
   // Load stage data from Supabase on mount
   useEffect(() => {
@@ -2288,6 +2398,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
           setAirtableRecordCreated(true)
         }
 
+        const hubspotDeal = await getStageData(leadId, 'setup', 'hubspot_deal_moved')
+        if (hubspotDeal === true) {
+          setHubspotDealMoved(true)
+        }
+
         const emailSent = await getStageData(leadId, 'setup', 'setup_email_sent')
         if (emailSent === true) {
           setSetupEmailSent(true)
@@ -2298,20 +2413,31 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         // Load Sprint Pricing data from dedicated sprint_pricing table
         const sprintPricing = await getSprintPricing(leadId)
         if (sprintPricing) {
-          // Map database fields to UI state
-          // Use confirmed values if available (after adjustment), otherwise use AI values
-          const sprintLength = sprintPricing.confirmed_sprint_length || sprintPricing.ai_sprint_length || '1'
-          const price = sprintPricing.confirmed_price || sprintPricing.ai_price || 0
+          // Check if user has confirmed the estimates (confirmed values exist)
+          const hasConfirmedValues = sprintPricing.confirmed_sprint_length && sprintPricing.confirmed_price
 
-          setSprintPricingData({
-            sprintLength,
-            price,
-            aiExplanation: sprintPricing.ai_explanation || '',
-            adjustmentReasoning: sprintPricing.adjustment_reasoning || undefined
-          })
-          // Mark sprint-pricing stage as completed when data exists
-          stagesToComplete.push('sprint-pricing')
+          if (hasConfirmedValues) {
+            // User has confirmed - use confirmed values and mark stage as completed
+            setSprintPricingData({
+              sprintLength: sprintPricing.confirmed_sprint_length!,
+              price: sprintPricing.confirmed_price!,
+              aiExplanation: sprintPricing.ai_explanation || '',
+              adjustmentReasoning: sprintPricing.adjustment_reasoning || undefined
+            })
+            stagesToComplete.push('sprint-pricing')
+          } else if (sprintPricing.ai_sprint_length && sprintPricing.ai_price) {
+            // AI estimates are available but not yet confirmed by user
+            setSprintPricingData({
+              sprintLength: sprintPricing.ai_sprint_length,
+              price: sprintPricing.ai_price,
+              aiExplanation: sprintPricing.ai_explanation || '',
+              adjustmentReasoning: undefined
+            })
+            setAiSprintEstimatesAvailable(true)
+            // Do NOT mark as completed - user needs to review and confirm
+          }
         }
+
 
         // Update completedStages with all stages that should be marked as completed
         if (stagesToComplete.length > 0) {
@@ -2328,6 +2454,48 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
     loadStageData()
   }, [leadId])
+
+  // Poll for AI sprint estimates when workflow-docs stage is completed but sprint pricing not yet available
+  useEffect(() => {
+    // Only poll if workflow-docs is completed and we don't have AI estimates yet and not already loading
+    const shouldPoll = completedStages.has('workflow-docs') && 
+                      !completedStages.has('sprint-pricing') &&
+                      !aiSprintEstimatesAvailable &&
+                      !sprintPricingData // Also check if we don't have pricing data
+
+    if (!shouldPoll) {
+      // Reset loading state if we're not polling (data already exists or stage is completed)
+      setAiSprintEstimatesLoading(false)
+      return
+    }
+
+    // Set loading state
+    setAiSprintEstimatesLoading(true)
+
+    // Poll every 3 seconds for AI estimates
+    const pollInterval = setInterval(async () => {
+      try {
+        const sprintPricing = await getSprintPricing(leadId)
+        if (sprintPricing && sprintPricing.ai_sprint_length && sprintPricing.ai_price) {
+          // AI estimates are now available
+          setSprintPricingData({
+            sprintLength: sprintPricing.ai_sprint_length,
+            price: sprintPricing.ai_price,
+            aiExplanation: sprintPricing.ai_explanation || '',
+            adjustmentReasoning: undefined
+          })
+          setAiSprintEstimatesAvailable(true)
+          setAiSprintEstimatesLoading(false)
+          clearInterval(pollInterval)
+        }
+      } catch (error) {
+        console.error("Error polling for AI sprint estimates:", error)
+      }
+    }, 3000) // Poll every 3 seconds
+
+    // Cleanup on unmount or when dependencies change
+    return () => clearInterval(pollInterval)
+  }, [leadId, completedStages, aiSprintEstimatesAvailable, sprintPricingData])
 
   const completedCount = completedStages.size
   const totalCount = events.length
@@ -2446,6 +2614,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       setClickupTaskLoading(false)
       setAirtableRecordCreated(false)
       setAirtableRecordLoading(false)
+      setHubspotDealMoved(false)
+      setHubspotDealMoving(false)
       setSetupEmailCopied(false)
       setSetupEmailSent(false)
 
@@ -3139,20 +3309,27 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     initialAiExplanation?: string
   }) => {
     console.log('Sprint pricing confirmed:', data)
+    
+    // Use the AI estimates from sprintPricingData if available (from n8n workflow)
+    // Otherwise fallback to the initial values passed from the form
+    const aiSprintLength = sprintPricingData?.sprintLength || data.initialAiSprintLength || data.sprintLength
+    const aiPrice = sprintPricingData?.price || data.initialAiPrice || data.price
+    const aiExplanation = sprintPricingData?.aiExplanation || data.initialAiExplanation || data.explanation
+    
     setSprintPricingData({
       sprintLength: data.sprintLength,
       price: data.price,
-      aiExplanation: data.initialAiExplanation || data.explanation,
+      aiExplanation: aiExplanation,
       adjustmentReasoning: undefined
     })
 
-    // Save both AI values (what was initially shown) and confirmed values (what user selected)
+    // Save both AI values (from n8n workflow) and confirmed values (what user selected/adjusted)
     confirmSprintPricing(
       leadId,
-      data.initialAiSprintLength || data.sprintLength, // AI values
-      data.initialAiPrice || data.price,
-      data.initialAiExplanation || data.explanation,
-      data.sprintLength, // Confirmed values (may be same or different from AI)
+      aiSprintLength, // AI-generated values from n8n
+      aiPrice,
+      aiExplanation,
+      data.sprintLength, // User-confirmed values (may be same or adjusted from AI)
       data.price
     ).catch(error => {
       console.error("Failed to save sprint pricing to Supabase:", error)
@@ -3293,6 +3470,22 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
         // Save to Supabase
         setStageData(leadId, 'setup', 'airtable_record_created', true).catch(error => {
+          console.error("Failed to save Setup data to Supabase:", error)
+        })
+      }, 3000)
+    } else if (action === 'move_hubspot_deal') {
+      console.log('move_hubspot_deal action triggered')
+      setHubspotDealMoving(true)
+      console.log('setHubspotDealMoving(true) called')
+      // Simulate 3 second loading
+      setTimeout(() => {
+        console.log('Timeout completed - setting moved state')
+        setHubspotDealMoving(false)
+        setHubspotDealMoved(true)
+        console.log('HubSpot deal moved to Closed Won')
+
+        // Save to Supabase
+        setStageData(leadId, 'setup', 'hubspot_deal_moved', true).catch(error => {
           console.error("Failed to save Setup data to Supabase:", error)
         })
       }, 3000)
@@ -3790,8 +3983,12 @@ The GrowthLab Team`
                 clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
                 airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
+                hubspotDealMoved={event.id === "setup" ? hubspotDealMoved : false}
+                hubspotDealMoving={event.id === "setup" ? hubspotDealMoving : false}
                 setupEmailCopied={event.id === "setup" ? setupEmailCopied : false}
                 setupEmailSent={event.id === "setup" ? setupEmailSent : false}
+                aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
+                aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
                 completionDate={completionDates[event.id]}
               />
             )
@@ -3889,8 +4086,12 @@ The GrowthLab Team`
                 clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
                 airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
+                hubspotDealMoved={event.id === "setup" ? hubspotDealMoved : false}
+                hubspotDealMoving={event.id === "setup" ? hubspotDealMoving : false}
                 setupEmailCopied={event.id === "setup" ? setupEmailCopied : false}
                 setupEmailSent={event.id === "setup" ? setupEmailSent : false}
+                aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
+                aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
                 completionDate={completionDates[event.id]}
               />
             )

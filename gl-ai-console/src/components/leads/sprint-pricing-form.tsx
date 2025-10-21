@@ -97,9 +97,8 @@ export function SprintPricingForm({ onConfirm, onCancel, initialData, isAdjustme
     const selectedOption = SPRINT_OPTIONS.find(option => option.value === value)
     if (selectedOption) {
       setPrice(selectedOption.price)
-      if (!isAdjustmentMode) {
-        setExplanation(generateRandomExplanation(value))
-      }
+      // Don't regenerate explanation - preserve the AI-generated one
+      // Users can manually adjust the price if needed
     }
   }
 

@@ -1,5 +1,5 @@
 {
-  "name": "Generate n8n Workflow Description",
+  "name": "Generate n8n Workflow Description & Sprint Estimate",
   "nodes": [
     {
       "parameters": {
@@ -348,6 +348,95 @@
           "name": "GL AI Console Supabase Key"
         }
       }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5-nano",
+          "mode": "list",
+          "cachedResultName": "GPT-5-NANO"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an expert project estimator specializing in n8n workflow automation projects. Analyze workflow descriptions and estimate the development effort required. Choose ONE sprint length based on complexity and scope:\n\n0.5 Sprint (≈2.5 days): Simple single-purpose automation, 1–2 basic integrations (e.g., webhook→email), minimal data transformation, no complex branching or error handling, straightforward flow.\n\n1 Sprint (≈5 days): Moderate complexity with 2–4 integrations, some data transformation, basic conditional logic (if/then), standard error handling, single linear workflow.\n\n1.5 Sprint (≈7.5 days): Complex automation with 4–6 integrations, multiple conditional branches, significant data transformation or aggregation, multiple third-party APIs, loops or custom functions, moderate error handling.\n\n2 Sprint (≈10 days): Comprehensive multi-system integration (6+ systems), complex business logic, advanced data processing and enrichment, multiple interconnected workflows, extensive error handling and monitoring, multi-scenario testing, custom authentication or complex APIs.\n\nRespond ONLY with valid JSON in this exact format:\n{\"sprint_length\": \"1.5\", \"explanation\": \"Your brief explanation here (2–3 sentences max)\"}\n\nYour explanation must justify the sprint length based on:\n\nNumber of integrations/systems\n\nComplexity of logic and data transformations\n\nError handling and edge-case coverage\n\nTesting and validation needs\n\nDo NOT include pricing or cost information. Focus solely on effort estimation.",
+              "role": "system"
+            },
+            {
+              "content": "=Analyze the following n8n workflow description and determine the appropriate sprint length.\n\n=== WORKFLOW DESCRIPTION ===\n{{ $('Format n8n Workflow Description').item.json.formatted_workflow_description }}\n\nBased on this information, estimate the sprint length required to build this automation. Consider the number of integrations, complexity of logic, data transformations needed, and overall scope.\n\nRespond with JSON only."
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        2800,
+        -192
+      ],
+      "id": "b67b3af8-c5ff-4934-acb3-e58af4679b99",
+      "name": "Generate Sprint Length Estimation",
+      "credentials": {
+        "openAiApi": {
+          "id": "lSSimk5MMw6cbVWo",
+          "name": "Automation OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and map sprint length to price\nconst projectId = $('Catch Project ID').first().json.body.project_id;\n\n// The AI response structure from the screenshot\nconst aiMessage = $input.first().json.message;\nconst sprintLength = aiMessage.content.sprint_length;\nconst explanation = aiMessage.content.explanation;\n\n// Sprint length to price mapping (matches frontend)\nconst SPRINT_PRICING = {\n  \"0.5\": 3000,\n  \"1\": 5000,\n  \"1.5\": 6500,\n  \"2\": 8000\n};\n\nlet aiSprintLength = \"1\"; // Default fallback\nlet aiExplanation = \"\";\nlet aiPrice = 5000; // Default fallback\n\n// Check if we have valid sprint length from AI\nif (sprintLength && SPRINT_PRICING[sprintLength.toString()]) {\n  aiSprintLength = sprintLength.toString();\n  aiExplanation = explanation || \"\";\n  aiPrice = SPRINT_PRICING[aiSprintLength];\n} else {\n  // Invalid or missing sprint length, use defaults\n  aiExplanation = `AI returned invalid sprint length (${sprintLength}). Defaulted to 1 sprint.`;\n  aiPrice = SPRINT_PRICING[\"1\"];\n}\n\nreturn [\n  {\n    json: {\n      project_id: projectId,\n      ai_sprint_length: aiSprintLength,\n      ai_price: aiPrice,\n      ai_explanation: aiExplanation,\n      raw_ai_response: JSON.stringify(aiMessage), // Store full message for debugging\n      estimation_timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3152,
+        -192
+      ],
+      "id": "4241d897-d0e9-4828-8d29-d6f8604a80fe",
+      "name": "Format Sprint Length Estimate"
+    },
+    {
+      "parameters": {
+        "tableId": "strms_sprint_pricing",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "project_id",
+              "fieldValue": "={{ $('Catch Project ID').item.json.body.project_id }}"
+            },
+            {
+              "fieldId": "ai_sprint_length",
+              "fieldValue": "={{ $json.ai_sprint_length }}"
+            },
+            {
+              "fieldId": "ai_price",
+              "fieldValue": "={{ $json.ai_price }}"
+            },
+            {
+              "fieldId": "ai_explanation",
+              "fieldValue": "={{ $json.ai_explanation }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3360,
+        -192
+      ],
+      "id": "5ef64fe8-1aa7-4857-b818-e644cf1b1eb6",
+      "name": "Create AI Sprint Estimate Row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
     }
   ],
   "pinData": {
@@ -502,13 +591,46 @@
           }
         ]
       ]
+    },
+    "Insert File Metadata": {
+      "main": [
+        [
+          {
+            "node": "Generate Sprint Length Estimation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Sprint Length Estimation": {
+      "main": [
+        [
+          {
+            "node": "Format Sprint Length Estimate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Sprint Length Estimate": {
+      "main": [
+        [
+          {
+            "node": "Create AI Sprint Estimate Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "26b76fb6-9491-4509-b2d8-95430b0e7164",
+  "versionId": "bacaeed0-f713-4e64-a202-4c49b0eed20f",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"

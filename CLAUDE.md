@@ -111,6 +111,28 @@ Reference these existing components as templates:
 - Path aliases configured: `@/*` maps to `./src/*`
 - ESLint configuration for code quality
 
+### File Editing Best Practices
+
+**Edit Tool Strategy:**
+- ALWAYS try the `Edit` tool first for making code changes
+- If the `Edit` tool fails with "File has been unexpectedly modified" error, immediately switch to using bash/python scripts for that edit
+- The Edit tool can fail when:
+  - The Next.js dev server is running and watching files
+  - VSCode has the file open with auto-save enabled
+  - OneDrive is syncing files in the background
+- Bash/python edits are perfectly acceptable and work reliably in these scenarios
+
+**Debugging Complex Issues:**
+- When struggling to solve a bug or implement a feature properly, ADD CONSOLE LOGS to help debug
+- Console logs help us work together to understand what's happening
+- Place strategic `console.log()` statements to output:
+  - Variable values
+  - Function execution flow
+  - State values at critical points
+  - API response data
+- After debugging is complete, remove the console logs
+- User will test with console logs visible and share the output to help identify the root cause
+
 ### CSS & Styling Technical Notes
 - **Font Loading**: Use Next.js font optimization in `layout.tsx`, NOT `@import` in CSS files
 - **Tailwind v4**: Uses `@theme {}` blocks for theme configuration

@@ -20,7 +20,8 @@
       "Bash(node:*)",
       "Bash(npx playwright install:*)",
       "Bash(mkdir:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(find:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
