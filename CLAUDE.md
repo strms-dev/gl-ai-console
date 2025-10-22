@@ -231,3 +231,225 @@ When adding new interactive buttons to timeline stages in `src/components/leads/
 
 #### Best Practice:
 **Always copy the exact pattern from an existing working stage** (like Engagement Agreement) rather than creating new patterns. Search for all occurrences of existing prop names (e.g., `anchorContactCreated`) to find all locations that need updating.
+
+### Adding AI Generation Animations ("Generate with AI" Button) to Timeline Stages
+
+When adding AI generation functionality with spinning animations to a timeline stage, follow this **exact pattern** used by working stages like `workflow-docs`, `readiness`, and `scoping-prep`:
+
+#### Critical: Identify the Correct event.id and event.type
+
+**MOST COMMON BUG**: Using the wrong `event.id` when passing props to ActionZone!
+- Always verify the stage's `event.id` and `event.type` by checking the timeline data or existing similar stages
+- Example: Scoping DOCUMENT stage uses `event.id === "internal-client-docs"` NOT `event.id === "scoping"`
+  - `"scoping"` is for scoping CALL transcript upload
+  - `"internal-client-docs"` is for scoping DOCUMENT generation
+
+#### Step-by-Step Implementation (Copy Exactly from workflow-docs):
+
+**1. Add State Variable** (Timeline component, ~line 2329):
+```typescript
+// Add after other generating states
+const [yourStageGenerating, setYourStageGenerating] = useState(false)
+```
+
+**2. Add Props to ActionZone & StageCard** (Following existing pattern):
+```typescript
+// ActionZone function parameters (~line 187):
+yourStageGenerating,
+
+// ActionZone type definition (~line 232):
+yourStageGenerating?: boolean,
+
+// StageCard function parameters (~line 1764):
+yourStageGenerating,
+
+// StageCard type definition (~line 1814):
+yourStageGenerating?: boolean,
+```
+
+**3. Pass Props in ALL THREE ActionZone Calls** (CRITICAL - must match correct event.id):
+```typescript
+// Inside StageCard (~line 1995):
+yourStageGenerating={event.id === "your-stage-id" ? yourStageGenerating : false}
+
+// Inside Timeline hideHeader=true block (~line 4162):
+yourStageGenerating={event.id === "your-stage-id" ? yourStageGenerating : false}
+
+// Inside Timeline with Card block (~line 4266):
+yourStageGenerating={event.id === "your-stage-id" ? yourStageGenerating : false}
+```
+
+**4. Add Automated Action Handler** (handleAction function, ~line 3165):
+```typescript
+// Handle automated action for your stage
+if (action === 'automated' && eventId === 'your-stage-id') {
+  console.log('Triggering AI generation for your stage')
+
+  // Set loading state
+  setYourStageGenerating(true)
+
+  // Send POST request to n8n webhook
+  fetch('https://your-webhook-url', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      project_id: leadId
+    })
+  })
+    .then(response => {
+      if (response.ok) {
+        console.log('Generation triggered successfully')
+      } else {
+        console.error('Failed to trigger generation:', response.statusText)
+      }
+    })
+    .catch(error => {
+      console.error('Error triggering generation:', error)
+    })
+
+  return
+}
+```
+
+**5. Add UI with Animation in ActionZone** (ActionZone component, ~line 728):
+```typescript
+// Special handling for Your Stage
+if (event.type === "your-stage-type") {
+  const fileType = getFileTypeById('your-file-type-id')
+  if (fileType) {
+    return (
+      <div className="mt-4">
+        {/* AI Generation Button */}
+        {event.actions.automated && (
+          <div className="mb-4">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => onAction('automated')}
+              disabled={!!existingFile || yourStageGenerating}
+              className="w-full sm:w-auto flex items-center gap-2"
+            >
+              {yourStageGenerating ? (
+                <>
+                  <RotateCw className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4" />
+                  {event.actions.automated.label}
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Manual Upload Option */}
+        <div>
+          <div className="mb-2">
+            <p className="text-sm font-medium text-foreground">Or upload manually:</p>
+          </div>
+          <FileUpload
+            fileType={fileType}
+            existingFile={existingFile}
+            onFileUploaded={onFileUploaded}
+            onFileCleared={() => onFileCleared?.('your-file-type-id')}
+            variant="compact"
+          />
+        </div>
+      </div>
+    )
+  }
+}
+```
+
+**6. Add Polling useEffect** (Timeline component, ~line 4000):
+```typescript
+// Poll for your stage file when generating
+useEffect(() => {
+  if (!yourStageGenerating) return
+
+  console.log('Starting polling for your stage file...')
+
+  const checkForFile = async () => {
+    try {
+      const file = await getFileByType(leadId, 'your-file-type-id')
+      if (file) {
+        console.log('File detected:', file)
+        setYourStageGenerating(false)
+
+        // Trigger file uploaded callback to update UI
+        if (onFileUploaded) {
+          const uploadedFile: UploadedFile = {
+            id: file.id,
+            fileTypeId: 'your-file-type-id',
+            fileName: file.file_name,
+            uploadDate: file.uploaded_at,
+            fileSize: file.file_size,
+            uploadedBy: file.uploaded_by,
+            storagePath: file.storage_path
+          }
+          onFileUploaded(uploadedFile)
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for file:', error)
+    }
+  }
+
+  // Check immediately
+  checkForFile()
+
+  // Then poll every 5 seconds
+  const interval = setInterval(checkForFile, 5000)
+
+  // Cleanup on unmount or when generating stops
+  return () => {
+    console.log('Stopping polling')
+    clearInterval(interval)
+  }
+}, [yourStageGenerating, leadId, onFileUploaded])
+```
+
+#### Triggering from Another Stage (Cross-Stage Triggering)
+
+To trigger generation when a button is clicked in a DIFFERENT stage:
+
+```typescript
+// In the handler for the OTHER stage's button (e.g., proposal decision):
+setScopingDocGenerating(true)
+
+fetch('https://your-webhook-url', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    project_id: leadId
+  })
+})
+```
+
+#### Common Debugging Steps:
+
+1. **Animation not showing**:
+   - Check ALL THREE ActionZone calls have correct `event.id` condition
+   - Verify `event.id` matches exactly (common: using "scoping" instead of "internal-client-docs")
+   - Add console.log to verify state is actually changing to `true`
+
+2. **Button click does nothing**:
+   - Verify automated action handler exists for `eventId === 'your-stage-id'`
+   - Ensure handler calls `setYourStageGenerating(true)`
+   - Check webhook URL is correct
+
+3. **File detected but animation doesn't stop**:
+   - Verify polling useEffect calls `setYourStageGenerating(false)` when file found
+   - Check `fileTypeId` matches in both handler and polling
+
+#### Reference Implementations:
+- **workflow-docs** (n8n workflow description): Lines 3135-3163 (handler), 3954-3997 (polling), 401-457 (UI)
+- **readiness** (readiness assessment): Lines 3073-3102 (handler), 3806-3845 (polling), 305-365 (UI)
+- **scoping-prep** (scoping call prep): Lines 3104-3133 (handler), 3852-3891 (polling), 367-398 (UI)
+- **internal-client-docs** (scoping document): Lines 3165-3194 (handler), 4026-4064 (polling), 728-774 (UI)

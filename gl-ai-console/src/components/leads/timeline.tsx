@@ -184,6 +184,7 @@ const ActionZone = ({
   readinessGenerating,
   scopingPrepGenerating,
   workflowDocsGenerating,
+  scopingDocGenerating,
   clickupTaskCreated,
   clickupTaskLoading,
   airtableRecordCreated,
@@ -228,6 +229,7 @@ const ActionZone = ({
   readinessGenerating?: boolean,
   scopingPrepGenerating?: boolean,
   workflowDocsGenerating?: boolean,
+  scopingDocGenerating?: boolean,
   clickupTaskCreated?: boolean,
   clickupTaskLoading?: boolean,
   airtableRecordCreated?: boolean,
@@ -735,11 +737,20 @@ The GrowthLab Team`
                 variant="default"
                 size="sm"
                 onClick={() => onAction('automated')}
-                disabled={!!existingFile}
+                disabled={!!existingFile || scopingDocGenerating}
                 className="w-full sm:w-auto flex items-center gap-2"
               >
-                <Zap className="w-4 h-4" />
-                {event.actions.automated.label}
+                {scopingDocGenerating ? (
+                  <>
+                    <RotateCw className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    {event.actions.automated.label}
+                  </>
+                )}
               </Button>
             </div>
           )}
@@ -1759,6 +1770,7 @@ const StageCard = ({
   readinessGenerating,
   scopingPrepGenerating,
   workflowDocsGenerating,
+  scopingDocGenerating,
   clickupTaskCreated,
   clickupTaskLoading,
   airtableRecordCreated,
@@ -1808,6 +1820,7 @@ const StageCard = ({
   readinessGenerating?: boolean
   scopingPrepGenerating?: boolean
   workflowDocsGenerating?: boolean
+  scopingDocGenerating?: boolean
   clickupTaskCreated?: boolean
   clickupTaskLoading?: boolean
   airtableRecordCreated?: boolean
@@ -1978,6 +1991,7 @@ const StageCard = ({
                     readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
                     scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
                     workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
+                    scopingDocGenerating={event.id === "internal-client-docs" ? scopingDocGenerating : false}
                     clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                     clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                     airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
@@ -2306,6 +2320,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [scopingPrepGenerating, setScopingPrepGenerating] = useState(false)
   // N8N Workflow Docs state
   const [workflowDocsGenerating, setWorkflowDocsGenerating] = useState(false)
+  // Scoping Document state
+  const [scopingDocGenerating, setScopingDocGenerating] = useState(false)
   // Project Setup state
   const [clickupTaskCreated, setClickupTaskCreated] = useState(false)
   const [clickupTaskLoading, setClickupTaskLoading] = useState(false)
@@ -2836,16 +2852,40 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     if (eventId === 'proposal-decision') {
       console.log(`Proposal decision: ${action}`)
 
-      // Mark proposal-decision stage as completed regardless of decision
-      setCompletedStages(prev => new Set(prev).add('proposal-decision'))
-
       if (action === 'accept') {
         console.log('Proposal accepted - proceeding to Scoping Document')
+
+        // Trigger scoping document generation
+        setScopingDocGenerating(true)
+
+        // Mark proposal-decision stage as completed
+        setCompletedStages(prev => new Set(prev).add('proposal-decision'))
 
         // Save accept decision to Supabase
         setStageData(leadId, 'proposal-decision', 'decision_made', 'accept').catch(error => {
           console.error("Failed to save proposal decision to Supabase:", error)
         })
+
+        // Trigger scoping document generation
+        fetch('https://n8n.srv1055749.hstgr.cloud/webhook/2979a880-57bb-4466-8880-7f93f42ccf0f', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            project_id: leadId
+          })
+        })
+          .then(response => {
+            if (response.ok) {
+              console.log('Scoping document generation triggered successfully')
+            } else {
+              console.error('Failed to trigger scoping document generation:', response.statusText)
+            }
+          })
+          .catch(error => {
+            console.error('Error triggering scoping document generation:', error)
+          })
 
         // Advance to Scoping Document
         setCollapsedItems(prev => {
@@ -2866,6 +2906,25 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         // Update project status to "proposal-declined"
         updateProjectStatus(leadId, 'proposal-declined').catch(error => {
           console.error("Failed to update project status:", error)
+        })
+
+        // Send webhook notification for declined proposal
+        fetch('https://n8n.srv1055749.hstgr.cloud/webhook/2fcc0371-2393-4a39-9d72-bf7bb802c7b0', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            project_id: leadId
+          })
+        }).then(response => {
+          if (response.ok) {
+            console.log('Webhook notification sent successfully for declined proposal')
+          } else {
+            console.error('Failed to send webhook notification:', response.status)
+          }
+        }).catch(error => {
+          console.error('Error sending webhook notification:', error)
         })
 
         // All remaining stages will be marked as skipped in the updatedEvents logic
@@ -3083,6 +3142,37 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         })
         .catch(error => {
           console.error('Error triggering n8n workflow description generation:', error)
+        })
+
+      return
+    }
+
+    // Handle automated action for scoping document (internal-client-docs)
+    if (action === 'automated' && eventId === 'internal-client-docs') {
+      console.log('Triggering AI generation for scoping document')
+
+      // Set loading state
+      setScopingDocGenerating(true)
+
+      // Send POST request to n8n webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/2979a880-57bb-4466-8880-7f93f42ccf0f', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('Scoping document generation triggered successfully')
+          } else {
+            console.error('Failed to trigger scoping document generation:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering scoping document generation:', error)
         })
 
       return
@@ -3349,6 +3439,10 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
   const handleProposalAdjustmentConfirm = (data: { sprintLength: string; price: number; explanation: string }) => {
     console.log('Proposal adjustment confirmed:', data)
+
+    // Trigger scoping document generation
+    setScopingDocGenerating(true)
+
     // Keep the original AI explanation and add the adjustment reasoning
     setSprintPricingData(prev => ({
       sprintLength: data.sprintLength,
@@ -3370,13 +3464,34 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       console.error("Failed to save adjusted sprint pricing to Supabase:", error)
     })
 
+    // Mark proposal-decision stage as completed
+    setCompletedStages(prev => new Set(prev).add('proposal-decision'))
+
     // Save that proposal was adjusted
     setStageData(leadId, 'proposal-decision', 'was_adjusted', true).catch(error => {
       console.error("Failed to save proposal adjustment flag to Supabase:", error)
     })
 
-    // Mark proposal-decision stage as completed
-    setCompletedStages(prev => new Set(prev).add('proposal-decision'))
+    // Trigger scoping document generation webhook
+    fetch('https://n8n.srv1055749.hstgr.cloud/webhook/2979a880-57bb-4466-8880-7f93f42ccf0f', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        project_id: leadId
+      })
+    })
+      .then(response => {
+        if (response.ok) {
+          console.log('Scoping document generation triggered successfully')
+        } else {
+          console.error('Failed to trigger scoping document generation:', response.statusText)
+        }
+      })
+      .catch(error => {
+        console.error('Error triggering scoping document generation:', error)
+      })
 
     // Collapse the proposal-decision stage and expand the next stage (internal-client-docs)
     setCollapsedItems(prev => {
@@ -3917,6 +4032,51 @@ The GrowthLab Team`
     }
   }, [workflowDocsGenerating, leadId, onFileUploaded])
 
+  // Poll for scoping document file when generating
+  useEffect(() => {
+    if (!scopingDocGenerating) return
+
+    console.log('Starting polling for scoping document file...')
+
+    const checkForFile = async () => {
+      try {
+        const file = await getFileByType(leadId, 'internal-client-documentation')
+        if (file) {
+          console.log('Scoping document file detected:', file)
+          setScopingDocGenerating(false)
+
+          // Trigger file uploaded callback to update UI
+          if (onFileUploaded) {
+            const uploadedFile: UploadedFile = {
+              id: file.id,
+              fileTypeId: 'internal-client-documentation',
+              fileName: file.file_name,
+              uploadDate: file.uploaded_at,
+              fileSize: file.file_size,
+              uploadedBy: file.uploaded_by,
+              storagePath: file.storage_path
+            }
+            onFileUploaded(uploadedFile)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for scoping document file:', error)
+      }
+    }
+
+    // Check immediately
+    checkForFile()
+
+    // Then poll every 5 seconds
+    const interval = setInterval(checkForFile, 5000)
+
+    // Cleanup on unmount or when generating stops
+    return () => {
+      console.log('Stopping scoping document polling')
+      clearInterval(interval)
+    }
+  }, [scopingDocGenerating, leadId, onFileUploaded])
+
   return hideHeader ? (
     // When hideHeader is true, return just the content without Card wrapper
     <div className="space-y-8 p-6">
@@ -3979,6 +4139,7 @@ The GrowthLab Team`
                 readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
                 scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
                 workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
+                scopingDocGenerating={event.id === "internal-client-docs" ? scopingDocGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                 clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
@@ -4082,6 +4243,7 @@ The GrowthLab Team`
                 readinessGenerating={event.id === "readiness" ? readinessGenerating : false}
                 scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
                 workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
+                scopingDocGenerating={event.id === "internal-client-docs" ? scopingDocGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                 clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
