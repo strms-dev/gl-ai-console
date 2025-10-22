@@ -1,0 +1,493 @@
+{
+  "name": "Generate Scoping Document",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "2979a880-57bb-4466-8880-7f93f42ccf0f",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -192
+      ],
+      "id": "0e99ed36-2903-4c33-9269-b22cf7b58841",
+      "name": "Catch Project ID",
+      "webhookId": "2979a880-57bb-4466-8880-7f93f42ccf0f"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "607b85aa-2ced-4374-87be-040ef2ea9252",
+              "leftValue": "={{ $json.body.project_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "40327336-b06a-4b1c-9528-5ba5d7f6a06f",
+              "leftValue": "={{ $json.body.project_id }}",
+              "rightValue": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        -192
+      ],
+      "id": "6775406e-621c-451f-baed-bc0ce8e596fb",
+      "name": "Validate Project ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate filename and storage path\nconst projectId = $('Catch Project ID').first().json.body.project_id;\nconst timestamp = $input.first().json.generation_timestamp;\n\nconst filename = `project_${projectId}_scoping_document_${timestamp}.txt`;\nconst storagePath = `${projectId}/internal-client-documentation/${filename}`;\n\nreturn [\n  {\n    json: {\n      ...($input.first().json),\n      generated_filename: filename,\n      storage_path: storagePath,\n      upload_path: storagePath\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        -192
+      ],
+      "id": "22809ac7-9e85-4cad-b323-d344ffc89954",
+      "name": "Generate Filename"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f4c31576-8f97-4088-87f6-42ae5e5a93fd",
+              "name": "file_size",
+              "value": "={{ $json.formatted_scoping_document.length }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1920,
+        -192
+      ],
+      "id": "9bda94b4-017a-4d2d-ab01-1907182b9761",
+      "name": "Calculate File Size"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2368,
+        -192
+      ],
+      "id": "20151d83-d6d5-4f04-9875-2e9823d471b3",
+      "name": "Wait For File Upload",
+      "webhookId": "7330d6ce-5209-47c0-a548-dff088517bde"
+    },
+    {
+      "parameters": {
+        "tableId": "strms_project_files",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "project_id",
+              "fieldValue": "={{ $('Catch Project ID').item.json.body.project_id }}"
+            },
+            {
+              "fieldId": "file_type_id",
+              "fieldValue": "internal-client-documentation"
+            },
+            {
+              "fieldId": "file_name",
+              "fieldValue": "={{ $('Generate Filename').item.json.generated_filename }}"
+            },
+            {
+              "fieldId": "file_path",
+              "fieldValue": "={{ $('Calculate File Size').item.json.storage_path }}"
+            },
+            {
+              "fieldId": "file_size",
+              "fieldValue": "={{ $('Calculate File Size').item.json.file_size }}"
+            },
+            {
+              "fieldId": "uploaded_by",
+              "fieldValue": "n8n-workflow"
+            },
+            {
+              "fieldId": "storage_bucket",
+              "fieldValue": "strms-project-files"
+            },
+            {
+              "fieldId": "storage_path",
+              "fieldValue": "={{ $('Calculate File Size').item.json.storage_path }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2592,
+        -192
+      ],
+      "id": "c04b8814-1455-4b65-a040-97a755928578",
+      "name": "Insert File Metadata",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "strms_project_files",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "project_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Catch Project ID').item.json.body.project_id }}"
+            },
+            {
+              "keyName": "file_type_id",
+              "condition": "eq",
+              "keyValue": "workflow-description"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -192
+      ],
+      "id": "840ba7f5-0e10-4362-80d2-f4fc9a4bae42",
+      "name": "Query n8n Workflow Description",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "474151a1-bfd1-4ed2-aa2c-cac97378170b",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        -192
+      ],
+      "id": "6e407bd4-d33d-40d1-8e91-a3f376811524",
+      "name": "Check n8n Workflow Description Found"
+    },
+    {
+      "parameters": {
+        "url": "=https://scahyfdsgpfurpcnwyrb.supabase.co/storage/v1/object/{{ $json.storage_bucket }}/{{ $json.storage_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        -192
+      ],
+      "id": "99190c77-8b20-4456-9c73-d1752e25809b",
+      "name": "Download n8n Workflow Description",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8o7ThfsHa3QWcSYa",
+          "name": "GL AI Console Supabase Service Role Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5-nano",
+          "mode": "list",
+          "cachedResultName": "GPT-5-NANO"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an expert technical project analyst and automation architect.\n\nYour role is to convert a detailed n8n Workflow Description Document into a clear, structured Project Scoping Document suitable for both internal and client audiences.\n\nWhen given an n8n workflow description, do the following:\n1. Analyze the workflow’s purpose, triggers, steps, logic, integrations, and reliability mechanisms.\n2. Infer key project scoping elements based on that information.\n3. Write a Scoping Document that includes:\n\n   1. Project Overview – what the automation does, who it serves, and its purpose.\n   2. Objectives & Success Criteria – measurable goals and key outcomes.\n   3. Scope of Work – what’s in scope and what’s explicitly out of scope.\n   4. Solution Outline – conceptual architecture and logical flow.\n   5. Deliverables & Milestones – major outputs and checkpoints.\n   6. Risks & Assumptions – dependencies, conditions, or possible blockers.\n   7. Integrations & Services – APIs and platforms involved.\n   8. Error Handling & Reliability – how the automation deals with issues or retries.\n   9. Security & Compliance Notes – credential handling, data protection, OAuth, etc.\n   10. Next Steps / Sign-off – recommended follow-ups or approvals.\n\nUse a concise, professional tone that’s understandable for non-technical stakeholders while maintaining enough technical clarity for internal teams.\n\nDo NOT include:\n- Metadata headers (e.g., “PROJECT SCOPING DOCUMENT”, “Generated By”, “End of Document”)\n- Low-level n8n node configurations or credentials\n- Any system messages or annotations\n\nUse Markdown formatting (bold, bullet lists, tables) where helpful for readability.\n",
+              "role": "system"
+            },
+            {
+              "content": "=You are given the following N8N WORKFLOW DESCRIPTION DOCUMENT.\n\nPlease analyze it and produce a detailed PROJECT SCOPING DOCUMENT according to the system instructions above.\n\n===================================================\nBEGIN N8N WORKFLOW DESCRIPTION DOCUMENT\n===================================================\n\n{{ $json.data }}\n\n===================================================\nEND N8N WORKFLOW DESCRIPTION DOCUMENT\n===================================================\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1120,
+        -192
+      ],
+      "id": "3cb71d66-0ac3-4b5c-91b0-d608f3e56b28",
+      "name": "Generate Scoping Document",
+      "credentials": {
+        "openAiApi": {
+          "id": "lSSimk5MMw6cbVWo",
+          "name": "Automation OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the AI-generated workflow description with headers and metadata\nconst projectId = $('Catch Project ID').first().json.body.project_id;\nconst aiResponse = $input.first().json.message.content;\n\n// Generate timestamp for filename\nconst now = new Date();\nconst timestamp = now\n  .toISOString()\n  .replace(/[-:]/g, '')\n  .split('.')[0]\n  .replace('T', '_');\n\nconst dateFormatted = now.toISOString().split('T')[0];\nconst timeFormatted = now.toTimeString().split(' ')[0];\n\n// Construct plain text workflow description document\nlet formattedDocument = `===================================================\nSCOPING DOCUMENT\n===================================================\nProject ID: ${projectId}\nGenerated: ${dateFormatted} ${timeFormatted}\nGenerated By: AI Automation\n===================================================\n\n${aiResponse}\n\n===================================================\nEnd of SCOPING DOCUMENT\nGenerated automatically by GrowthLab AI Console\n===================================================`;\n\n// ✅ Normalize all text for UTF-8 and JSON compatibility\nformattedDocument = formattedDocument\n  // Replace smart quotes with straight quotes\n  .replace(/[“”]/g, '\"')\n  .replace(/[‘’]/g, \"'\")\n  // Replace en/em dashes with hyphen\n  .replace(/[–—]/g, '-')\n  // Replace ellipsis with three dots\n  .replace(/…/g, '...')\n  // Replace bullet points with a hyphen\n  .replace(/•/g, '-')\n  // Replace non-breaking spaces with normal ones\n  .replace(/\\u00A0/g, ' ')\n  // Normalize line endings\n  .replace(/\\r?\\n/g, '\\n');\n\n// ✅ Make it JSON-safe for Supabase\nconst jsonSafeFormatted = JSON.stringify(formattedDocument);\n\n// ✅ Parse back to remove wrapping quotes (so stored as readable text)\nconst safeDocument = JSON.parse(jsonSafeFormatted);\n\nreturn [\n  {\n    json: {\n      project_id: projectId,\n      formatted_scoping_document: safeDocument,\n      raw_description_content: aiResponse,\n      generation_timestamp: timestamp,\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        -192
+      ],
+      "id": "2deac805-32c4-489a-b1e5-672e580884fc",
+      "name": "Format Scoping Document"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://scahyfdsgpfurpcnwyrb.supabase.co/storage/v1/object/strms-project-files/{{ $json.upload_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/plain"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "Text/Plain",
+        "body": "={{ $json.formatted_scoping_document }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2144,
+        -192
+      ],
+      "id": "3f54946f-1192-4b9b-ae36-c64bf8bf3415",
+      "name": "Upload Scoping Document To Storage",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8o7ThfsHa3QWcSYa",
+          "name": "GL AI Console Supabase Service Role Key"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Catch Project ID": {
+      "main": [
+        [
+          {
+            "node": "Validate Project ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Project ID": {
+      "main": [
+        [
+          {
+            "node": "Query n8n Workflow Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Filename": {
+      "main": [
+        [
+          {
+            "node": "Calculate File Size",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate File Size": {
+      "main": [
+        [
+          {
+            "node": "Upload Scoping Document To Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For File Upload": {
+      "main": [
+        [
+          {
+            "node": "Insert File Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert File Metadata": {
+      "main": [
+        []
+      ]
+    },
+    "Query n8n Workflow Description": {
+      "main": [
+        [
+          {
+            "node": "Check n8n Workflow Description Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check n8n Workflow Description Found": {
+      "main": [
+        [
+          {
+            "node": "Download n8n Workflow Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download n8n Workflow Description": {
+      "main": [
+        [
+          {
+            "node": "Generate Scoping Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Scoping Document": {
+      "main": [
+        [
+          {
+            "node": "Format Scoping Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Scoping Document": {
+      "main": [
+        [
+          {
+            "node": "Generate Filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Scoping Document To Storage": {
+      "main": [
+        [
+          {
+            "node": "Wait For File Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5c8f2876-3978-4274-99f8-9b5aa980f13f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "ndAecxWl55BbT4DN",
+  "tags": []
+}

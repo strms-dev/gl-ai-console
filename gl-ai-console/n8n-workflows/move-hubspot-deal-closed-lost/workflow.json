@@ -1,0 +1,226 @@
+{
+  "name": "Move Sales Pipeline HubSpot Deal To Closed Lost",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "2fcc0371-2393-4a39-9d72-bf7bb802c7b0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -96
+      ],
+      "id": "36a91e24-ac7c-432b-8423-8ad2830b6bc6",
+      "name": "Catch Project ID",
+      "webhookId": "2fcc0371-2393-4a39-9d72-bf7bb802c7b0"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7a04a849-38f7-43f4-bb87-a178829c0ce5",
+              "leftValue": "={{ $json.body.project_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d5f0ffd4-c502-4b20-a222-21c1e04c3dfa",
+              "leftValue": "={{ $json.body.project_id }}",
+              "rightValue": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        -96
+      ],
+      "id": "7602b5ae-2ca1-4378-83be-4661ba2d0cba",
+      "name": "Validate Project ID"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "strms_projects",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.body.project_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -96
+      ],
+      "id": "19a1e2b0-dcfe-40c7-b44c-e40a137e72f1",
+      "name": "Get Project Details",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "deal",
+        "operation": "search",
+        "limit": 1,
+        "filterGroupsUi": {
+          "filterGroupsValues": [
+            {
+              "filtersUi": {
+                "filterValues": [
+                  {
+                    "propertyName": "dealname",
+                    "value": "={{ $json.company }} - STRMS"
+                  },
+                  {
+                    "propertyName": "dealstage",
+                    "operator": "NEQ",
+                    "value": "closedwon"
+                  },
+                  {
+                    "propertyName": "dealstage",
+                    "operator": "NEQ",
+                    "value": "closedlost"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        640,
+        -96
+      ],
+      "id": "14829119-a858-4df4-b230-480f4540aa04",
+      "name": "Find HubSpot Deal",
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "deal",
+        "operation": "update",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "updateFields": {
+          "stage": "=closedlost"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        -96
+      ],
+      "id": "b0485cab-75ad-4555-b253-262b71ddf236",
+      "name": "Move Deal To Closed Lost",
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Catch Project ID": {
+      "main": [
+        [
+          {
+            "node": "Validate Project ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Project ID": {
+      "main": [
+        [
+          {
+            "node": "Get Project Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Project Details": {
+      "main": [
+        [
+          {
+            "node": "Find HubSpot Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find HubSpot Deal": {
+      "main": [
+        [
+          {
+            "node": "Move Deal To Closed Lost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "66bfe22c-5e8b-48b0-ad7d-fccace6e9a1c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "Gbqn7GqfOV5KXj0G",
+  "tags": []
+}
