@@ -45,6 +45,7 @@ import {
   FileSignature,
   Settings,
   Calendar,
+  UserPlus,
   LucideIcon
 } from "lucide-react"
 
@@ -174,10 +175,8 @@ const ActionZone = ({
   showProposalAdjustment,
   proposalWasAdjusted,
   onProposalAdjustmentConfirm,
-  anchorContactCreated,
-  anchorProposalCreated,
-  anchorContactLoading,
-  anchorProposalLoading,
+  anchorSetupCreated,
+  anchorSetupLoading,
   eaWordingGenerated,
   eaWordingGenerating,
   eaConfirmed,
@@ -219,10 +218,8 @@ const ActionZone = ({
   showProposalAdjustment?: boolean,
   proposalWasAdjusted?: boolean,
   onProposalAdjustmentConfirm?: (data: { sprintLength: string; price: number; explanation: string }) => void,
-  anchorContactCreated?: boolean,
-  anchorProposalCreated?: boolean,
-  anchorContactLoading?: boolean,
-  anchorProposalLoading?: boolean,
+  anchorSetupCreated?: boolean,
+  anchorSetupLoading?: boolean,
   eaWordingGenerated?: boolean,
   eaWordingGenerating?: boolean,
   eaConfirmed?: boolean,
@@ -1152,59 +1149,31 @@ The GrowthLab Team`
       <div className="mt-4 space-y-4">
         <div className="p-4 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
           <div className="space-y-3">
-            {/* Create Contact In Anchor */}
+            {/* Create Contact & Proposal Draft In Anchor */}
             <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center gap-3">
-                <User className="w-6 h-6 text-gray-600" />
+                <div className="flex items-center gap-2">
+                  <UserPlus className="w-6 h-6 text-gray-600" />
+                  <FileText className="w-6 h-6 text-gray-600" />
+                </div>
                 <div>
-                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create Contact In Anchor</h4>
+                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create Contact & Proposal Draft In Anchor</h4>
                 </div>
               </div>
               <div className="flex items-center">
-                {anchorContactCreated ? (
+                {anchorSetupCreated ? (
                   <div className="flex items-center gap-2 text-green-600">
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <span className="text-sm font-medium">Complete</span>
                   </div>
-                ) : anchorContactLoading ? (
+                ) : anchorSetupLoading ? (
                   <div className="flex items-center gap-2 text-[#407B9D]">
                     <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
                     <span className="text-sm">Creating...</span>
                   </div>
                 ) : (
                   <Button
-                    onClick={() => onAction('create_anchor_contact')}
-                    size="sm"
-                    className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
-                  >
-                    Create
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Create Proposal Draft In Anchor */}
-            <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
-              <div className="flex items-center gap-3">
-                <FileText className="w-6 h-6 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create Proposal Draft In Anchor</h4>
-                </div>
-              </div>
-              <div className="flex items-center">
-                {anchorProposalCreated ? (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <span className="text-sm font-medium">Complete</span>
-                  </div>
-                ) : anchorProposalLoading ? (
-                  <div className="flex items-center gap-2 text-[#407B9D]">
-                    <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm">Creating...</span>
-                  </div>
-                ) : (
-                  <Button
-                    onClick={() => onAction('create_anchor_proposal')}
+                    onClick={() => onAction('create_anchor_setup')}
                     size="sm"
                     className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                   >
@@ -1760,10 +1729,8 @@ const StageCard = ({
   showProposalAdjustment,
   proposalWasAdjusted,
   onProposalAdjustmentConfirm,
-  anchorContactCreated,
-  anchorProposalCreated,
-  anchorContactLoading,
-  anchorProposalLoading,
+  anchorSetupCreated,
+  anchorSetupLoading,
   eaWordingGenerated,
   eaWordingGenerating,
   eaConfirmed,
@@ -1810,10 +1777,8 @@ const StageCard = ({
   showProposalAdjustment?: boolean
   proposalWasAdjusted?: boolean
   onProposalAdjustmentConfirm?: (data: { sprintLength: string; price: number; explanation: string }) => void
-  anchorContactCreated?: boolean
-  anchorProposalCreated?: boolean
-  anchorContactLoading?: boolean
-  anchorProposalLoading?: boolean
+  anchorSetupCreated?: boolean
+  anchorSetupLoading?: boolean
   eaWordingGenerated?: boolean
   eaWordingGenerating?: boolean
   eaConfirmed?: boolean
@@ -1981,10 +1946,8 @@ const StageCard = ({
                     showProposalAdjustment={event.id === "proposal-decision" ? showProposalAdjustment : false}
                     proposalWasAdjusted={event.id === "proposal-decision" ? proposalWasAdjusted : false}
                     onProposalAdjustmentConfirm={event.id === "proposal-decision" ? onProposalAdjustmentConfirm : undefined}
-                    anchorContactCreated={event.id === "ea" ? anchorContactCreated : false}
-                    anchorProposalCreated={event.id === "ea" ? anchorProposalCreated : false}
-                    anchorContactLoading={event.id === "ea" ? anchorContactLoading : false}
-                    anchorProposalLoading={event.id === "ea" ? anchorProposalLoading : false}
+                    anchorSetupCreated={event.id === "ea" ? anchorSetupCreated : false}
+                    anchorSetupLoading={event.id === "ea" ? anchorSetupLoading : false}
                     eaWordingGenerated={event.id === "ea" ? eaWordingGenerated : false}
                     eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
                     eaConfirmed={event.id === "ea" ? eaConfirmed : false}
@@ -2017,31 +1980,16 @@ const StageCard = ({
 
                     <div className="space-y-3">
                       {/* Contact Creation Status */}
+                      {/* Anchor Setup Status */}
                       <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <User className="w-5 h-5 text-gray-600" />
-                          <span className="font-medium text-gray-700">Contact Created in Anchor</span>
-                        </div>
-                        {anchorContactCreated ? (
-                          <div className="flex items-center gap-2 text-green-600">
-                            <CheckCircle2 className="w-5 h-5 text-green-600" />
-                            <span className="text-sm font-medium">Complete</span>
+                          <div className="flex items-center gap-2">
+                            <User className="w-5 h-5 text-gray-600" />
+                            <FileText className="w-5 h-5 text-gray-600" />
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-2 text-gray-500">
-                            <Circle className="w-5 h-5 text-gray-400" />
-                            <span className="text-sm font-medium">Not Created</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Proposal Draft Status */}
-                      <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <FileText className="w-5 h-5 text-gray-600" />
-                          <span className="font-medium text-gray-700">Proposal Draft Created in Anchor</span>
+                          <span className="font-medium text-gray-700">Contact & Proposal Created in Anchor</span>
                         </div>
-                        {anchorProposalCreated ? (
+                        {anchorSetupCreated ? (
                           <div className="flex items-center gap-2 text-green-600">
                             <CheckCircle2 className="w-5 h-5 text-green-600" />
                             <span className="text-sm font-medium">Complete</span>
@@ -2242,8 +2190,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [proposalDeclined, setProposalDeclined] = useState(false)
   const [showProposalAdjustment, setShowProposalAdjustment] = useState(false)
   const [proposalWasAdjusted, setProposalWasAdjusted] = useState(false)
-  const [anchorContactCreated, setAnchorContactCreated] = useState(false)
-  const [anchorProposalCreated, setAnchorProposalCreated] = useState(false)
+  // Combined Anchor action state
+  const [anchorSetupCreated, setAnchorSetupCreated] = useState(false)
   const [dealCreated, setDealCreated] = useState(false)
 
   // Sync Timeline internal state with external changes (like file clearing from documents section)
@@ -2309,8 +2257,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       }
     })
   }, [uploadedFiles, leadStage])
-  const [anchorContactLoading, setAnchorContactLoading] = useState(false)
-  const [anchorProposalLoading, setAnchorProposalLoading] = useState(false)
+  const [anchorSetupLoading, setAnchorSetupLoading] = useState(false)
   const [eaWordingGenerated, setEaWordingGenerated] = useState(false)
   const [eaWordingGenerating, setEaWordingGenerating] = useState(false)
   const [eaConfirmed, setEaConfirmed] = useState(false)
@@ -2393,14 +2340,9 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
           stagesToComplete.push('ea')
         }
 
-        const anchorContact = await getStageData(leadId, 'ea', 'anchor_contact_created')
-        if (anchorContact === true) {
-          setAnchorContactCreated(true)
-        }
-
-        const anchorProposal = await getStageData(leadId, 'ea', 'anchor_proposal_created')
-        if (anchorProposal === true) {
-          setAnchorProposalCreated(true)
+        const anchorSetup = await getStageData(leadId, 'ea', 'anchor_setup_created')
+        if (anchorSetup === true) {
+          setAnchorSetupCreated(true)
         }
 
         // Load Setup stage data
@@ -3504,29 +3446,16 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
   // Handle anchor actions
   const handleAnchorAction = (action: string) => {
-    if (action === 'create_anchor_contact') {
-      setAnchorContactLoading(true)
-      // Simulate 3 second loading
+    if (action === 'create_anchor_setup') {
+      setAnchorSetupLoading(true)
+      // Simulate 3 second loading for creating both contact and proposal
       setTimeout(() => {
-        setAnchorContactLoading(false)
-        setAnchorContactCreated(true)
-        console.log('Contact created in Anchor')
+        setAnchorSetupLoading(false)
+        setAnchorSetupCreated(true)
+        console.log('Contact and Proposal draft created in Anchor')
 
-        // Save to Supabase
-        setStageData(leadId, 'ea', 'anchor_contact_created', true).catch(error => {
-          console.error("Failed to save EA data to Supabase:", error)
-        })
-      }, 3000)
-    } else if (action === 'create_anchor_proposal') {
-      setAnchorProposalLoading(true)
-      // Simulate 3 second loading
-      setTimeout(() => {
-        setAnchorProposalLoading(false)
-        setAnchorProposalCreated(true)
-        console.log('Proposal draft created in Anchor')
-
-        // Save to Supabase
-        setStageData(leadId, 'ea', 'anchor_proposal_created', true).catch(error => {
+        // Save to Supabase - using single combined field
+        setStageData(leadId, 'ea', 'anchor_setup_created', true).catch(error => {
           console.error("Failed to save EA data to Supabase:", error)
         })
       }, 3000)
@@ -4129,10 +4058,8 @@ The GrowthLab Team`
                 showProposalAdjustment={event.id === "proposal-decision" ? showProposalAdjustment : false}
                 proposalWasAdjusted={event.id === "proposal-decision" ? proposalWasAdjusted : false}
                 onProposalAdjustmentConfirm={event.id === "proposal-decision" ? handleProposalAdjustmentConfirm : undefined}
-                anchorContactCreated={event.id === "ea" ? anchorContactCreated : false}
-                anchorProposalCreated={event.id === "ea" ? anchorProposalCreated : false}
-                anchorContactLoading={event.id === "ea" ? anchorContactLoading : false}
-                anchorProposalLoading={event.id === "ea" ? anchorProposalLoading : false}
+                anchorSetupCreated={event.id === "ea" ? anchorSetupCreated : false}
+                anchorSetupLoading={event.id === "ea" ? anchorSetupLoading : false}
                 eaWordingGenerated={event.id === "ea" ? eaWordingGenerated : false}
                 eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
                 eaConfirmed={event.id === "ea" ? eaConfirmed : false}
@@ -4233,10 +4160,8 @@ The GrowthLab Team`
                 showProposalAdjustment={event.id === "proposal-decision" ? showProposalAdjustment : false}
                 proposalWasAdjusted={event.id === "proposal-decision" ? proposalWasAdjusted : false}
                 onProposalAdjustmentConfirm={event.id === "proposal-decision" ? handleProposalAdjustmentConfirm : undefined}
-                anchorContactCreated={event.id === "ea" ? anchorContactCreated : false}
-                anchorProposalCreated={event.id === "ea" ? anchorProposalCreated : false}
-                anchorContactLoading={event.id === "ea" ? anchorContactLoading : false}
-                anchorProposalLoading={event.id === "ea" ? anchorProposalLoading : false}
+                anchorSetupCreated={event.id === "ea" ? anchorSetupCreated : false}
+                anchorSetupLoading={event.id === "ea" ? anchorSetupLoading : false}
                 eaWordingGenerated={event.id === "ea" ? eaWordingGenerated : false}
                 eaWordingGenerating={event.id === "ea" ? eaWordingGenerating : false}
                 eaConfirmed={event.id === "ea" ? eaConfirmed : false}
