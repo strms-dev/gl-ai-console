@@ -185,11 +185,9 @@ const ActionZone = ({
   workflowDocsGenerating,
   scopingDocGenerating,
   clickupTaskCreated,
-  clickupTaskLoading,
   airtableRecordCreated,
   airtableRecordLoading,
   hubspotDealMoved,
-  hubspotDealMoving,
   setupEmailCopied,
   setupEmailSent,
   aiSprintEstimatesLoading,
@@ -228,11 +226,9 @@ const ActionZone = ({
   workflowDocsGenerating?: boolean,
   scopingDocGenerating?: boolean,
   clickupTaskCreated?: boolean,
-  clickupTaskLoading?: boolean,
   airtableRecordCreated?: boolean,
   airtableRecordLoading?: boolean,
   hubspotDealMoved?: boolean,
-  hubspotDealMoving?: boolean,
   setupEmailCopied?: boolean,
   setupEmailSent?: boolean,
   aiSprintEstimatesLoading?: boolean,
@@ -1191,27 +1187,25 @@ The GrowthLab Team`
                   <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Project-Specific EA Wording</h4>
                 </div>
               </div>
-              {eaWordingGenerated ? (
-                <div className="flex items-center gap-2 text-green-600 p-2 bg-[#C8E4BB]/30 border border-[#C8E4BB] rounded-lg">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  <span className="text-sm font-medium">EA wording generated successfully</span>
-                </div>
-              ) : eaWordingGenerating ? (
-                <div className="flex items-center gap-2 text-[#407B9D] p-2 bg-[#95CBD7]/30 border border-[#95CBD7] rounded-lg">
-                  <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-sm">Generating EA wording...</span>
-                </div>
-              ) : (
-                <Button
-                  onClick={() => {}}
-                  size="sm"
-                  disabled={!!existingFile}
-                  className="bg-[#407B9D] hover:bg-[#325F7A] text-white transition-all duration-200 hover:scale-105 rounded-lg shadow-md flex items-center gap-2"
-                >
-                  <span><Zap className="w-4 h-4" /></span>
-                  Generate with AI
-                </Button>
-              )}
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => onAction('generate_ea_wording')}
+                disabled={!!existingFile || eaWordingGenerating}
+                className="w-full sm:w-auto flex items-center gap-2"
+              >
+                {eaWordingGenerating ? (
+                  <>
+                    <RotateCw className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    Generate with AI
+                  </>
+                )}
+              </Button>
 
               <div className="mt-3">
                 <p className="text-sm font-medium text-foreground mb-2">Or upload manually:</p>
@@ -1264,49 +1258,47 @@ The GrowthLab Team`
     )
   }
 
-  // Project Setup Actions - Create ClickUp Task and Airtable Inventory Record
+  // Project Setup Actions - Create ClickUp Task and Airtable CRM & Inventory Record
   if (event.type === "setup") {
     return (
       <div className="mt-4 space-y-4">
         <div className="p-4 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
           <div className="space-y-3">
             {/* Create ClickUp Task */}
-            <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
-              <div className="flex items-center gap-3">
-                <ClipboardList className="w-6 h-6 text-gray-600" />
-                <div>
-                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create ClickUp Task</h4>
+            <div className="p-3 bg-white border border-gray-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <ClipboardList className="w-6 h-6 text-gray-600" />
+                  <div>
+                    <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create ClickUp Task</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">Manual for now - soon automating with GL AI Console project management</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center">
-                {clickupTaskCreated ? (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    <span className="text-sm font-medium">Complete</span>
-                  </div>
-                ) : clickupTaskLoading ? (
-                  <div className="flex items-center gap-2 text-[#407B9D]">
-                    <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm">Creating...</span>
-                  </div>
-                ) : (
-                  <Button
-                    onClick={() => onAction('create_clickup_task')}
-                    size="sm"
-                    className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
-                  >
-                    Create
-                  </Button>
-                )}
+                <div className="flex items-center">
+                  {clickupTaskCreated ? (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <span className="text-sm font-medium">Complete</span>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => onAction('create_clickup_task')}
+                      size="sm"
+                      className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
+                    >
+                      Confirm
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Create Airtable Inventory Record */}
+            {/* Create Airtable CRM & Inventory Record */}
             <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center gap-3">
                 <BarChart3 className="w-6 h-6 text-gray-600" />
                 <div>
-                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create Airtable Inventory Record</h4>
+                  <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create Airtable CRM & Inventory Record</h4>
                 </div>
               </div>
               <div className="flex items-center">
@@ -1342,18 +1334,13 @@ The GrowthLab Team`
               </div>
               <div className="flex items-center">
                 {(() => {
-                  console.log('HubSpot UI - hubspotDealMoved:', hubspotDealMoved, 'hubspotDealMoving:', hubspotDealMoving)
+                  console.log('HubSpot UI - hubspotDealMoved:', hubspotDealMoved)
                   return null
                 })()}
                 {hubspotDealMoved ? (
                   <div className="flex items-center gap-2 text-green-600">
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
                     <span className="text-sm font-medium">Moved</span>
-                  </div>
-                ) : hubspotDealMoving ? (
-                  <div className="flex items-center gap-2 text-[#407B9D]">
-                    <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm">Moving...</span>
                   </div>
                 ) : (
                   <Button
@@ -1739,11 +1726,9 @@ const StageCard = ({
   workflowDocsGenerating,
   scopingDocGenerating,
   clickupTaskCreated,
-  clickupTaskLoading,
   airtableRecordCreated,
   airtableRecordLoading,
   hubspotDealMoved,
-  hubspotDealMoving,
   setupEmailCopied,
   setupEmailSent,
   aiSprintEstimatesLoading,
@@ -1787,11 +1772,9 @@ const StageCard = ({
   workflowDocsGenerating?: boolean
   scopingDocGenerating?: boolean
   clickupTaskCreated?: boolean
-  clickupTaskLoading?: boolean
   airtableRecordCreated?: boolean
   airtableRecordLoading?: boolean
   hubspotDealMoved?: boolean
-  hubspotDealMoving?: boolean
   setupEmailCopied?: boolean
   setupEmailSent?: boolean
   aiSprintEstimatesLoading?: boolean
@@ -1956,11 +1939,9 @@ const StageCard = ({
                     workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
                     scopingDocGenerating={event.id === "internal-client-docs" ? scopingDocGenerating : false}
                     clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
-                    clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                     airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
                     airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
                     hubspotDealMoved={event.id === "setup" ? hubspotDealMoved : false}
-                    hubspotDealMoving={event.id === "setup" ? hubspotDealMoving : false}
                     setupEmailCopied={event.id === "setup" ? setupEmailCopied : false}
                     setupEmailSent={event.id === "setup" ? setupEmailSent : false}
                     aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
@@ -2012,6 +1993,11 @@ const StageCard = ({
                           <div className="flex items-center gap-2 text-green-600 text-sm">
                             <CheckCircle2 className="w-4 h-4 text-green-600" />
                             <span>Generated with AI</span>
+                          </div>
+                        ) : eaWordingGenerating ? (
+                          <div className="flex items-center gap-2 text-[#407B9D] text-sm">
+                            <div className="w-4 h-4 border-2 border-[#407B9D] border-t-transparent rounded-full animate-spin"></div>
+                            <span>Generating...</span>
                           </div>
                         ) : (
                           <div>
@@ -2100,7 +2086,7 @@ const StageCard = ({
                       <div className="flex items-center justify-between p-3 bg-white/80 border border-[#95CBD7]/50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <BarChart3 className="w-5 h-5 text-gray-600" />
-                          <span className="font-medium text-gray-700">Airtable Inventory Record Created</span>
+                          <span className="font-medium text-gray-700">Airtable CRM & Inventory Record Created</span>
                         </div>
                         {airtableRecordCreated ? (
                           <div className="flex items-center gap-2 text-green-600">
@@ -2271,11 +2257,9 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [scopingDocGenerating, setScopingDocGenerating] = useState(false)
   // Project Setup state
   const [clickupTaskCreated, setClickupTaskCreated] = useState(false)
-  const [clickupTaskLoading, setClickupTaskLoading] = useState(false)
   const [airtableRecordCreated, setAirtableRecordCreated] = useState(false)
   const [airtableRecordLoading, setAirtableRecordLoading] = useState(false)
   const [hubspotDealMoved, setHubspotDealMoved] = useState(false)
-  const [hubspotDealMoving, setHubspotDealMoving] = useState(false)
   const [setupEmailCopied, setSetupEmailCopied] = useState(false)
   const [setupEmailSent, setSetupEmailSent] = useState(false)
   // Sprint pricing form is always shown for sprint-pricing stage
@@ -2800,6 +2784,9 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         // Trigger scoping document generation
         setScopingDocGenerating(true)
 
+        // Trigger EA wording generation
+        setEaWordingGenerating(true)
+
         // Mark proposal-decision stage as completed
         setCompletedStages(prev => new Set(prev).add('proposal-decision'))
 
@@ -2827,6 +2814,27 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
           })
           .catch(error => {
             console.error('Error triggering scoping document generation:', error)
+          })
+
+        // Trigger EA wording generation
+        fetch('https://n8n.srv1055749.hstgr.cloud/webhook/47cfbf23-faf9-498a-8f75-39c9d48099e1', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            project_id: leadId
+          })
+        })
+          .then(response => {
+            if (response.ok) {
+              console.log('EA wording generation triggered successfully')
+            } else {
+              console.error('Failed to trigger EA wording generation:', response.statusText)
+            }
+          })
+          .catch(error => {
+            console.error('Error triggering EA wording generation:', error)
           })
 
         // Advance to Scoping Document
@@ -3385,6 +3393,9 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     // Trigger scoping document generation
     setScopingDocGenerating(true)
 
+    // Trigger EA wording generation
+    setEaWordingGenerating(true)
+
     // Keep the original AI explanation and add the adjustment reasoning
     setSprintPricingData(prev => ({
       sprintLength: data.sprintLength,
@@ -3435,6 +3446,27 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         console.error('Error triggering scoping document generation:', error)
       })
 
+    // Trigger EA wording generation webhook
+    fetch('https://n8n.srv1055749.hstgr.cloud/webhook/47cfbf23-faf9-498a-8f75-39c9d48099e1', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        project_id: leadId
+      })
+    })
+      .then(response => {
+        if (response.ok) {
+          console.log('EA wording generation triggered successfully')
+        } else {
+          console.error('Failed to trigger EA wording generation:', response.statusText)
+        }
+      })
+      .catch(error => {
+        console.error('Error triggering EA wording generation:', error)
+      })
+
     // Collapse the proposal-decision stage and expand the next stage (internal-client-docs)
     setCollapsedItems(prev => {
       const newSet = new Set(prev)
@@ -3460,18 +3492,31 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         })
       }, 3000)
     } else if (action === 'generate_ea_wording') {
-      setEaWordingGenerating(true)
-      // Simulate 4 second AI generation
-      setTimeout(() => {
-        setEaWordingGenerating(false)
-        setEaWordingGenerated(true)
-        console.log('EA wording generated with AI')
+      console.log('Triggering AI generation for EA wording')
 
-        // Save to Supabase
-        setStageData(leadId, 'ea', 'wording_generated', true).catch(error => {
-          console.error("Failed to save EA data to Supabase:", error)
+      // Set loading state
+      setEaWordingGenerating(true)
+
+      // Send POST request to n8n webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/47cfbf23-faf9-498a-8f75-39c9d48099e1', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
         })
-      }, 4000)
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('EA wording generation triggered successfully')
+          } else {
+            console.error('Failed to trigger EA wording generation:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering EA wording generation:', error)
+        })
     } else if (action === 'confirm_ea_completed') {
       setEaConfirmed(true)
       console.log('EA confirmed as completed and sent to customer')
@@ -3484,6 +3529,66 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       // Mark the engagement agreement stage as completed
       setCompletedStages(prev => new Set(prev).add('ea'))
 
+      // Automatically mark Airtable record as created
+      setAirtableRecordCreated(true)
+
+      // Trigger Airtable record creation via n8n webhook
+      console.log('Triggering Airtable record creation for EA completion')
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/create-airtable-records', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('Airtable record creation triggered successfully')
+
+            // Save to Supabase
+            setStageData(leadId, 'setup', 'airtable_record_created', true).catch(error => {
+              console.error("Failed to save Setup data to Supabase:", error)
+            })
+          } else {
+            console.error('Failed to trigger Airtable record creation:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering Airtable record creation:', error)
+        })
+
+      // Automatically move HubSpot deal to Closed Won
+      console.log('Triggering HubSpot deal move to Closed Won for EA completion')
+      setHubspotDealMoved(true)
+
+      // Save to Supabase
+      setStageData(leadId, 'setup', 'hubspot_deal_moved', true).catch(error => {
+        console.error("Failed to save HubSpot deal moved data to Supabase:", error)
+      })
+
+      // Trigger HubSpot move webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/move-closed-won', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('HubSpot deal move to Closed Won triggered successfully')
+          } else {
+            console.error('Failed to trigger HubSpot deal move:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering HubSpot deal move:', error)
+        })
+
       // Collapse the EA stage and expand the next stage (setup)
       setCollapsedItems(prev => {
         const newSet = new Set(prev)
@@ -3492,47 +3597,75 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         return newSet
       })
     } else if (action === 'create_clickup_task') {
-      setClickupTaskLoading(true)
-      // Simulate 3 second loading
-      setTimeout(() => {
-        setClickupTaskLoading(false)
-        setClickupTaskCreated(true)
-        console.log('ClickUp task created')
+      setClickupTaskCreated(true)
+      console.log('ClickUp task created')
 
-        // Save to Supabase
-        setStageData(leadId, 'setup', 'clickup_task_created', true).catch(error => {
-          console.error("Failed to save Setup data to Supabase:", error)
-        })
-      }, 3000)
+      // Save to Supabase
+      setStageData(leadId, 'setup', 'clickup_task_created', true).catch(error => {
+        console.error("Failed to save Setup data to Supabase:", error)
+      })
     } else if (action === 'create_airtable_record') {
-      setAirtableRecordLoading(true)
-      // Simulate 3 second loading
-      setTimeout(() => {
-        setAirtableRecordLoading(false)
-        setAirtableRecordCreated(true)
-        console.log('Airtable inventory record created')
+      // Immediately mark as created (no loading state)
+      setAirtableRecordCreated(true)
+      console.log('Creating Airtable CRM & Inventory record')
 
-        // Save to Supabase
-        setStageData(leadId, 'setup', 'airtable_record_created', true).catch(error => {
-          console.error("Failed to save Setup data to Supabase:", error)
+      // Send POST request to n8n webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/create-airtable-records', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
         })
-      }, 3000)
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('Airtable inventory record created successfully')
+
+            // Save to Supabase
+            setStageData(leadId, 'setup', 'airtable_record_created', true).catch(error => {
+              console.error("Failed to save Setup data to Supabase:", error)
+            })
+          } else {
+            console.error('Failed to create Airtable record:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error creating Airtable record:', error)
+        })
     } else if (action === 'move_hubspot_deal') {
       console.log('move_hubspot_deal action triggered')
-      setHubspotDealMoving(true)
-      console.log('setHubspotDealMoving(true) called')
-      // Simulate 3 second loading
-      setTimeout(() => {
-        console.log('Timeout completed - setting moved state')
-        setHubspotDealMoving(false)
-        setHubspotDealMoved(true)
-        console.log('HubSpot deal moved to Closed Won')
 
-        // Save to Supabase
-        setStageData(leadId, 'setup', 'hubspot_deal_moved', true).catch(error => {
-          console.error("Failed to save Setup data to Supabase:", error)
+      // Immediately set moved state (no loading animation)
+      setHubspotDealMoved(true)
+      console.log('HubSpot deal moved to Closed Won')
+
+      // Save to Supabase
+      setStageData(leadId, 'setup', 'hubspot_deal_moved', true).catch(error => {
+        console.error("Failed to save HubSpot deal moved data to Supabase:", error)
+      })
+
+      // Trigger HubSpot move webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/move-closed-won', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
         })
-      }, 3000)
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('HubSpot deal move to Closed Won triggered successfully')
+          } else {
+            console.error('Failed to trigger HubSpot deal move:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering HubSpot deal move:', error)
+        })
     } else if (action === 'copy_setup_email') {
       const emailContent = `Subject: Project Kickoff - Let's Get Started!
 
@@ -4006,6 +4139,51 @@ The GrowthLab Team`
     }
   }, [scopingDocGenerating, leadId, onFileUploaded])
 
+  // Poll for EA wording file when generating
+  useEffect(() => {
+    if (!eaWordingGenerating) return
+
+    console.log('Starting polling for EA wording file...')
+
+    const checkForFile = async () => {
+      try {
+        const file = await getFileByType(leadId, 'ea-wording')
+        if (file) {
+          console.log('EA wording file detected:', file)
+          setEaWordingGenerating(false)
+
+          // Trigger file uploaded callback to update UI
+          if (onFileUploaded) {
+            const uploadedFile: UploadedFile = {
+              id: file.id,
+              fileTypeId: 'ea-wording',
+              fileName: file.file_name,
+              uploadDate: file.uploaded_at,
+              fileSize: file.file_size,
+              uploadedBy: file.uploaded_by,
+              storagePath: file.storage_path
+            }
+            onFileUploaded(uploadedFile)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for EA wording file:', error)
+      }
+    }
+
+    // Check immediately
+    checkForFile()
+
+    // Then poll every 5 seconds
+    const interval = setInterval(checkForFile, 5000)
+
+    // Cleanup on unmount or when generating stops
+    return () => {
+      console.log('Stopping EA wording polling')
+      clearInterval(interval)
+    }
+  }, [eaWordingGenerating, leadId, onFileUploaded])
+
   return hideHeader ? (
     // When hideHeader is true, return just the content without Card wrapper
     <div className="space-y-8 p-6">
@@ -4068,11 +4246,9 @@ The GrowthLab Team`
                 workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
                 scopingDocGenerating={event.id === "internal-client-docs" ? scopingDocGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
-                clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
                 airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
                 hubspotDealMoved={event.id === "setup" ? hubspotDealMoved : false}
-                hubspotDealMoving={event.id === "setup" ? hubspotDealMoving : false}
                 setupEmailCopied={event.id === "setup" ? setupEmailCopied : false}
                 setupEmailSent={event.id === "setup" ? setupEmailSent : false}
                 aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
@@ -4170,11 +4346,9 @@ The GrowthLab Team`
                 workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
                 scopingDocGenerating={event.id === "internal-client-docs" ? scopingDocGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
-                clickupTaskLoading={event.id === "setup" ? clickupTaskLoading : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
                 airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
                 hubspotDealMoved={event.id === "setup" ? hubspotDealMoved : false}
-                hubspotDealMoving={event.id === "setup" ? hubspotDealMoving : false}
                 setupEmailCopied={event.id === "setup" ? setupEmailCopied : false}
                 setupEmailSent={event.id === "setup" ? setupEmailSent : false}
                 aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
