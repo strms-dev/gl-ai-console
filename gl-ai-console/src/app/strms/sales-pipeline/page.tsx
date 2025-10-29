@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect } from "react"
 import { LeadsTable } from "@/components/leads/leads-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ChatInterface } from "@/components/chat/chat-interface"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LeadForm } from "@/components/leads/lead-form"
 import { Lead } from "@/lib/dummy-data"
@@ -23,8 +22,7 @@ export default function SalesPipelinePage() {
 
   // State to track collapsible sections
   const [collapsedSections, setCollapsedSections] = useState({
-    leads: false,
-    assistant: false
+    leads: false
   })
 
   // Load leads from Supabase on mount
@@ -241,25 +239,6 @@ export default function SalesPipelinePage() {
                 hideCard={true}
               />
             </CardContent>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>STRMS AI Assistant</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => toggleSection('assistant')}
-                className="h-8 w-8 p-0"
-              >
-                {collapsedSections.assistant ? "+" : "−"}
-              </Button>
-            </div>
-          </CardHeader>
-          {!collapsedSections.assistant && (
-            <ChatInterface title="STRMS AI Assistant" hideHeader={true} />
           )}
         </Card>
       </div>

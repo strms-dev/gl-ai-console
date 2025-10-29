@@ -330,6 +330,7 @@ For more information about this document, please contact the GrowthLab team.`
               <div className="flex flex-col items-center justify-center gap-3 py-2">
                 <FileIcon className="w-8 h-8 text-gray-700" />
                 <div className="text-center w-full">
+                  <h3 className="font-semibold text-gray-900 text-base mb-1" style={{ fontFamily: 'var(--font-heading)' }}>{fileType.label}</h3>
                   <p className="font-medium text-gray-800 truncate text-base px-2">{displayFile.fileName}</p>
                   <p className="text-sm text-gray-600 mt-1">
                     {formatFileSize(displayFile.fileSize)} • Uploaded {new Date(displayFile.uploadDate).toLocaleDateString()}

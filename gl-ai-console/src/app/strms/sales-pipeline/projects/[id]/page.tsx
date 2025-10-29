@@ -4,7 +4,6 @@ import Link from "next/link"
 import { Timeline } from "@/components/leads/timeline"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChatInterface } from "@/components/chat/chat-interface"
 import { stageLabels, stageColors, Lead } from "@/lib/dummy-data"
 import { getTimelineForLead } from "@/lib/timeline-data"
 import { cn } from "@/lib/utils"
@@ -71,7 +70,6 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
   const [collapsedSections, setCollapsedSections] = useState({
     summary: false,
     timeline: false,
-    assistant: false,
     documents: false
   })
 
@@ -616,25 +614,6 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
                 ))}
               </div>
             </CardContent>
-          )}
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>STRMS AI Assistant</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => toggleSection('assistant')}
-                className="h-8 w-8 p-0"
-              >
-                {collapsedSections.assistant ? "+" : "−"}
-              </Button>
-            </div>
-          </CardHeader>
-          {!collapsedSections.assistant && (
-            <ChatInterface title="STRMS AI Assistant" hideHeader={true} />
           )}
         </Card>
       </div>

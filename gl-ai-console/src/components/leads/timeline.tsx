@@ -184,6 +184,7 @@ const ActionZone = ({
   scopingPrepGenerating,
   workflowDocsGenerating,
   scopingDocGenerating,
+  kickoffAgendaGenerating,
   clickupTaskCreated,
   airtableRecordCreated,
   airtableRecordLoading,
@@ -225,6 +226,7 @@ const ActionZone = ({
   scopingPrepGenerating?: boolean,
   workflowDocsGenerating?: boolean,
   scopingDocGenerating?: boolean,
+  kickoffAgendaGenerating?: boolean,
   clickupTaskCreated?: boolean,
   airtableRecordCreated?: boolean,
   airtableRecordLoading?: boolean,
@@ -779,11 +781,20 @@ The GrowthLab Team`
                 variant="default"
                 size="sm"
                 onClick={() => onAction('automated')}
-                disabled={!!existingFile}
+                disabled={!!existingFile || kickoffAgendaGenerating}
                 className="w-full sm:w-auto flex items-center gap-2"
               >
-                <Zap className="w-4 h-4" />
-                {event.actions.automated.label}
+                {kickoffAgendaGenerating ? (
+                  <>
+                    <RotateCw className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    {event.actions.automated.label}
+                  </>
+                )}
               </Button>
             </div>
           )}
@@ -1725,6 +1736,7 @@ const StageCard = ({
   scopingPrepGenerating,
   workflowDocsGenerating,
   scopingDocGenerating,
+  kickoffAgendaGenerating,
   clickupTaskCreated,
   airtableRecordCreated,
   airtableRecordLoading,
@@ -1771,6 +1783,7 @@ const StageCard = ({
   scopingPrepGenerating?: boolean
   workflowDocsGenerating?: boolean
   scopingDocGenerating?: boolean
+  kickoffAgendaGenerating?: boolean
   clickupTaskCreated?: boolean
   airtableRecordCreated?: boolean
   airtableRecordLoading?: boolean
@@ -1938,6 +1951,7 @@ const StageCard = ({
                     scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
                     workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
                     scopingDocGenerating={event.id === "internal-client-docs" ? scopingDocGenerating : false}
+                    kickoffAgendaGenerating={event.id === "kickoff" ? kickoffAgendaGenerating : false}
                     clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                     airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
                     airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
@@ -2255,6 +2269,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [workflowDocsGenerating, setWorkflowDocsGenerating] = useState(false)
   // Scoping Document state
   const [scopingDocGenerating, setScopingDocGenerating] = useState(false)
+  // Kickoff Meeting Agenda state
+  const [kickoffAgendaGenerating, setKickoffAgendaGenerating] = useState(false)
   // Project Setup state
   const [clickupTaskCreated, setClickupTaskCreated] = useState(false)
   const [airtableRecordCreated, setAirtableRecordCreated] = useState(false)
@@ -2553,11 +2569,9 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
 
       // Reset all Setup related state
       setClickupTaskCreated(false)
-      setClickupTaskLoading(false)
       setAirtableRecordCreated(false)
       setAirtableRecordLoading(false)
       setHubspotDealMoved(false)
-      setHubspotDealMoving(false)
       setSetupEmailCopied(false)
       setSetupEmailSent(false)
 
@@ -3123,6 +3137,37 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         })
         .catch(error => {
           console.error('Error triggering scoping document generation:', error)
+        })
+
+      return
+    }
+
+    // Handle automated action for kickoff meeting agenda
+    if (action === 'automated' && eventId === 'kickoff') {
+      console.log('Triggering AI generation for kickoff meeting agenda')
+
+      // Set loading state
+      setKickoffAgendaGenerating(true)
+
+      // Send POST request to n8n webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/kickoff-agenda', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('Kickoff meeting agenda generation triggered successfully')
+          } else {
+            console.error('Failed to trigger kickoff meeting agenda generation:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering kickoff meeting agenda generation:', error)
         })
 
       return
@@ -3718,6 +3763,30 @@ The GrowthLab Team`
         newSet.delete('kickoff') // Expand kickoff stage
         return newSet
       })
+
+      // Trigger kickoff agenda generation
+      console.log('Triggering AI generation for kickoff meeting agenda after setup completion')
+      setKickoffAgendaGenerating(true)
+
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/kickoff-agenda', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('Kickoff meeting agenda generation triggered successfully from setup stage')
+          } else {
+            console.error('Failed to trigger kickoff meeting agenda generation:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering kickoff meeting agenda generation:', error)
+        })
     }
   }
 
@@ -4184,6 +4253,51 @@ The GrowthLab Team`
     }
   }, [eaWordingGenerating, leadId, onFileUploaded])
 
+  // Poll for kickoff meeting agenda file when generating
+  useEffect(() => {
+    if (!kickoffAgendaGenerating) return
+
+    console.log('Starting polling for kickoff meeting agenda file...')
+
+    const checkForFile = async () => {
+      try {
+        const file = await getFileByType(leadId, 'kickoff-meeting-brief')
+        if (file) {
+          console.log('Kickoff meeting agenda file detected:', file)
+          setKickoffAgendaGenerating(false)
+
+          // Trigger file uploaded callback to update UI
+          if (onFileUploaded) {
+            const uploadedFile: UploadedFile = {
+              id: file.id,
+              fileTypeId: 'kickoff-meeting-brief',
+              fileName: file.file_name,
+              uploadDate: file.uploaded_at,
+              fileSize: file.file_size,
+              uploadedBy: file.uploaded_by,
+              storagePath: file.storage_path
+            }
+            onFileUploaded(uploadedFile)
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for kickoff meeting agenda file:', error)
+      }
+    }
+
+    // Check immediately
+    checkForFile()
+
+    // Then poll every 5 seconds
+    const interval = setInterval(checkForFile, 5000)
+
+    // Cleanup on unmount or when generating stops
+    return () => {
+      console.log('Stopping kickoff meeting agenda polling')
+      clearInterval(interval)
+    }
+  }, [kickoffAgendaGenerating, leadId, onFileUploaded])
+
   return hideHeader ? (
     // When hideHeader is true, return just the content without Card wrapper
     <div className="space-y-8 p-6">
@@ -4245,6 +4359,7 @@ The GrowthLab Team`
                 scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
                 workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
                 scopingDocGenerating={event.id === "internal-client-docs" ? scopingDocGenerating : false}
+                kickoffAgendaGenerating={event.id === "kickoff" ? kickoffAgendaGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
                 airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
@@ -4345,6 +4460,7 @@ The GrowthLab Team`
                 scopingPrepGenerating={event.id === "scoping-prep" ? scopingPrepGenerating : false}
                 workflowDocsGenerating={event.id === "workflow-docs" ? workflowDocsGenerating : false}
                 scopingDocGenerating={event.id === "internal-client-docs" ? scopingDocGenerating : false}
+                kickoffAgendaGenerating={event.id === "kickoff" ? kickoffAgendaGenerating : false}
                 clickupTaskCreated={event.id === "setup" ? clickupTaskCreated : false}
                 airtableRecordCreated={event.id === "setup" ? airtableRecordCreated : false}
                 airtableRecordLoading={event.id === "setup" ? airtableRecordLoading : false}
