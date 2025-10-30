@@ -3226,6 +3226,39 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         })
     }
 
+    // Handle scoping document special case - trigger Anchor contact and proposal creation
+    // This needs to happen BEFORE early return so it runs even with parent callback
+    if (file.fileTypeId === 'internal-client-documentation') {
+      console.log('Scoping document uploaded - triggering Anchor contact and proposal draft creation')
+      setAnchorSetupCreated(true)
+
+      // Save to Supabase
+      setStageData(leadId, 'ea', 'anchor_setup_created', true).catch(error => {
+        console.error("Failed to save EA data to Supabase:", error)
+      })
+
+      // Send POST request to n8n webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/anchor-contact-proposal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
+        })
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('Anchor contact and proposal creation triggered successfully from scoping document upload')
+          } else {
+            console.error('Failed to trigger Anchor creation:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering Anchor creation:', error)
+        })
+    }
+
     // Store the uploaded file
     if (onFileUploaded) {
       // Use prop callback if provided - parent will handle all automation logic
@@ -3524,18 +3557,37 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   // Handle anchor actions
   const handleAnchorAction = (action: string) => {
     if (action === 'create_anchor_setup') {
-      setAnchorSetupLoading(true)
-      // Simulate 3 second loading for creating both contact and proposal
-      setTimeout(() => {
-        setAnchorSetupLoading(false)
-        setAnchorSetupCreated(true)
-        console.log('Contact and Proposal draft created in Anchor')
+      console.log('Triggering Anchor contact and proposal draft creation')
 
-        // Save to Supabase - using single combined field
-        setStageData(leadId, 'ea', 'anchor_setup_created', true).catch(error => {
-          console.error("Failed to save EA data to Supabase:", error)
+      // Immediately set to created (no loading animation)
+      setAnchorSetupCreated(true)
+      console.log('Contact and Proposal draft created in Anchor')
+
+      // Save to Supabase - using single combined field
+      setStageData(leadId, 'ea', 'anchor_setup_created', true).catch(error => {
+        console.error("Failed to save EA data to Supabase:", error)
+      })
+
+      // Send POST request to n8n webhook
+      fetch('https://n8n.srv1055749.hstgr.cloud/webhook/anchor-contact-proposal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: leadId
         })
-      }, 3000)
+      })
+        .then(response => {
+          if (response.ok) {
+            console.log('Anchor contact and proposal creation triggered successfully')
+          } else {
+            console.error('Failed to trigger Anchor creation:', response.statusText)
+          }
+        })
+        .catch(error => {
+          console.error('Error triggering Anchor creation:', error)
+        })
     } else if (action === 'generate_ea_wording') {
       console.log('Triggering AI generation for EA wording')
 
