@@ -1,5 +1,6 @@
 import { supabase } from './client'
 import type { Project, ProjectInsert, ProjectUpdate, ProjectWithDetails } from './types'
+import { deleteProjectFiles } from './files'
 
 /**
  * Fetch all projects from Supabase
@@ -118,9 +119,13 @@ export async function updateProject(id: string, updates: ProjectUpdate): Promise
 }
 
 /**
- * Delete a project (cascades to related tables)
+ * Delete a project (cascades to related tables and deletes storage files)
  */
 export async function deleteProject(id: string): Promise<void> {
+  // Delete all files from storage and file metadata
+  await deleteProjectFiles(id)
+
+  // Delete the project record (this will cascade to related tables via DB constraints)
   const { error } = await supabase
     .from('strms_projects')
     .delete()

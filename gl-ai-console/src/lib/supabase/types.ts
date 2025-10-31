@@ -124,6 +124,7 @@ export interface Database {
           ai_sprint_length: string | null
           ai_price: number | null
           ai_explanation: string | null
+          ai_scope: string | null
           confirmed_sprint_length: string | null
           confirmed_price: number | null
           adjustment_reasoning: string | null
@@ -136,6 +137,7 @@ export interface Database {
           ai_sprint_length?: string | null
           ai_price?: number | null
           ai_explanation?: string | null
+          ai_scope?: string | null
           confirmed_sprint_length?: string | null
           confirmed_price?: number | null
           adjustment_reasoning?: string | null
@@ -148,6 +150,7 @@ export interface Database {
           ai_sprint_length?: string | null
           ai_price?: number | null
           ai_explanation?: string | null
+          ai_scope?: string | null
           confirmed_sprint_length?: string | null
           confirmed_price?: number | null
           adjustment_reasoning?: string | null

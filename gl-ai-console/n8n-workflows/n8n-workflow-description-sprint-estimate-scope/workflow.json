@@ -1,5 +1,5 @@
 {
-  "name": "Generate n8n Workflow Description & Sprint Estimate",
+  "name": "Generate n8n Workflow Description, Sprint Estimate & Scope",
   "nodes": [
     {
       "parameters": {
@@ -437,39 +437,82 @@
           "name": "GL AI Console Supabase Key"
         }
       }
-    }
-  ],
-  "pinData": {
-    "Catch Project ID": [
-      {
-        "json": {
-          "headers": {
-            "host": "n8n.srv1055749.hstgr.cloud",
-            "user-agent": "PostmanRuntime/7.48.0",
-            "content-length": "62",
-            "accept": "*/*",
-            "accept-encoding": "gzip, deflate, br",
-            "cache-control": "no-cache",
-            "content-type": "application/json",
-            "postman-token": "b5442a5d-647b-4291-ae05-53a4ab598732",
-            "x-forwarded-for": "68.6.247.35",
-            "x-forwarded-host": "n8n.srv1055749.hstgr.cloud",
-            "x-forwarded-port": "443",
-            "x-forwarded-proto": "https",
-            "x-forwarded-server": "116d6ec74012",
-            "x-real-ip": "68.6.247.35"
-          },
-          "params": {},
-          "query": {},
-          "body": {
-            "project_id": "a298b29e-9e05-40fc-b945-dbbd1c897bc0"
-          },
-          "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook-test/generate-n8n-workflow-description",
-          "executionMode": "test"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5-nano",
+          "mode": "list",
+          "cachedResultName": "GPT-5-NANO"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a workflow scoping assistant. The user will provide a detailed workflow description that includes triggers, steps, branching, integrations, error handling, logging, and operational notes.\n\nYour task is to return ONLY a clean, client-facing scope summary that can be placed into a proposal email. It must:\n\n- Be written in plain language, not technical execution detail.\n- Focus on what the workflow will *do*, not how it is implemented.\n- Highlight major outcomes, automations, data flows, and key services involved.\n- Be concise, structured, and readable, without unnecessary jargon.\n- Do NOT include instructions, node sequencing, retry logic, DevOps, database schema, or implementation specifics.\n- Do NOT include pricing, sprint count, timelines, suggestions, disclaimers, or commentary.\n- Do NOT mention n8n, APIs, webhooks, credentials, OAuth, failover logic, or workflow mechanics.\n\nFormat the final scope as a short, direct bullet list. No introduction, no closing sentence — just the scope.\n\nIf the workflow includes branching, summarize the branches clearly (e.g., \"If Enterprise tier, notify compliance team for manual handling\").\n\nYour output must be ONLY the scope. Do not say anything else.",
+              "role": "system"
+            },
+            {
+              "content": "=Below is a workflow description. Produce the scope only, following the system prompt.\n\nWORKFLOW DESCRIPTION:\n{{ $('Format n8n Workflow Description').item.json.formatted_workflow_description }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        3568,
+        -192
+      ],
+      "id": "b79ee500-3789-45b8-a0b8-1ff5edc2ab68",
+      "name": "Generate Scope Of Project",
+      "credentials": {
+        "openAiApi": {
+          "id": "lSSimk5MMw6cbVWo",
+          "name": "Automation OpenAI API Key"
         }
       }
-    ]
-  },
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "strms_sprint_pricing",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "project_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Catch Project ID').item.json.body.project_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "ai_scope",
+              "fieldValue": "={{ $json.message.content }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3920,
+        -192
+      ],
+      "id": "28308c70-25fa-4548-90bf-9ef1afbd119d",
+      "name": "Update Record With Scope",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    }
+  ],
+  "pinData": {},
   "connections": {
     "Catch Project ID": {
       "main": [
@@ -624,13 +667,35 @@
           }
         ]
       ]
+    },
+    "Create AI Sprint Estimate Row": {
+      "main": [
+        [
+          {
+            "node": "Generate Scope Of Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Scope Of Project": {
+      "main": [
+        [
+          {
+            "node": "Update Record With Scope",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "bacaeed0-f713-4e64-a202-4c49b0eed20f",
+  "versionId": "11de9fb2-2cc3-4542-866b-acdd8840e6af",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"

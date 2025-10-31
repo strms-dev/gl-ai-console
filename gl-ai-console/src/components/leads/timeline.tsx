@@ -14,6 +14,7 @@ import { getStageData, setStageData, deleteAllStageData } from "@/lib/supabase/s
 import { confirmSprintPricing, updateConfirmedPricing, getSprintPricing, deleteSprintPricing } from "@/lib/supabase/sprint-pricing"
 import { updateProjectStatus } from "@/lib/supabase/project-status"
 import { getFileByType } from "@/lib/supabase/files"
+import { getProjectById } from "@/lib/supabase/projects"
 import {
   CheckCircle2,
   XCircle,
@@ -192,7 +193,8 @@ const ActionZone = ({
   setupEmailCopied,
   setupEmailSent,
   aiSprintEstimatesLoading,
-  aiSprintEstimatesAvailable
+  aiSprintEstimatesAvailable,
+  leadId
 }: {
   event: TimelineEvent,
   onAction: (action: string) => void,
@@ -212,7 +214,7 @@ const ActionZone = ({
     initialAiPrice?: number
     initialAiExplanation?: string
   }) => void,
-  sprintPricingData?: { sprintLength: string; price: number; aiExplanation: string; adjustmentReasoning?: string } | null,
+  sprintPricingData?: { sprintLength: string; price: number; aiExplanation: string; aiScope?: string; adjustmentReasoning?: string } | null,
   proposalDeclined?: boolean,
   showProposalAdjustment?: boolean,
   proposalWasAdjusted?: boolean,
@@ -234,9 +236,27 @@ const ActionZone = ({
   setupEmailCopied?: boolean,
   setupEmailSent?: boolean,
   aiSprintEstimatesLoading?: boolean,
-  aiSprintEstimatesAvailable?: boolean
+  aiSprintEstimatesAvailable?: boolean,
+  leadId: string
 }) => {
   const [emailCopied, setEmailCopied] = useState(false)
+  const [contactName, setContactName] = useState<string>('')
+
+  // Fetch contact name from Supabase
+  useEffect(() => {
+    const fetchContactName = async () => {
+      try {
+        const project = await getProjectById(leadId)
+        if (project?.contact_name) {
+          setContactName(project.contact_name)
+        }
+      } catch (error) {
+        console.error('Error fetching contact name:', error)
+      }
+    }
+
+    fetchContactName()
+  }, [leadId])
 
   if (!event.actions) return null
 
@@ -551,15 +571,16 @@ const ActionZone = ({
     // Show recap for completed stage when expanded
     if (event.status === "completed") {
       const sprintOptions = {
-        "0.5": "2.5 days",
-        "1": "5 days",
-        "1.5": "7.5 days",
-        "2": "10 days"
+        "0.5": { duration: "2.5 days", type: "1/2 sprint" },
+        "1": { duration: "5 days", type: "1x sprint" },
+        "1.5": { duration: "7.5 days", type: "1.5x sprint" },
+        "2": { duration: "10 days", type: "2x sprint" }
       }
 
-      const sprintDuration = sprintPricingData ?
-        (sprintOptions[sprintPricingData.sprintLength as keyof typeof sprintOptions] || `${sprintPricingData.sprintLength} sprint days`) :
-        "Not specified"
+      const sprintInfo = sprintPricingData ?
+        (sprintOptions[sprintPricingData.sprintLength as keyof typeof sprintOptions] ||
+         { duration: `${sprintPricingData.sprintLength} sprint days`, type: `${sprintPricingData.sprintLength} sprint` }) :
+        { duration: "Not specified", type: "Not specified" }
 
       return (
         <div className="mt-4 p-4 bg-[#C8E4BB]/20 border border-[#C8E4BB] rounded-xl">
@@ -579,9 +600,10 @@ const ActionZone = ({
               <div className="text-sm text-gray-600">
                 {sprintPricingData ? (
                   <>
-                    <p>• Sprint Duration: {sprintDuration}</p>
+                    <p>• Sprint Type: {sprintInfo.type}</p>
+                    <p>• Sprint Duration: {sprintInfo.duration}</p>
                     <p>• Total Investment: ${sprintPricingData.price.toLocaleString()}</p>
-                    <p>• Email included project overview, timeline, and next steps</p>
+                    <p>• Email included project scope and next steps</p>
                   </>
                 ) : (
                   <p>• Email included project overview and next steps</p>
@@ -607,43 +629,39 @@ const ActionZone = ({
     // Show proposal email draft for pending/in-progress stage
     if (sprintPricingData) {
       const sprintOptions = {
-        "0.5": "2.5 days",
-        "1": "5 days",
-        "1.5": "7.5 days",
-        "2": "10 days"
+        "0.5": { duration: "2.5 days", type: "1/2 sprint" },
+        "1": { duration: "5 days", type: "1x sprint" },
+        "1.5": { duration: "7.5 days", type: "1.5x sprint" },
+        "2": { duration: "10 days", type: "2x sprint" }
       }
 
-      const sprintDuration = sprintOptions[sprintPricingData.sprintLength as keyof typeof sprintOptions] || `${sprintPricingData.sprintLength} sprint days`
+      const sprintInfo = sprintOptions[sprintPricingData.sprintLength as keyof typeof sprintOptions] ||
+        { duration: `${sprintPricingData.sprintLength} sprint days`, type: `${sprintPricingData.sprintLength} sprint` }
 
-      const proposalEmailContent = `Subject: Your Automation Project Proposal - Ready to Get Started!
+      // Extract first name from contact name
+      const firstName = contactName ? contactName.split(' ')[0] : '[First Name]'
 
-Hi there!
+      const proposalEmailContent = `Subject: Please Review Your STRMS Proposal
 
-Thank you for taking the time to discuss your automation needs with us. Based on our scoping session and analysis, I'm excited to present our proposal for your project.
+Hi ${firstName},
 
-## Project Overview
-We've carefully reviewed your requirements and believe we can deliver an excellent automation solution that will streamline your operations and save you valuable time.
+I'm reaching out to share the proposal based on our recent discussion and the information gathered by our team.
 
-## Proposed Timeline & Investment
+For your project, we estimate a ${sprintInfo.type}, lasting approximately ${sprintInfo.duration}, with a total cost of $${sprintPricingData.price.toLocaleString()}. Each sprint is a short, focused work period dedicated entirely to your project, which allows us to:
 
-**Sprint Duration:** ${sprintDuration}
-**Total Investment:** $${sprintPricingData.price.toLocaleString()}
+• Cut out distractions and give your project our full attention
+• Keep priorities clear and track progress easily
+• Move quickly without compromising quality
 
-${sprintPricingData.aiExplanation}
+By working this way, we can plan better, execute with precision, and get your solution up and running faster, while making sure you know exactly what's coming and when.
 
-## What's Included
-• Complete automation development and implementation
-• Thorough testing across all use cases
-• Documentation and handover training
-• 30 days of post-launch support and adjustments
+The scope of this engagement would include:
+${sprintPricingData.aiScope || sprintPricingData.aiExplanation}
 
-## Next Steps
-If you're ready to move forward, simply reply to this email and we'll send over the engagement agreement to get started. We're excited to help transform your business processes!
+Please review the details above and let me know how you'd like to proceed. Once I get the go-ahead, I can send over the Engagement Agreement so we can get started.
 
-Looking forward to working with you!
-
-Best regards,
-The GrowthLab Team`
+Looking forward to collaborating with you,
+Tim`
 
       return (
         <div className="mt-4">
@@ -654,7 +672,7 @@ The GrowthLab Team`
             </div>
             <p className="text-sm text-gray-600 mb-4 flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
-              Based on your sprint estimate: {sprintDuration} for ${sprintPricingData.price.toLocaleString()}
+              Based on your sprint estimate: {sprintInfo.type} ({sprintInfo.duration}) for ${sprintPricingData.price.toLocaleString()}
             </p>
           </div>
 
@@ -821,13 +839,13 @@ The GrowthLab Team`
   if (event.type === "decision" && showEmailDraft && selectedDeveloper) {
     const developerData = {
       nick: {
-        name: "Nick",
+        name: "Nicolas Sementilli",
         title: "The Growth Architect",
-        bookingLink: "https://calendly.com/nick-growthlab/scoping-call",
+        bookingLink: "https://calendar.app.google/suptZjSqhs2nLPUTA",
         specialty: "Marketing & Growth Systems"
       },
       gon: {
-        name: "Gon",
+        name: "Gonzalo Alvarez de Toledo",
         title: "The Numbers Ninja",
         bookingLink: "https://calendly.com/gon-growthlab/scoping-call",
         specialty: "Finance & Operations Systems"
@@ -835,23 +853,24 @@ The GrowthLab Team`
     }
 
     const developer = developerData[selectedDeveloper as keyof typeof developerData]
-    const emailContent = `Subject: Ready to Move Forward with Your Automation Project!
 
-Hi there!
+    // Extract first name from contact name
+    const firstName = contactName ? contactName.split(' ')[0] : 'there'
 
-Great news! After reviewing your demo call and readiness assessment, we're excited to move forward with your automation project.
+    const emailContent = `Subject: Schedule Your Scoping Call
 
-I've assigned ${developer.name} (${developer.title}) to work with you. ${developer.name} specializes in ${developer.specialty} and will be perfect for your project needs.
+Hi ${firstName},
 
-Please use the link below to schedule your scoping call with ${developer.name}:
-${developer.bookingLink}
+Thanks again for your time on the demo call! We're excited to move forward with next steps.
 
-During this call, we'll dive deep into your specific requirements and create a detailed technical plan for your automation solution.
+Please use the link below to schedule a Scoping Call with our developer, ${developer.name}. During this call, you'll review the project details, align on priorities, and confirm the technical approach before we send a proposal.
 
-Looking forward to working with you!
+👉 ${developer.bookingLink}
 
-Best regards,
-The GrowthLab Team`
+We're looking forward to collaborating and bringing your project to life!
+
+Best,
+Tim`
 
     return (
       <div className="mt-4">
@@ -916,22 +935,23 @@ The GrowthLab Team`
 
   // Not a Fit Email Draft Screen
   if (event.type === "decision" && showNotAFitEmail) {
-    const notAFitEmailContent = `Subject: Thank You for Your Interest in GrowthLab Automation
+    // Extract first name from contact name
+    const firstName = contactName ? contactName.split(' ')[0] : '[First Name]'
 
-Hi there,
+    const notAFitEmailContent = `Subject: Follow-up on Our Demo Call
 
-Thank you for taking the time to explore automation opportunities with GrowthLab. We really appreciate your interest in our services.
+Hi ${firstName},
 
-After reviewing your demo call and completing our readiness assessment, we've determined that your current needs and our automation expertise may not be the perfect match at this time.
+Thank you for taking the time to join the demo and share your goals with us. I really appreciate the openness and energy you brought to our conversation.
 
-This doesn't reflect on your business in any way - it simply means that our specific automation solutions might not align with your current operational structure and requirements.
+After reviewing your current state and what will be required to set up a successful automation/AI rollout, we believe that moving into a sprint right now would not provide the strongest outcome for your team. At this stage, it seems you'd benefit most from further foundational work (such as data readiness, process standardization, or internal alignment) before embarking on a full sprint.
 
-We encourage you to revisit automation opportunities in the future as your business evolves. Feel free to reach out again if your needs change or if you'd like to discuss alternative approaches.
+That said, we think you're on the right path and would welcome revisiting this in the future when the timing aligns more closely with the level of readiness we like to see to maximize success. If you like, we can also share some recommendations or resources to help build toward that readiness.
 
-We wish you all the best with your business growth!
+Thanks again for the chance to connect, and I hope we'll have the opportunity to work together when the conditions are ideal. If you have questions or would like to check in again in a few months, please feel free to reach out.
 
-Best regards,
-The GrowthLab Team`
+Warm regards,
+Tim`
 
     return (
       <div className="mt-4">
@@ -1271,6 +1291,29 @@ The GrowthLab Team`
 
   // Project Setup Actions - Create ClickUp Task and Airtable CRM & Inventory Record
   if (event.type === "setup") {
+    // Extract developer from decisionMade (e.g., "proceed_nick" -> "nick")
+    const getDeveloperName = () => {
+      if (selectedDeveloper === 'nick') return 'Nicolas Sementilli'
+      if (selectedDeveloper === 'gon') return 'Gonzalo Alvarez de Toledo'
+      if (decisionMade?.startsWith('proceed_')) {
+        const dev = decisionMade.replace('proceed_', '')
+        if (dev === 'nick') return 'Nicolas Sementilli'
+        if (dev === 'gon') return 'Gonzalo Alvarez de Toledo'
+      }
+      return '[Developer Name]'
+    }
+
+    // Get booking link based on developer
+    const getBookingLink = () => {
+      if (selectedDeveloper === 'nick') return 'https://calendar.app.google/VvMm2qJXRmi5U3Ac7'
+      if (decisionMade?.startsWith('proceed_')) {
+        const dev = decisionMade.replace('proceed_', '')
+        if (dev === 'nick') return 'https://calendar.app.google/VvMm2qJXRmi5U3Ac7'
+        if (dev === 'gon') return '[Booking link to be added]'
+      }
+      return '[Booking link]'
+    }
+
     return (
       <div className="mt-4 space-y-4">
         <div className="p-4 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
@@ -1384,33 +1427,27 @@ The GrowthLab Team`
 
               <div className="bg-white rounded-lg p-4 mb-4 shadow-sm">
                 <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
-{`Subject: Project Kickoff - Let's Get Started!
+{`Subject: Next Steps: Your ${sprintPricingData?.sprintLength || '[sprint length]'}x Development Sprint Starts Soon!
 
-Hi there!
+Hi ${contactName ? contactName.split(' ')[0] : '[Customer First Name]'},
 
-Great news! We're ready to kick off your automation project. Our team has completed all the initial setup and we're excited to get started.
+We're excited to kick off your ${sprintPricingData?.sprintLength || '[sprint length]'}x Development Sprint with STRMS! Now that the engagement agreement is signed, here's what to expect as we gear up to get started:
 
-## Project Overview
-Your automation project is now set up and ready to begin development. We've created your project workspace and assigned your dedicated developer.
+Project Details
+Scope:
+${sprintPricingData?.aiScope || sprintPricingData?.aiExplanation || '[Scope placeholder]'}
 
-## Your Point of Contact
-**Developer:** [Developer Name]
-**Title:** [Developer Title]
-**Specialty:** [Developer Specialty]
+Primary Contact/Developer: ${getDeveloperName()}
 
-## Next Steps
-Let's schedule your project kickoff meeting to:
-• Review the project scope and timeline
-• Introduce your development team
-• Answer any questions you might have
-• Set up regular check-in meetings
+What Happens Next
+To ensure a smooth and collaborative experience, we'll begin with a brief Kick-Off Call before the sprint starts. During this call, we'll review the project, align on priorities, and schedule Sprint Review meetings to create a strong feedback loop that keeps the project moving forward.
 
-**Schedule your kickoff meeting:** [Booking Link]
+👉 Please schedule your kickoff call here: ${getBookingLink()}
 
-We're looking forward to working with you and delivering an amazing automation solution!
+We're looking forward to collaborating!
 
-Best regards,
-The GrowthLab Team`}
+Best,
+Tim`}
                 </pre>
               </div>
 
@@ -1745,7 +1782,8 @@ const StageCard = ({
   setupEmailSent,
   aiSprintEstimatesLoading,
   aiSprintEstimatesAvailable,
-  completionDate
+  completionDate,
+  leadId
 }: {
   event: TimelineEvent
   index: number
@@ -1793,6 +1831,7 @@ const StageCard = ({
   aiSprintEstimatesLoading?: boolean
   aiSprintEstimatesAvailable?: boolean
   completionDate?: string
+  leadId: string
 }) => {
   const isActive = event.status === "in_progress" || event.status === "action-required"
 
@@ -1935,9 +1974,9 @@ const StageCard = ({
                     showEmailDraft={event.id === "decision" ? showEmailDraft : false}
                     selectedDeveloper={selectedDeveloper}
                     showNotAFitEmail={event.id === "decision" ? showNotAFitEmail : false}
-                    decisionMade={event.id === "decision" ? decisionMade : null}
+                    decisionMade={(event.id === "decision" || event.id === "setup") ? decisionMade : null}
                     onSprintPricingConfirm={event.id === "sprint-pricing" ? onSprintPricingConfirm : undefined}
-                    sprintPricingData={(event.id === "sprint-pricing" || event.id === "proposal" || event.id === "proposal-decision") ? sprintPricingData : null}
+                    sprintPricingData={(event.id === "sprint-pricing" || event.id === "proposal" || event.id === "proposal-decision" || event.id === "setup") ? sprintPricingData : null}
                     proposalDeclined={event.id === "proposal-decision" ? proposalDeclined : false}
                     showProposalAdjustment={event.id === "proposal-decision" ? showProposalAdjustment : false}
                     proposalWasAdjusted={event.id === "proposal-decision" ? proposalWasAdjusted : false}
@@ -1960,6 +1999,7 @@ const StageCard = ({
                     setupEmailSent={event.id === "setup" ? setupEmailSent : false}
                     aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
                     aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
+                    leadId={leadId}
                   />
                 ) : null}
 
@@ -2283,6 +2323,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     sprintLength: string
     price: number
     aiExplanation: string
+    aiScope?: string
     adjustmentReasoning?: string
   } | null>(null)
   // AI Sprint Pricing state - for polling n8n workflow results
@@ -2380,6 +2421,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
               sprintLength: sprintPricing.confirmed_sprint_length!,
               price: sprintPricing.confirmed_price!,
               aiExplanation: sprintPricing.ai_explanation || '',
+              aiScope: sprintPricing.ai_scope || undefined,
               adjustmentReasoning: sprintPricing.adjustment_reasoning || undefined
             })
             stagesToComplete.push('sprint-pricing')
@@ -2389,6 +2431,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
               sprintLength: sprintPricing.ai_sprint_length,
               price: sprintPricing.ai_price,
               aiExplanation: sprintPricing.ai_explanation || '',
+              aiScope: sprintPricing.ai_scope || undefined,
               adjustmentReasoning: undefined
             })
             setAiSprintEstimatesAvailable(true)
@@ -2440,6 +2483,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
             sprintLength: sprintPricing.ai_sprint_length,
             price: sprintPricing.ai_price,
             aiExplanation: sprintPricing.ai_explanation || '',
+            aiScope: sprintPricing.ai_scope || undefined,
             adjustmentReasoning: undefined
           })
           setAiSprintEstimatesAvailable(true)
@@ -3438,6 +3482,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       sprintLength: data.sprintLength,
       price: data.price,
       aiExplanation: aiExplanation,
+      aiScope: sprintPricingData?.aiScope,
       adjustmentReasoning: undefined
     })
 
@@ -3479,6 +3524,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       sprintLength: data.sprintLength,
       price: data.price,
       aiExplanation: prev?.aiExplanation || '', // Preserve original AI explanation
+      aiScope: prev?.aiScope, // Preserve AI scope
       adjustmentReasoning: data.explanation
     }))
     setShowProposalAdjustment(false)
@@ -3764,38 +3810,87 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
           console.error('Error triggering HubSpot deal move:', error)
         })
     } else if (action === 'copy_setup_email') {
-      const emailContent = `Subject: Project Kickoff - Let's Get Started!
+      // Get developer name from decisionMade
+      const getDeveloperName = () => {
+        if (decisionMade?.startsWith('proceed_')) {
+          const dev = decisionMade.replace('proceed_', '')
+          if (dev === 'nick') return 'Nicolas Sementilli'
+          if (dev === 'gon') return 'Gonzalo Alvarez de Toledo'
+        }
+        return '[Developer Name]'
+      }
 
-Hi there!
+      // Get booking link based on developer
+      const getBookingLink = () => {
+        if (decisionMade?.startsWith('proceed_')) {
+          const dev = decisionMade.replace('proceed_', '')
+          if (dev === 'nick') return 'https://calendar.app.google/VvMm2qJXRmi5U3Ac7'
+          if (dev === 'gon') return '[Booking link to be added]'
+        }
+        return '[Booking link]'
+      }
 
-Great news! We're ready to kick off your automation project. Our team has completed all the initial setup and we're excited to get started.
+      // Fetch contact name and build email
+      getProjectById(leadId).then(project => {
+        const contactName = project?.contact_name || '[Customer First Name]'
+        const firstName = contactName.split(' ')[0]
 
-## Project Overview
-Your automation project is now set up and ready to begin development. We've created your project workspace and assigned your dedicated developer.
+        const emailContent = `Subject: Next Steps: Your ${sprintPricingData?.sprintLength || '[sprint length]'}x Development Sprint Starts Soon!
 
-## Your Point of Contact
-**Developer:** [Developer Name]
-**Title:** [Developer Title]
-**Specialty:** [Developer Specialty]
+Hi ${firstName},
 
-## Next Steps
-Let's schedule your project kickoff meeting to:
-• Review the project scope and timeline
-• Introduce your development team
-• Answer any questions you might have
-• Set up regular check-in meetings
+We're excited to kick off your ${sprintPricingData?.sprintLength || '[sprint length]'}x Development Sprint with STRMS! Now that the engagement agreement is signed, here's what to expect as we gear up to get started:
 
-**Schedule your kickoff meeting:** [Booking Link]
+Project Details
+Scope:
+${sprintPricingData?.aiScope || sprintPricingData?.aiExplanation || '[Scope placeholder]'}
 
-We're looking forward to working with you and delivering an amazing automation solution!
+Primary Contact/Developer: ${getDeveloperName()}
 
-Best regards,
-The GrowthLab Team`
+What Happens Next
+To ensure a smooth and collaborative experience, we'll begin with a brief Kick-Off Call before the sprint starts. During this call, we'll review the project, align on priorities, and schedule Sprint Review meetings to create a strong feedback loop that keeps the project moving forward.
 
-      navigator.clipboard.writeText(emailContent)
-      setSetupEmailCopied(true)
-      setTimeout(() => setSetupEmailCopied(false), 2000)
-      console.log('Setup email copied to clipboard')
+👉 Please schedule your kickoff call here: ${getBookingLink()}
+
+We're looking forward to collaborating!
+
+Best,
+Tim`
+
+        navigator.clipboard.writeText(emailContent)
+        setSetupEmailCopied(true)
+        setTimeout(() => setSetupEmailCopied(false), 2000)
+        console.log('Setup email copied to clipboard')
+      }).catch(error => {
+        console.error('Error fetching contact name:', error)
+        // Fallback if fetch fails
+        const emailContent = `Subject: Next Steps: Your ${sprintPricingData?.sprintLength || '[sprint length]'}x Development Sprint Starts Soon!
+
+Hi [Customer First Name],
+
+We're excited to kick off your ${sprintPricingData?.sprintLength || '[sprint length]'}x Development Sprint with STRMS! Now that the engagement agreement is signed, here's what to expect as we gear up to get started:
+
+Project Details
+Scope:
+${sprintPricingData?.aiScope || sprintPricingData?.aiExplanation || '[Scope placeholder]'}
+
+Primary Contact/Developer: ${getDeveloperName()}
+
+What Happens Next
+To ensure a smooth and collaborative experience, we'll begin with a brief Kick-Off Call before the sprint starts. During this call, we'll review the project, align on priorities, and schedule Sprint Review meetings to create a strong feedback loop that keeps the project moving forward.
+
+👉 Please schedule your kickoff call here: ${getBookingLink()}
+
+We're looking forward to collaborating!
+
+Best,
+Tim`
+
+        navigator.clipboard.writeText(emailContent)
+        setSetupEmailCopied(true)
+        setTimeout(() => setSetupEmailCopied(false), 2000)
+        console.log('Setup email copied to clipboard (with fallback)')
+      })
     } else if (action === 'setup_email_sent') {
       setSetupEmailSent(true)
       console.log('Setup kickoff email sent to client')
@@ -4397,7 +4492,7 @@ The GrowthLab Team`
                 showNotAFitEmail={event.id === "decision" ? showNotAFitEmail : false}
                 decisionMade={decisionMade}
                 onSprintPricingConfirm={event.id === "sprint-pricing" ? handleSprintPricingConfirm : undefined}
-                sprintPricingData={(event.id === "sprint-pricing" || event.id === "proposal" || event.id === "proposal-decision") ? sprintPricingData : null}
+                sprintPricingData={(event.id === "sprint-pricing" || event.id === "proposal" || event.id === "proposal-decision" || event.id === "setup") ? sprintPricingData : null}
                 proposalDeclined={event.id === "proposal-decision" ? proposalDeclined : false}
                 showProposalAdjustment={event.id === "proposal-decision" ? showProposalAdjustment : false}
                 proposalWasAdjusted={event.id === "proposal-decision" ? proposalWasAdjusted : false}
@@ -4421,6 +4516,7 @@ The GrowthLab Team`
                 aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
                 aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
                 completionDate={completionDates[event.id]}
+                leadId={leadId}
               />
             )
           })}
@@ -4496,9 +4592,9 @@ The GrowthLab Team`
                 showEmailDraft={event.id === "decision" && decisionMade === "reject"}
                 selectedDeveloper={selectedDeveloper}
                 showNotAFitEmail={event.id === "decision" && decisionMade === "reject"}
-                decisionMade={event.id === "decision" ? decisionMade : undefined}
+                decisionMade={(event.id === "decision" || event.id === "setup") ? decisionMade : undefined}
                 onSprintPricingConfirm={event.id === "sprint-pricing" ? handleSprintPricingConfirm : undefined}
-                sprintPricingData={event.id === "sprint-pricing" ? sprintPricingData : undefined}
+                sprintPricingData={(event.id === "sprint-pricing" || event.id === "proposal" || event.id === "proposal-decision" || event.id === "setup") ? sprintPricingData : undefined}
                 proposalDeclined={event.id === "proposal-decision" ? proposalDeclined : false}
                 showProposalAdjustment={event.id === "proposal-decision" ? showProposalAdjustment : false}
                 proposalWasAdjusted={event.id === "proposal-decision" ? proposalWasAdjusted : false}
@@ -4522,6 +4618,7 @@ The GrowthLab Team`
                 aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
                 aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
                 completionDate={completionDates[event.id]}
+                leadId={leadId}
               />
             )
           })}

@@ -238,3 +238,74 @@ export async function getFileUploadDate(projectId: string, fileTypeId: string): 
 
   return data?.uploaded_at || null
 }
+
+/**
+ * Delete all files and storage folder for a project
+ * Called when a project is deleted
+ */
+export async function deleteProjectFiles(projectId: string): Promise<void> {
+  try {
+    // First, get all file metadata for this project to know exact storage paths
+    const { data: fileRecords, error: fetchError } = await supabase
+      .from('strms_project_files')
+      .select('storage_path')
+      .eq('project_id', projectId)
+
+    if (fetchError) {
+      console.error('Error fetching project file records:', fetchError)
+    }
+
+    // Delete files from storage using their exact paths from metadata
+    if (fileRecords && fileRecords.length > 0) {
+      const filePaths = fileRecords.map(record => record.storage_path)
+
+      const { error: removeError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .remove(filePaths)
+
+      if (removeError) {
+        console.error('Error removing project files from storage:', removeError)
+      }
+    }
+
+    // Also try to list and delete any files that might exist in storage but aren't in metadata
+    // List all subdirectories (file type folders) in the project folder
+    const { data: folders, error: listError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .list(projectId)
+
+    if (listError) {
+      console.error('Error listing project folders in storage:', listError)
+    } else if (folders && folders.length > 0) {
+      // For each file type folder, list and delete files
+      for (const folder of folders) {
+        const { data: files, error: filesError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .list(`${projectId}/${folder.name}`)
+
+        if (!filesError && files && files.length > 0) {
+          const filePaths = files.map(file => `${projectId}/${folder.name}/${file.name}`)
+
+          await supabase.storage
+            .from(STORAGE_BUCKET)
+            .remove(filePaths)
+        }
+      }
+    }
+
+    // Delete file metadata from database
+    // This should be handled by CASCADE on the database level,
+    // but we'll do it explicitly to be safe
+    const { error: metadataError } = await supabase
+      .from('strms_project_files')
+      .delete()
+      .eq('project_id', projectId)
+
+    if (metadataError) {
+      console.error('Error deleting project file metadata:', metadataError)
+    }
+  } catch (error) {
+    console.error('Error in deleteProjectFiles:', error)
+    // Don't throw - we want project deletion to succeed even if file cleanup fails
+  }
+}
