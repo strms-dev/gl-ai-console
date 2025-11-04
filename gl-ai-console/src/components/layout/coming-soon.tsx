@@ -37,8 +37,8 @@ export function ComingSoon({ departmentName, departmentIcon, description, featur
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-6">
-              We're building an AI-powered console for {departmentName} that will revolutionize how you work.
-              Here's what's coming:
+              We&apos;re building an AI-powered console for {departmentName} that will revolutionize how you work.
+              Here&apos;s what&apos;s coming:
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {features.map((feature, index) => (

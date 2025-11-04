@@ -35,6 +35,7 @@ function formatTimestamp(timestamp: string): string {
 
 // Helper function to convert Lead to Supabase Project format
 function leadToProject(lead: Partial<Lead>): ProjectInsert | ProjectUpdate {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const project: any = {}
 
   if (lead.projectName !== undefined) project.project_name = lead.projectName

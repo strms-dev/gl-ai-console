@@ -272,7 +272,6 @@ const ActionZone = ({
             onFileUploaded={onFileUploaded}
             onFileCleared={() => onFileCleared?.('demo-call-transcript')}
             variant="compact"
-            variant="compact"
           />
         </div>
       )
@@ -290,7 +289,6 @@ const ActionZone = ({
             existingFile={existingFile}
             onFileUploaded={onFileUploaded}
             onFileCleared={() => onFileCleared?.('scoping-call-transcript')}
-            variant="compact"
             variant="compact"
           />
         </div>
@@ -717,7 +715,7 @@ Tim`
           </div>
 
           <p className="text-xs text-gray-500 text-center mt-3">
-            Click "Copy Email" to copy the proposal, then "Email Sent" when you've sent it to the client
+            Click &quot;Copy Email&quot; to copy the proposal, then &quot;Email Sent&quot; when you&apos;ve sent it to the client
           </p>
         </div>
       )
@@ -927,7 +925,7 @@ Tim`
         </div>
 
         <p className="text-xs text-gray-500 text-center mt-3">
-          Click "Copy Email" to copy the draft, then "Email Sent" when you've sent it to the client
+          Click &quot;Copy Email&quot; to copy the draft, then &quot;Email Sent&quot; when you&apos;ve sent it to the client
         </p>
       </div>
     )
@@ -1004,7 +1002,7 @@ Tim`
         </div>
 
         <p className="text-xs text-gray-500 text-center mt-3">
-          Click "Copy Email" to copy the draft, then "Email Sent" when you've sent it to the client
+          Click &quot;Copy Email&quot; to copy the draft, then &quot;Email Sent&quot; when you&apos;ve sent it to the client
         </p>
       </div>
     )
@@ -1056,7 +1054,7 @@ Tim`
           </div>
           <div className="text-sm text-gray-700">
             <p>• Proposal was declined by the client</p>
-            <p>• HubSpot deal status updated to "Closed Lost"</p>
+            <p>• HubSpot deal status updated to &quot;Closed Lost&quot;</p>
             <p>• All remaining onboarding stages have been marked as not applicable</p>
           </div>
         </div>
@@ -1105,7 +1103,7 @@ Tim`
               </div>
               <div className="mt-3">
                 <span className="font-medium">Adjustment Reasoning:</span>
-                <p className="mt-1 text-gray-600 italic">"{sprintPricingData.adjustmentReasoning}"</p>
+                <p className="mt-1 text-gray-600 italic">&quot;{sprintPricingData.adjustmentReasoning}&quot;</p>
               </div>
             </div>
           </div>
@@ -1482,7 +1480,7 @@ Tim`}
               </div>
 
               <p className="text-xs text-gray-500 text-center mt-3">
-                Click "Copy Email" to copy the draft, then "Email Sent" when you've sent it to the client
+                Click &quot;Copy Email&quot; to copy the draft, then &quot;Email Sent&quot; when you&apos;ve sent it to the client
               </p>
             </div>
         </div>

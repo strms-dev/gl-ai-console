@@ -25,6 +25,7 @@ const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
@@ -43,6 +44,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
 )
 DialogContent.displayName = "DialogContent"
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface DialogHeaderProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 const DialogHeader = ({ className, ...props }: DialogHeaderProps) => (
@@ -53,6 +55,7 @@ const DialogHeader = ({ className, ...props }: DialogHeaderProps) => (
 )
 DialogHeader.displayName = "DialogHeader"
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface DialogTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {}
 
 const DialogTitle = React.forwardRef<HTMLHeadingElement, DialogTitleProps>(
@@ -66,6 +69,7 @@ const DialogTitle = React.forwardRef<HTMLHeadingElement, DialogTitleProps>(
 )
 DialogTitle.displayName = "DialogTitle"
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface DialogFooterProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 const DialogFooter = ({ className, ...props }: DialogFooterProps) => (

@@ -160,7 +160,7 @@ export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFi
 
       // For demo files, create appropriate dummy content
       let content = ''
-      let mimeType = 'text/plain'
+      const mimeType = 'text/plain'
 
       if (fileToDownload.fileName.includes('Demo_Call_Transcript')) {
         content = `DEMO CALL TRANSCRIPT
