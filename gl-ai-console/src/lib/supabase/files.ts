@@ -129,7 +129,7 @@ export async function replaceFile(
     .from('strms_project_files')
     .select('id')
     .eq('project_id', projectId)
-    .eq('file_type_id', fileTypeId)
+    .eq('file_type_id', fileTypeId) as { data: { id: string }[] | null, error: Error | null }
 
   if (fetchError) {
     console.error('Error fetching existing files:', fetchError)
@@ -154,7 +154,7 @@ export async function getProjectFiles(projectId: string): Promise<ProjectFile[]>
     .from('strms_project_files')
     .select('*')
     .eq('project_id', projectId)
-    .order('uploaded_at', { ascending: false })
+    .order('uploaded_at', { ascending: false }) as { data: ProjectFile[] | null, error: Error | null }
 
   if (error) {
     console.error('Error fetching project files:', error)
@@ -175,7 +175,7 @@ export async function getFileByType(projectId: string, fileTypeId: string): Prom
     .eq('file_type_id', fileTypeId)
     .order('uploaded_at', { ascending: false })
     .limit(1)
-    .single()
+    .single() as { data: ProjectFile | null, error: Error | null }
 
   if (error) {
     if (error.code === 'PGRST116') {
@@ -198,7 +198,7 @@ export async function deleteFilesByType(projectId: string, fileTypeId: string): 
     .from('strms_project_files')
     .select('id')
     .eq('project_id', projectId)
-    .eq('file_type_id', fileTypeId)
+    .eq('file_type_id', fileTypeId) as { data: { id: string }[] | null, error: Error | null }
 
   if (fetchError) {
     console.error('Error fetching files to delete:', fetchError)
@@ -225,7 +225,7 @@ export async function getFileUploadDate(projectId: string, fileTypeId: string): 
     .eq('file_type_id', fileTypeId)
     .order('uploaded_at', { ascending: false })
     .limit(1)
-    .single()
+    .single() as { data: { uploaded_at: string } | null, error: { code?: string, message: string } | null }
 
   if (error) {
     if (error.code === 'PGRST116') {
@@ -249,7 +249,7 @@ export async function deleteProjectFiles(projectId: string): Promise<void> {
     const { data: fileRecords, error: fetchError } = await supabase
       .from('strms_project_files')
       .select('storage_path')
-      .eq('project_id', projectId)
+      .eq('project_id', projectId) as { data: { storage_path: string }[] | null, error: Error | null }
 
     if (fetchError) {
       console.error('Error fetching project file records:', fetchError)
