@@ -20,7 +20,7 @@ export function ComingSoon({ departmentName, departmentIcon, description, featur
             {IconComponent ? (
               <IconComponent className="w-16 h-16 text-[#407B9D]" />
             ) : (
-              <div className="text-6xl">{departmentIcon}</div>
+              <div className="text-6xl">{typeof departmentIcon === 'string' ? departmentIcon : null}</div>
             )}
           </div>
           <h1 className="text-4xl font-bold text-foreground mb-4">
