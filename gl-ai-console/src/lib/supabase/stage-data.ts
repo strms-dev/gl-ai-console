@@ -18,7 +18,7 @@ export async function setStageData(
         stage_id: stageId,
         data_key: dataKey,
         data_value: dataValue
-      },
+      } as never,
       {
         onConflict: 'project_id,stage_id,data_key'
       }
@@ -48,7 +48,7 @@ export async function getStageData(
     .eq('project_id', projectId)
     .eq('stage_id', stageId)
     .eq('data_key', dataKey)
-    .single()
+    .single() as { data: { data_value: Json } | null, error: { code?: string, message?: string } | null }
 
   if (error) {
     if (error.code === 'PGRST116') {
@@ -70,7 +70,7 @@ export async function getAllStageData(projectId: string, stageId: string): Promi
     .from('strms_project_stage_data')
     .select('data_key, data_value')
     .eq('project_id', projectId)
-    .eq('stage_id', stageId)
+    .eq('stage_id', stageId) as { data: { data_key: string, data_value: Json }[] | null, error: Error | null }
 
   if (error) {
     console.error('Error getting all stage data:', error)
@@ -257,7 +257,7 @@ export async function getStageCompletionDate(projectId: string, stageId: string)
     .eq('stage_id', stageId)
     .order('updated_at', { ascending: false })
     .limit(1)
-    .single()
+    .single() as { data: { updated_at: string } | null, error: { code?: string } | null }
 
   if (error) {
     if (error.code === 'PGRST116') {

@@ -175,7 +175,7 @@ export async function getFileByType(projectId: string, fileTypeId: string): Prom
     .eq('file_type_id', fileTypeId)
     .order('uploaded_at', { ascending: false })
     .limit(1)
-    .single() as { data: ProjectFile | null, error: Error | null }
+    .single() as { data: ProjectFile | null, error: { code?: string, message?: string } | null }
 
   if (error) {
     if (error.code === 'PGRST116') {
@@ -183,7 +183,7 @@ export async function getFileByType(projectId: string, fileTypeId: string): Prom
       return null
     }
     console.error('Error fetching file:', error)
-    throw new Error(`Failed to fetch file: ${error.message}`)
+    throw new Error(`Failed to fetch file: ${error.message || 'Unknown error'}`)
   }
 
   return data

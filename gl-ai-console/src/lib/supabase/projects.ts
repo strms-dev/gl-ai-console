@@ -1,5 +1,5 @@
 import { supabase } from './client'
-import type { Project, ProjectInsert, ProjectUpdate, ProjectWithDetails } from './types'
+import type { Project, ProjectInsert, ProjectUpdate, ProjectWithDetails, ProjectFile, StageData, SprintPricing } from './types'
 import { deleteProjectFiles } from './files'
 
 /**
@@ -30,7 +30,7 @@ export async function getProjectById(id: string): Promise<ProjectWithDetails | n
     .from('strms_projects')
     .select('*')
     .eq('id', id)
-    .single()
+    .single() as { data: Project | null, error: Error | null }
 
   if (projectError) {
     console.error('Error fetching project:', projectError)
@@ -45,7 +45,7 @@ export async function getProjectById(id: string): Promise<ProjectWithDetails | n
   const { data: files, error: filesError } = await supabase
     .from('strms_project_files')
     .select('*')
-    .eq('project_id', id)
+    .eq('project_id', id) as { data: ProjectFile[] | null, error: Error | null }
 
   if (filesError) {
     console.error('Error fetching project files:', filesError)
@@ -55,7 +55,7 @@ export async function getProjectById(id: string): Promise<ProjectWithDetails | n
   const { data: stageData, error: stageDataError } = await supabase
     .from('strms_project_stage_data')
     .select('*')
-    .eq('project_id', id)
+    .eq('project_id', id) as { data: StageData[] | null, error: Error | null }
 
   if (stageDataError) {
     console.error('Error fetching stage data:', stageDataError)
@@ -66,7 +66,7 @@ export async function getProjectById(id: string): Promise<ProjectWithDetails | n
     .from('strms_sprint_pricing')
     .select('*')
     .eq('project_id', id)
-    .single()
+    .single() as { data: SprintPricing | null, error: { code?: string } | null }
 
   if (sprintPricingError && sprintPricingError.code !== 'PGRST116') {
     // PGRST116 = no rows returned, which is fine
@@ -87,7 +87,7 @@ export async function getProjectById(id: string): Promise<ProjectWithDetails | n
 export async function createProject(project: ProjectInsert): Promise<Project> {
   const { data, error } = await supabase
     .from('strms_projects')
-    .insert(project)
+    .insert(project as never)
     .select()
     .single()
 
@@ -105,7 +105,7 @@ export async function createProject(project: ProjectInsert): Promise<Project> {
 export async function updateProject(id: string, updates: ProjectUpdate): Promise<Project> {
   const { data, error } = await supabase
     .from('strms_projects')
-    .update(updates)
+    .update(updates as never)
     .eq('id', id)
     .select()
     .single()
@@ -143,7 +143,7 @@ export async function deleteProject(id: string): Promise<void> {
 export async function updateProjectActivity(id: string): Promise<void> {
   const { error } = await supabase
     .from('strms_projects')
-    .update({ last_activity: new Date().toISOString() })
+    .update({ last_activity: new Date().toISOString() } as never)
     .eq('id', id)
 
   if (error) {

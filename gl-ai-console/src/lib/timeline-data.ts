@@ -196,6 +196,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       timestamp: "",
       status: "pending",
       icon: "scale",
+      automationLevel: "manual-intervention",
       actions: {
         decision: {
           options: [

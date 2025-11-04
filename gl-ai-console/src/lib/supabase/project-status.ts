@@ -13,7 +13,7 @@ export async function updateProjectStatus(
     .update({
       project_status: status,
       updated_at: new Date().toISOString()
-    })
+    } as never)
     .eq('id', projectId)
 
   if (error) {
@@ -30,12 +30,12 @@ export async function getProjectStatus(projectId: string): Promise<ProjectStatus
     .from('strms_projects')
     .select('project_status')
     .eq('id', projectId)
-    .single()
+    .single() as { data: { project_status: ProjectStatus } | null, error: Error | null }
 
   if (error) {
     console.error('Error getting project status:', error)
     throw new Error(`Failed to get project status: ${error.message}`)
   }
 
-  return (data.project_status as ProjectStatus) || 'active'
+  return (data?.project_status as ProjectStatus) || 'active'
 }

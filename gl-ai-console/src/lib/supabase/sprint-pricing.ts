@@ -27,7 +27,7 @@ export async function saveSprintPricing(
 
   const { data, error } = await supabase
     .from('strms_sprint_pricing')
-    .upsert(insertData, {
+    .upsert(insertData as never, {
       onConflict: 'project_id'
     })
     .select()
@@ -80,7 +80,7 @@ export async function updateConfirmedPricing(
 
   const { data, error } = await supabase
     .from('strms_sprint_pricing')
-    .update(updateData)
+    .update(updateData as never)
     .eq('project_id', projectId)
     .select()
     .single()
