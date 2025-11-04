@@ -47,7 +47,7 @@ export async function uploadFile(
 
   const { data, error } = await supabase
     .from('strms_project_files')
-    .insert(fileMetadata)
+    .insert(fileMetadata as never)
     .select()
     .single()
 
