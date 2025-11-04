@@ -4169,12 +4169,16 @@ Tim`
 
   // Sync lead's current stage with timeline progress
   useEffect(() => {
-    const currentStage = determineCurrentStage(updatedEvents)
-    const lead = getLeadById(leadId)
+    const syncStage = async () => {
+      const currentStage = determineCurrentStage(updatedEvents)
+      const lead = await getLeadById(leadId)
 
-    if (lead && lead.stage !== currentStage) {
-      updateLead(leadId, { stage: currentStage as Lead["stage"] })
+      if (lead && lead.stage !== currentStage) {
+        updateLead(leadId, { stage: currentStage as Lead["stage"] })
+      }
     }
+
+    syncStage()
   }, [leadId, updatedEvents])
 
   // Poll for readiness assessment file when generating
