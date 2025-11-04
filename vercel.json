@@ -1,7 +1,3 @@
 {
-  "buildCommand": "npm run build --prefix gl-ai-console",
-  "devCommand": "npm run dev --prefix gl-ai-console",
-  "installCommand": "npm install --prefix gl-ai-console",
-  "framework": "nextjs",
-  "outputDirectory": "gl-ai-console/.next"
+  "framework": "nextjs"
 }
