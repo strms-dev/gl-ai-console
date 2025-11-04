@@ -2299,6 +2299,10 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   const [eaWordingGenerated, setEaWordingGenerated] = useState(false)
   const [eaWordingGenerating, setEaWordingGenerating] = useState(false)
   const [eaConfirmed, setEaConfirmed] = useState(false)
+  const [anchorContactCreated, setAnchorContactCreated] = useState(false)
+  const [anchorContactLoading, setAnchorContactLoading] = useState(false)
+  const [anchorProposalCreated, setAnchorProposalCreated] = useState(false)
+  const [anchorProposalLoading, setAnchorProposalLoading] = useState(false)
   // Readiness Assessment state
   const [readinessGenerating, setReadinessGenerating] = useState(false)
   // Scoping Call Prep state
