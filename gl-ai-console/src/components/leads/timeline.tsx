@@ -841,13 +841,13 @@ Tim`
       nick: {
         name: "Nicolas Sementilli",
         title: "The Growth Architect",
-        bookingLink: "https://calendar.app.google/suptZjSqhs2nLPUTA",
+        bookingLink: "https://calendar.app.google/UFVr75LmhjrUPPMQA",
         specialty: "Marketing & Growth Systems"
       },
       gon: {
         name: "Gonzalo Alvarez de Toledo",
         title: "The Numbers Ninja",
-        bookingLink: "https://calendly.com/gon-growthlab/scoping-call",
+        bookingLink: "https://calendar.app.google/Q4K7LKELHZLoYtW49",
         specialty: "Finance & Operations Systems"
       }
     }
@@ -1305,11 +1305,11 @@ Tim`
 
     // Get booking link based on developer
     const getBookingLink = () => {
-      if (selectedDeveloper === 'nick') return 'https://calendar.app.google/VvMm2qJXRmi5U3Ac7'
+      if (selectedDeveloper === 'nick') return 'https://calendar.app.google/z5K9B6qxxFM1n6HF8'
       if (decisionMade?.startsWith('proceed_')) {
         const dev = decisionMade.replace('proceed_', '')
-        if (dev === 'nick') return 'https://calendar.app.google/VvMm2qJXRmi5U3Ac7'
-        if (dev === 'gon') return '[Booking link to be added]'
+        if (dev === 'nick') return 'https://calendar.app.google/z5K9B6qxxFM1n6HF8'
+        if (dev === 'gon') return 'https://calendar.app.google/F4SLV6oceooSg2Gt9'
       }
       return '[Booking link]'
     }
@@ -3824,8 +3824,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       const getBookingLink = () => {
         if (decisionMade?.startsWith('proceed_')) {
           const dev = decisionMade.replace('proceed_', '')
-          if (dev === 'nick') return 'https://calendar.app.google/VvMm2qJXRmi5U3Ac7'
-          if (dev === 'gon') return '[Booking link to be added]'
+          if (dev === 'nick') return 'https://calendar.app.google/z5K9B6qxxFM1n6HF8'
+          if (dev === 'gon') return 'https://calendar.app.google/F4SLV6oceooSg2Gt9'
         }
         return '[Booking link]'
       }
