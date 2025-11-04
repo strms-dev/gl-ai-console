@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Wrench, RotateCw, Home, LucideIcon } from "lucide-react"
+import { Wrench, RotateCw, Home, Code, AlertCircle, Users, Clock, LucideIcon } from "lucide-react"
 
 const departments = [
   { name: "STRMS", href: "/strms/home", icon: "wrench", active: true },
@@ -14,6 +14,10 @@ const departments = [
 const departmentNavigation: Record<string, Array<{ name: string; href: string; icon: string }>> = {
   strms: [
     { name: "Sales Pipeline", href: "/strms/sales-pipeline", icon: "rotate-cw" },
+    { name: "Project Management", href: "/strms/project-management", icon: "code" },
+    { name: "Maintenance", href: "/strms/maintenance", icon: "alert-circle" },
+    { name: "Developer Views", href: "/strms/developer-views", icon: "users" },
+    { name: "Time Tracking", href: "/strms/time-tracking", icon: "clock" },
   ],
 }
 
@@ -23,6 +27,10 @@ const getIconComponent = (iconName: string): LucideIcon => {
     'home': Home,
     'wrench': Wrench,
     'rotate-cw': RotateCw,
+    'code': Code,
+    'alert-circle': AlertCircle,
+    'users': Users,
+    'clock': Clock,
   }
   return iconMap[iconName] || RotateCw
 }
@@ -163,9 +171,12 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
             )}
             <ul className="space-y-1">
               {currentNavigation.map((item) => {
-                // Highlight sales pipeline when on the page OR on project details pages
+                // Highlight item when on the page OR on detail pages
                 const isActive = pathname === item.href ||
-                  (item.href === '/strms/sales-pipeline' && pathname.startsWith('/strms/sales-pipeline/projects/'))
+                  (item.href === '/strms/sales-pipeline' && pathname.startsWith('/strms/sales-pipeline/projects/')) ||
+                  (item.href === '/strms/project-management' && pathname.startsWith('/strms/project-management/projects/')) ||
+                  (item.href === '/strms/maintenance' && pathname.startsWith('/strms/maintenance/tickets/')) ||
+                  (item.href === '/strms/developer-views' && pathname.startsWith('/strms/developer-views/'))
                 const IconComponent = getIconComponent(item.icon)
                 return (
                   <li key={item.name}>
