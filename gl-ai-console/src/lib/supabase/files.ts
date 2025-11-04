@@ -86,11 +86,11 @@ export async function deleteFile(fileId: string): Promise<void> {
     .from('strms_project_files')
     .select('storage_path, storage_bucket')
     .eq('id', fileId)
-    .single()
+    .single() as { data: { storage_path: string, storage_bucket: string } | null, error: Error | null }
 
-  if (fetchError) {
+  if (fetchError || !fileMetadata) {
     console.error('Error fetching file metadata:', fetchError)
-    throw new Error(`Failed to fetch file metadata: ${fetchError.message}`)
+    throw new Error(`Failed to fetch file metadata: ${fetchError?.message || 'File not found'}`)
   }
 
   // Delete from storage
