@@ -9,3 +9,7 @@ Purpose: Verify ignored build step configuration works correctly
 Test #2: Testing simplified command syntax
 Command: [ "$VERCEL_GIT_COMMIT_REF" = "main" ]
 Expected: Build should be skipped for feature branch
+
+Test #3: Testing inverted logic
+Command: [ "$VERCEL_GIT_COMMIT_REF" != "main" ]
+Expected: Exit 0 = skip build for non-main branches
