@@ -82,6 +82,7 @@ export interface DevelopmentProject {
   status: DevelopmentStatus
   assignee: Developer
   timeTracked: number            // Minutes tracked
+  priority: number               // Priority for developer view ordering (lower = higher priority)
   notes: string
   lastActivity: string           // Relative time string
   createdAt: string              // ISO timestamp
@@ -104,6 +105,7 @@ export interface MaintenanceTicket {
   startDate: string
   endDate: string
   timeTracked: number            // Minutes tracked
+  priority: number               // Priority for developer view ordering (lower = higher priority)
   notes: string
   lastActivity: string
   createdAt: string
@@ -181,6 +183,7 @@ export const dummyDevProjects: DevelopmentProject[] = [
     status: "dev-in-progress",
     assignee: "Nick",
     timeTracked: 1200, // 20 hours
+    priority: 1,
     notes: "Building custom authentication flow",
     lastActivity: "2 hours ago",
     createdAt: "2025-01-01T10:00:00Z",
@@ -196,6 +199,7 @@ export const dummyDevProjects: DevelopmentProject[] = [
     status: "setup",
     assignee: "Gon",
     timeTracked: 180, // 3 hours
+    priority: 2,
     notes: "Stripe integration",
     lastActivity: "5 hours ago",
     createdAt: "2025-01-02T09:00:00Z",
@@ -211,6 +215,7 @@ export const dummyDevProjects: DevelopmentProject[] = [
     status: "user-testing",
     assignee: "Nick",
     timeTracked: 2160, // 36 hours
+    priority: 3,
     notes: "Real-time analytics dashboard with charts",
     lastActivity: "4 hours ago",
     createdAt: "2024-12-10T08:00:00Z",
@@ -226,6 +231,7 @@ export const dummyDevProjects: DevelopmentProject[] = [
     status: "complete",
     assignee: "Gon",
     timeTracked: 4320, // 72 hours
+    priority: 4,
     notes: "Drag-and-drop email template builder",
     lastActivity: "1 week ago",
     createdAt: "2024-11-20T09:00:00Z",
@@ -241,6 +247,7 @@ export const dummyDevProjects: DevelopmentProject[] = [
     status: "connections",
     assignee: "Nick",
     timeTracked: 480, // 8 hours
+    priority: 5,
     notes: "Integrating with Shopify API",
     lastActivity: "6 hours ago",
     createdAt: "2025-01-03T10:00:00Z",
@@ -256,6 +263,7 @@ export const dummyDevProjects: DevelopmentProject[] = [
     status: "dev-in-progress",
     assignee: "Gon",
     timeTracked: 1560, // 26 hours
+    priority: 6,
     notes: "REST API for fitness tracking mobile app",
     lastActivity: "3 hours ago",
     createdAt: "2024-12-15T11:00:00Z",
@@ -271,6 +279,7 @@ export const dummyDevProjects: DevelopmentProject[] = [
     status: "setup",
     assignee: "Nick",
     timeTracked: 120, // 2 hours
+    priority: 7,
     notes: "Requirements gathering phase",
     lastActivity: "1 day ago",
     createdAt: "2025-01-02T14:00:00Z",
@@ -286,6 +295,7 @@ export const dummyDevProjects: DevelopmentProject[] = [
     status: "cancelled",
     assignee: "Gon",
     timeTracked: 360, // 6 hours
+    priority: 8,
     notes: "Client decided to use different solution",
     lastActivity: "2 months ago",
     createdAt: "2024-11-10T09:00:00Z",
@@ -301,6 +311,7 @@ export const dummyDevProjects: DevelopmentProject[] = [
     status: "user-testing",
     assignee: "Gon",
     timeTracked: 3600, // 60 hours
+    priority: 9,
     notes: "Migrating from Salesforce to custom CRM",
     lastActivity: "8 hours ago",
     createdAt: "2024-12-01T08:00:00Z",
@@ -316,6 +327,7 @@ export const dummyDevProjects: DevelopmentProject[] = [
     status: "complete",
     assignee: "Nick",
     timeTracked: 480, // 8 hours
+    priority: 10,
     notes: "Redis-based rate limiting middleware",
     lastActivity: "3 days ago",
     createdAt: "2024-12-20T13:00:00Z",
@@ -337,6 +349,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "2025-01-03",
     endDate: "2025-01-07",
     timeTracked: 240, // 4 hours
+    priority: 1,
     notes: "Connection pool exhaustion issue",
     lastActivity: "1 hour ago",
     createdAt: "2025-01-02T14:00:00Z",
@@ -371,6 +384,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "2025-01-02",
     endDate: "2025-01-06",
     timeTracked: 180, // 3 hours
+    priority: 2,
     notes: "SMTP configuration issue",
     lastActivity: "3 hours ago",
     createdAt: "2025-01-01T15:00:00Z",
@@ -388,6 +402,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "2025-01-04",
     endDate: "2025-01-08",
     timeTracked: 120, // 2 hours
+    priority: 3,
     notes: "CSS specificity issue in theme engine",
     lastActivity: "30 minutes ago",
     createdAt: "2025-01-03T12:00:00Z",
@@ -405,6 +420,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "",
     endDate: "",
     timeTracked: 360, // 6 hours
+    priority: 4,
     notes: "Waiting for client to provide test environment access",
     lastActivity: "2 days ago",
     createdAt: "2024-12-28T10:00:00Z",
@@ -422,6 +438,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "2024-12-20",
     endDate: "2024-12-23",
     timeTracked: 300, // 5 hours
+    priority: 5,
     notes: "Updated PDF library, resolved layout issues",
     lastActivity: "2 weeks ago",
     createdAt: "2024-12-18T11:00:00Z",
@@ -456,6 +473,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "2025-01-05",
     endDate: "2025-01-09",
     timeTracked: 90, // 1.5 hours
+    priority: 6,
     notes: "Database schema update needed",
     lastActivity: "4 hours ago",
     createdAt: "2025-01-02T16:00:00Z",
@@ -473,6 +491,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "2024-12-15",
     endDate: "2024-12-22",
     timeTracked: 720, // 12 hours
+    priority: 7,
     notes: "Added database indexes, implemented caching",
     lastActivity: "2 weeks ago",
     createdAt: "2024-12-12T09:00:00Z",
@@ -490,6 +509,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "",
     endDate: "",
     timeTracked: 150, // 2.5 hours
+    priority: 8,
     notes: "Waiting for client approval on design changes",
     lastActivity: "5 days ago",
     createdAt: "2024-12-27T14:00:00Z",
@@ -507,6 +527,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "2025-01-03",
     endDate: "2025-01-07",
     timeTracked: 420, // 7 hours
+    priority: 9,
     notes: "Session cookie configuration bug",
     lastActivity: "2 hours ago",
     createdAt: "2025-01-02T08:00:00Z",
@@ -541,6 +562,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "2024-12-18",
     endDate: "2024-12-21",
     timeTracked: 180, // 3 hours
+    priority: 10,
     notes: "Increased server upload limit configuration",
     lastActivity: "2 weeks ago",
     createdAt: "2024-12-16T13:00:00Z",
@@ -558,6 +580,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "2025-01-04",
     endDate: "2025-01-08",
     timeTracked: 210, // 3.5 hours
+    priority: 11,
     notes: "Retry logic not working correctly",
     lastActivity: "5 hours ago",
     createdAt: "2025-01-03T09:00:00Z",
@@ -575,6 +598,7 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     startDate: "2025-01-02",
     endDate: "2025-01-13",
     timeTracked: 900, // 15 hours
+    priority: 12,
     notes: "Building 3 custom chart components",
     lastActivity: "1 hour ago",
     createdAt: "2024-12-30T10:00:00Z",

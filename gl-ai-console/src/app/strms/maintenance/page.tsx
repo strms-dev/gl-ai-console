@@ -12,15 +12,14 @@ import { ListView, ColumnConfig } from "@/components/shared/list-view"
 import { ViewToggle, ViewMode } from "@/components/shared/view-toggle"
 import { TicketCard } from "@/components/maintenance/ticket-card"
 import { TicketForm, TicketFormData } from "@/components/maintenance/ticket-form"
+import { TicketDetailModal } from "@/components/maintenance/ticket-detail-modal"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { useRouter } from "next/navigation"
 
 type SortField = "ticketTitle" | "customer" | "assignee" | "lastActivity"
 type SortOrder = "asc" | "desc"
 
 export default function MaintenancePage() {
-  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [sortField, setSortField] = useState<SortField>("lastActivity")
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
@@ -28,6 +27,8 @@ export default function MaintenancePage() {
   const [showTicketForm, setShowTicketForm] = useState(false)
   const [editingTicket, setEditingTicket] = useState<MaintenanceTicket | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
 
   // Load tickets on mount
   useEffect(() => {
@@ -176,9 +177,22 @@ export default function MaintenancePage() {
     setTickets(getMaintTickets())
   }
 
-  // Handle ticket click (navigate to detail page)
+  // Handle ticket click (open modal)
   const handleTicketClick = (ticket: MaintenanceTicket) => {
-    router.push(`/strms/tickets/${ticket.id}`)
+    setSelectedTicketId(ticket.id)
+    setDetailModalOpen(true)
+  }
+
+  // Handle ticket updated from modal
+  const handleTicketUpdated = () => {
+    setTickets(getMaintTickets())
+  }
+
+  // Handle ticket deleted from modal
+  const handleTicketDeleted = () => {
+    setDetailModalOpen(false)
+    setSelectedTicketId(null)
+    setTickets(getMaintTickets())
   }
 
   // Filter and sort tickets
@@ -354,6 +368,17 @@ export default function MaintenancePage() {
         initialData={editingTicket || undefined}
         mode={editingTicket ? "edit" : "create"}
       />
+
+      {/* Ticket Detail Modal */}
+      {selectedTicketId && (
+        <TicketDetailModal
+          ticketId={selectedTicketId}
+          open={detailModalOpen}
+          onOpenChange={setDetailModalOpen}
+          onTicketDeleted={handleTicketDeleted}
+          onTicketUpdated={handleTicketUpdated}
+        />
+      )}
     </div>
   )
 }

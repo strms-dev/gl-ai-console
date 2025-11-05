@@ -133,6 +133,23 @@ export function deleteDevProject(id: string): void {
   localStorage.setItem(STORAGE_KEYS.DEV_PROJECTS, JSON.stringify(filtered))
 }
 
+/**
+ * Update priority for a development project
+ */
+export function updateDevProjectPriority(id: string, newPriority: number): void {
+  const projects = getDevProjects()
+  const index = projects.findIndex(p => p.id === id)
+
+  if (index === -1) {
+    throw new Error(`Development project with id ${id} not found`)
+  }
+
+  projects[index].priority = newPriority
+  projects[index].updatedAt = new Date().toISOString()
+
+  localStorage.setItem(STORAGE_KEYS.DEV_PROJECTS, JSON.stringify(projects))
+}
+
 // ============================================================================
 // MAINTENANCE TICKETS
 // ============================================================================
@@ -219,6 +236,23 @@ export function deleteMaintTicket(id: string): void {
   const tickets = getMaintTickets()
   const filtered = tickets.filter(t => t.id !== id)
   localStorage.setItem(STORAGE_KEYS.MAINT_TICKETS, JSON.stringify(filtered))
+}
+
+/**
+ * Update priority for a maintenance ticket
+ */
+export function updateMaintTicketPriority(id: string, newPriority: number): void {
+  const tickets = getMaintTickets()
+  const index = tickets.findIndex(t => t.id === id)
+
+  if (index === -1) {
+    throw new Error(`Maintenance ticket with id ${id} not found`)
+  }
+
+  tickets[index].priority = newPriority
+  tickets[index].updatedAt = new Date().toISOString()
+
+  localStorage.setItem(STORAGE_KEYS.MAINT_TICKETS, JSON.stringify(tickets))
 }
 
 // ============================================================================

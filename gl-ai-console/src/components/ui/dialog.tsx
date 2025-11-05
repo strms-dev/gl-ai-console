@@ -10,15 +10,41 @@ interface DialogProps {
 }
 
 const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
+  // Prevent background scrolling when modal is open
+  React.useEffect(() => {
+    if (open) {
+      // Store original values
+      const originalBodyOverflow = document.body.style.overflow
+      const originalHtmlOverflow = document.documentElement.style.overflow
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+
+      // Prevent scrolling on both html and body
+      document.body.style.overflow = 'hidden'
+      document.documentElement.style.overflow = 'hidden'
+
+      // Prevent layout shift by adding padding to compensate for scrollbar
+      if (scrollbarWidth > 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`
+      }
+
+      // Cleanup on unmount or when modal closes
+      return () => {
+        document.body.style.overflow = originalBodyOverflow
+        document.documentElement.style.overflow = originalHtmlOverflow
+        document.body.style.paddingRight = ''
+      }
+    }
+  }, [open])
+
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden p-4">
       <div
         className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-50 w-full max-w-lg mx-4">
+      <div className="relative z-50 w-full">
         {children}
       </div>
     </div>
@@ -33,7 +59,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
     <div
       ref={ref}
       className={cn(
-        "bg-background p-6 shadow-lg rounded-lg border max-h-[90vh] overflow-auto",
+        "bg-background p-6 shadow-lg rounded-lg border max-h-[90vh] overflow-auto mx-auto",
         className
       )}
       {...props}

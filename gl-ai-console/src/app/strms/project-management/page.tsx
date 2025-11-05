@@ -12,15 +12,14 @@ import { ListView, ColumnConfig } from "@/components/shared/list-view"
 import { ViewToggle, ViewMode } from "@/components/shared/view-toggle"
 import { ProjectCard } from "@/components/project-management/project-card"
 import { ProjectForm, ProjectFormData } from "@/components/project-management/project-form"
+import { ProjectDetailModal } from "@/components/project-management/project-detail-modal"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { useRouter } from "next/navigation"
 
 type SortField = "projectName" | "customer" | "assignee" | "lastActivity"
 type SortOrder = "asc" | "desc"
 
 export default function ProjectManagementPage() {
-  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [sortField, setSortField] = useState<SortField>("lastActivity")
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
@@ -28,6 +27,8 @@ export default function ProjectManagementPage() {
   const [showProjectForm, setShowProjectForm] = useState(false)
   const [editingProject, setEditingProject] = useState<DevelopmentProject | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [detailModalOpen, setDetailModalOpen] = useState(false)
 
   // Load projects on mount
   useEffect(() => {
@@ -178,9 +179,22 @@ export default function ProjectManagementPage() {
     setProjects(getDevProjects())
   }
 
-  // Handle project click (navigate to detail page)
+  // Handle project click (open modal)
   const handleProjectClick = (project: DevelopmentProject) => {
-    router.push(`/strms/projects/${project.id}`)
+    setSelectedProjectId(project.id)
+    setDetailModalOpen(true)
+  }
+
+  // Handle project updated from modal
+  const handleProjectUpdated = () => {
+    setProjects(getDevProjects())
+  }
+
+  // Handle project deleted from modal
+  const handleProjectDeleted = () => {
+    setDetailModalOpen(false)
+    setSelectedProjectId(null)
+    setProjects(getDevProjects())
   }
 
   // Filter and sort projects
@@ -356,6 +370,17 @@ export default function ProjectManagementPage() {
         initialData={editingProject || undefined}
         mode={editingProject ? "edit" : "create"}
       />
+
+      {/* Project Detail Modal */}
+      {selectedProjectId && (
+        <ProjectDetailModal
+          projectId={selectedProjectId}
+          open={detailModalOpen}
+          onOpenChange={setDetailModalOpen}
+          onProjectDeleted={handleProjectDeleted}
+          onProjectUpdated={handleProjectUpdated}
+        />
+      )}
     </div>
   )
 }
