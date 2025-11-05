@@ -5,3 +5,7 @@
 Test timestamp: 2025-11-05
 Branch: feature/project-maintenance-management
 Purpose: Verify ignored build step configuration works correctly
+
+Test #2: Testing simplified command syntax
+Command: [ "$VERCEL_GIT_COMMIT_REF" = "main" ]
+Expected: Build should be skipped for feature branch
