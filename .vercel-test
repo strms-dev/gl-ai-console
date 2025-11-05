@@ -1,0 +1,7 @@
+# Test file to verify Vercel deployment configuration
+# This commit should NOT trigger a deployment on feature branches
+# Only commits to main branch should trigger deployments
+
+Test timestamp: 2025-11-05
+Branch: feature/project-maintenance-management
+Purpose: Verify ignored build step configuration works correctly
