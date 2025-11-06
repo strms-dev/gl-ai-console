@@ -50,16 +50,28 @@ export default function TimeTrackingPage() {
       .reduce((sum, entry) => sum + entry.duration, 0)
   }, [weekEntries])
 
-  // Calculate hours by project type
-  const devMinutes = useMemo(() => {
+  // Calculate hours by developer AND project type
+  const nickDevMinutes = useMemo(() => {
     return weekEntries
-      .filter(e => e.projectType === "development")
+      .filter(e => e.assignee === "Nick" && e.projectType === "development")
       .reduce((sum, entry) => sum + entry.duration, 0)
   }, [weekEntries])
 
-  const maintMinutes = useMemo(() => {
+  const nickMaintMinutes = useMemo(() => {
     return weekEntries
-      .filter(e => e.projectType === "maintenance")
+      .filter(e => e.assignee === "Nick" && e.projectType === "maintenance")
+      .reduce((sum, entry) => sum + entry.duration, 0)
+  }, [weekEntries])
+
+  const gonDevMinutes = useMemo(() => {
+    return weekEntries
+      .filter(e => e.assignee === "Gon" && e.projectType === "development")
+      .reduce((sum, entry) => sum + entry.duration, 0)
+  }, [weekEntries])
+
+  const gonMaintMinutes = useMemo(() => {
+    return weekEntries
+      .filter(e => e.assignee === "Gon" && e.projectType === "maintenance")
       .reduce((sum, entry) => sum + entry.duration, 0)
   }, [weekEntries])
 
@@ -174,7 +186,7 @@ export default function TimeTrackingPage() {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         {/* Total Hours */}
         <Card className="bg-white border-none shadow-sm">
           <CardHeader className="pb-3">
@@ -196,7 +208,7 @@ export default function TimeTrackingPage() {
           </CardContent>
         </Card>
 
-        {/* Nick's Hours */}
+        {/* Nick's Hours Breakdown */}
         <Card className="bg-white border-none shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
@@ -204,7 +216,7 @@ export default function TimeTrackingPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-3">
               <div className="w-12 h-12 rounded-full bg-[#407B9D]/10 flex items-center justify-center">
                 <User className="w-6 h-6 text-[#407B9D]" />
               </div>
@@ -217,10 +229,34 @@ export default function TimeTrackingPage() {
                 </p>
               </div>
             </div>
+            <div className="space-y-2 pt-3 border-t border-[#E5E5E5]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Code className="w-3 h-3 text-[#407B9D]" />
+                  <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                    Development
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                  {formatMinutes(nickDevMinutes)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-3 h-3 text-[#407B9D]" />
+                  <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                    Maintenance
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                  {formatMinutes(nickMaintMinutes)}
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Gon's Hours */}
+        {/* Gon's Hours Breakdown */}
         <Card className="bg-white border-none shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
@@ -228,7 +264,7 @@ export default function TimeTrackingPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-3">
               <div className="w-12 h-12 rounded-full bg-[#407B9D]/10 flex items-center justify-center">
                 <User className="w-6 h-6 text-[#407B9D]" />
               </div>
@@ -241,38 +277,27 @@ export default function TimeTrackingPage() {
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Project Type Split */}
-        <Card className="bg-white border-none shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-              Project Type Split
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2 pt-3 border-t border-[#E5E5E5]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Code className="w-4 h-4 text-[#407B9D]" />
-                  <span className="text-sm text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                  <Code className="w-3 h-3 text-[#407B9D]" />
+                  <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
                     Development
                   </span>
                 </div>
-                <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
-                  {formatMinutes(devMinutes)}
+                <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                  {formatMinutes(gonDevMinutes)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Wrench className="w-4 h-4 text-[#407B9D]" />
-                  <span className="text-sm text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                  <Wrench className="w-3 h-3 text-[#407B9D]" />
+                  <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
                     Maintenance
                   </span>
                 </div>
-                <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
-                  {formatMinutes(maintMinutes)}
+                <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                  {formatMinutes(gonMaintMinutes)}
                 </span>
               </div>
             </div>

@@ -28,14 +28,7 @@ const departmentNavigation: Record<string, NavigationItem[]> = {
       children: [
         { name: "Development Projects", href: "/strms/project-management", icon: "code" },
         { name: "Maintenance", href: "/strms/maintenance", icon: "alert-circle" },
-        {
-          name: "Developer Views",
-          icon: "users",
-          children: [
-            { name: "Nick", href: "/strms/developer-views/nick", icon: "user" },
-            { name: "Gon", href: "/strms/developer-views/gon", icon: "user" },
-          ]
-        },
+        { name: "Developer Views", href: "/strms/developer-views", icon: "users" },
         { name: "Time Tracking", href: "/strms/time-tracking", icon: "clock" },
       ]
     },
