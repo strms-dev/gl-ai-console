@@ -11,7 +11,7 @@ import { KanbanBoard, StageConfig } from "@/components/shared/kanban-board"
 import { ListView, ColumnConfig } from "@/components/shared/list-view"
 import { ViewToggle, ViewMode } from "@/components/shared/view-toggle"
 import { TicketCard } from "@/components/maintenance/ticket-card"
-import { TicketForm, TicketFormData } from "@/components/maintenance/ticket-form"
+// import { TicketForm, TicketFormData } from "@/components/maintenance/ticket-form" // No longer needed
 import { TicketDetailModal } from "@/components/maintenance/ticket-detail-modal"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -24,8 +24,7 @@ export default function MaintenancePage() {
   const [sortField, setSortField] = useState<SortField>("lastActivity")
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
   const [tickets, setTickets] = useState<MaintenanceTicket[]>([])
-  const [showTicketForm, setShowTicketForm] = useState(false)
-  const [editingTicket, setEditingTicket] = useState<MaintenanceTicket | null>(null)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
@@ -143,32 +142,20 @@ export default function MaintenancePage() {
   ]
 
   // Handle creating a new ticket
-  const handleCreateTicket = (ticketData: TicketFormData) => {
-    const newTicket = addMaintTicket(ticketData)
+  const handleTicketCreated = () => {
     setTickets(getMaintTickets())
   }
 
-  // Handle editing an existing ticket
-  const handleEditTicket = (ticketData: TicketFormData) => {
-    if (editingTicket) {
-      updateMaintTicket(editingTicket.id, ticketData)
-      setTickets(getMaintTickets())
-      setEditingTicket(null)
-    }
+  // Handle ticket updated
+  const handleTicketUpdated = () => {
+    setTickets(getMaintTickets())
   }
 
-  // Open edit form for a specific ticket
-  const handleOpenEditForm = (ticket: MaintenanceTicket) => {
-    setEditingTicket(ticket)
-    setShowTicketForm(true)
-  }
-
-  // Handle deleting a ticket
-  const handleDeleteTicket = (id: string) => {
-    if (confirm("Are you sure you want to delete this ticket?")) {
-      deleteMaintTicket(id)
-      setTickets(getMaintTickets())
-    }
+  // Handle ticket deleted
+  const handleTicketDeleted = () => {
+    setTickets(getMaintTickets())
+    setSelectedTicketId(null)
+    setDetailModalOpen(false)
   }
 
   // Handle stage change from kanban drag-and-drop
@@ -181,18 +168,6 @@ export default function MaintenancePage() {
   const handleTicketClick = (ticket: MaintenanceTicket) => {
     setSelectedTicketId(ticket.id)
     setDetailModalOpen(true)
-  }
-
-  // Handle ticket updated from modal
-  const handleTicketUpdated = () => {
-    setTickets(getMaintTickets())
-  }
-
-  // Handle ticket deleted from modal
-  const handleTicketDeleted = () => {
-    setDetailModalOpen(false)
-    setSelectedTicketId(null)
-    setTickets(getMaintTickets())
   }
 
   // Filter and sort tickets
@@ -271,10 +246,7 @@ export default function MaintenancePage() {
           </p>
         </div>
         <Button
-          onClick={() => {
-            setEditingTicket(null)
-            setShowTicketForm(true)
-          }}
+          onClick={() => setCreateModalOpen(true)}
           className="bg-[#407B9D] hover:bg-[#407B9D]/90 flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
@@ -356,27 +328,24 @@ export default function MaintenancePage() {
       </Card>
 
       {/* Ticket Form Dialog */}
-      <TicketForm
-        open={showTicketForm}
-        onOpenChange={(open) => {
-          setShowTicketForm(open)
-          if (!open) {
-            setEditingTicket(null)
-          }
-        }}
-        onSubmit={editingTicket ? handleEditTicket : handleCreateTicket}
-        initialData={editingTicket || undefined}
-        mode={editingTicket ? "edit" : "create"}
+      {/* Create Ticket Modal */}
+      <TicketDetailModal
+        ticketId={null}
+        mode="create"
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onTicketCreated={handleTicketCreated}
       />
 
-      {/* Ticket Detail Modal */}
+      {/* Ticket Detail Modal (Edit) */}
       {selectedTicketId && (
         <TicketDetailModal
           ticketId={selectedTicketId}
+          mode="edit"
           open={detailModalOpen}
           onOpenChange={setDetailModalOpen}
-          onTicketDeleted={handleTicketDeleted}
           onTicketUpdated={handleTicketUpdated}
+          onTicketDeleted={handleTicketDeleted}
         />
       )}
     </div>

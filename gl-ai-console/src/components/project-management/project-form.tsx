@@ -9,6 +9,7 @@ import { DevelopmentProject, SprintLength, Developer, DevelopmentStatus, TimeEnt
 import { formatMinutes, getTimeEntriesForProject, addTimeEntry, deleteTimeEntry, getWeekStartDate } from "@/lib/project-store"
 import { Clock, Trash2 } from "lucide-react"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
+import { CustomerSelector } from "@/components/ui/customer-selector"
 
 // ============================================================================
 // TYPES
@@ -47,11 +48,11 @@ export function ProjectForm({
   const [formData, setFormData] = useState<ProjectFormData>({
     projectName: "",
     customer: "",
-    sprintLength: "1x",
+    sprintLength: "" as SprintLength,
     startDate: "",
     endDate: "",
     status: "setup",
-    assignee: "Nick",
+    assignee: initialData?.assignee || "Nick",
     notes: ""
   })
 
@@ -88,11 +89,11 @@ export function ProjectForm({
       setFormData({
         projectName: "",
         customer: "",
-        sprintLength: "1x",
+        sprintLength: "" as SprintLength,
         startDate: "",
         endDate: "",
         status: "setup",
-        assignee: "Nick",
+        assignee: initialData?.assignee || "Nick",
         notes: ""
       })
     }
@@ -174,8 +175,8 @@ export function ProjectForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.projectName.trim() || !formData.customer.trim()) {
-      alert("Project name and customer are required")
+    if (!formData.projectName.trim()) {
+      alert("Project name is required")
       return
     }
 
@@ -220,15 +221,10 @@ export function ProjectForm({
 
           {/* Customer */}
           <div className="space-y-2">
-            <Label htmlFor="customer" style={{fontFamily: 'var(--font-body)'}}>
-              Customer *
-            </Label>
-            <Input
-              id="customer"
+            <CustomerSelector
               value={formData.customer}
-              onChange={(e) => handleChange("customer", e.target.value)}
-              placeholder="Enter customer name"
-              required
+              onChange={(value) => handleChange("customer", value)}
+              required={false}
             />
           </div>
 
@@ -242,8 +238,9 @@ export function ProjectForm({
                 id="sprintLength"
                 value={formData.sprintLength}
                 onChange={(e) => handleChange("sprintLength", e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full h-10 rounded-md border border-input bg-white px-3 py-2 text-sm"
               >
+                <option value="">Select sprint length...</option>
                 <option value="0.5x">0.5x Sprint</option>
                 <option value="1x">1x Sprint</option>
                 <option value="1.5x">1.5x Sprint</option>
@@ -253,13 +250,14 @@ export function ProjectForm({
 
             <div className="space-y-2">
               <Label htmlFor="assignee" style={{fontFamily: 'var(--font-body)'}}>
-                Assignee
+                Assignee *
               </Label>
               <select
                 id="assignee"
                 value={formData.assignee}
                 onChange={(e) => handleChange("assignee", e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full h-10 rounded-md border border-input bg-white px-3 py-2 text-sm"
+                disabled={mode === "create"}
               >
                 <option value="Nick">Nick</option>
                 <option value="Gon">Gon</option>
@@ -304,7 +302,7 @@ export function ProjectForm({
                 id="status"
                 value={formData.status}
                 onChange={(e) => handleChange("status", e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full h-10 rounded-md border border-input bg-white px-3 py-2 text-sm"
               >
                 <option value="setup">Setup</option>
                 <option value="connections">Connections</option>
@@ -432,7 +430,7 @@ export function ProjectForm({
               value={formData.notes}
               onChange={(e) => handleChange("notes", e.target.value)}
               placeholder="Add any notes or details about this project"
-              className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="w-full min-h-[100px] rounded-md border border-input bg-white px-3 py-2 text-sm"
               style={{fontFamily: 'var(--font-body)'}}
             />
           </div>

@@ -11,7 +11,7 @@ import { KanbanBoard, StageConfig } from "@/components/shared/kanban-board"
 import { ListView, ColumnConfig } from "@/components/shared/list-view"
 import { ViewToggle, ViewMode } from "@/components/shared/view-toggle"
 import { ProjectCard } from "@/components/project-management/project-card"
-import { ProjectForm, ProjectFormData } from "@/components/project-management/project-form"
+// import { ProjectForm, ProjectFormData } from "@/components/project-management/project-form" // No longer needed
 import { ProjectDetailModal } from "@/components/project-management/project-detail-modal"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -24,8 +24,7 @@ export default function ProjectManagementPage() {
   const [sortField, setSortField] = useState<SortField>("lastActivity")
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
   const [projects, setProjects] = useState<DevelopmentProject[]>([])
-  const [showProjectForm, setShowProjectForm] = useState(false)
-  const [editingProject, setEditingProject] = useState<DevelopmentProject | null>(null)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
@@ -145,32 +144,20 @@ export default function ProjectManagementPage() {
   ]
 
   // Handle creating a new project
-  const handleCreateProject = (projectData: ProjectFormData) => {
-    const newProject = addDevProject(projectData)
+  const handleProjectCreated = () => {
     setProjects(getDevProjects())
   }
 
-  // Handle editing an existing project
-  const handleEditProject = (projectData: ProjectFormData) => {
-    if (editingProject) {
-      updateDevProject(editingProject.id, projectData)
-      setProjects(getDevProjects())
-      setEditingProject(null)
-    }
+  // Handle project updated
+  const handleProjectUpdated = () => {
+    setProjects(getDevProjects())
   }
 
-  // Open edit form for a specific project
-  const handleOpenEditForm = (project: DevelopmentProject) => {
-    setEditingProject(project)
-    setShowProjectForm(true)
-  }
-
-  // Handle deleting a project
-  const handleDeleteProject = (id: string) => {
-    if (confirm("Are you sure you want to delete this project?")) {
-      deleteDevProject(id)
-      setProjects(getDevProjects())
-    }
+  // Handle project deleted
+  const handleProjectDeleted = () => {
+    setProjects(getDevProjects())
+    setSelectedProjectId(null)
+    setDetailModalOpen(false)
   }
 
   // Handle stage change from kanban drag-and-drop
@@ -183,18 +170,6 @@ export default function ProjectManagementPage() {
   const handleProjectClick = (project: DevelopmentProject) => {
     setSelectedProjectId(project.id)
     setDetailModalOpen(true)
-  }
-
-  // Handle project updated from modal
-  const handleProjectUpdated = () => {
-    setProjects(getDevProjects())
-  }
-
-  // Handle project deleted from modal
-  const handleProjectDeleted = () => {
-    setDetailModalOpen(false)
-    setSelectedProjectId(null)
-    setProjects(getDevProjects())
   }
 
   // Filter and sort projects
@@ -273,10 +248,7 @@ export default function ProjectManagementPage() {
           </p>
         </div>
         <Button
-          onClick={() => {
-            setEditingProject(null)
-            setShowProjectForm(true)
-          }}
+          onClick={() => setCreateModalOpen(true)}
           className="bg-[#407B9D] hover:bg-[#407B9D]/90 flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
@@ -357,28 +329,24 @@ export default function ProjectManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Project Form Dialog */}
-      <ProjectForm
-        open={showProjectForm}
-        onOpenChange={(open) => {
-          setShowProjectForm(open)
-          if (!open) {
-            setEditingProject(null)
-          }
-        }}
-        onSubmit={editingProject ? handleEditProject : handleCreateProject}
-        initialData={editingProject || undefined}
-        mode={editingProject ? "edit" : "create"}
+      {/* Create Project Modal */}
+      <ProjectDetailModal
+        projectId={null}
+        mode="create"
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onProjectCreated={handleProjectCreated}
       />
 
-      {/* Project Detail Modal */}
+      {/* Project Detail Modal (Edit) */}
       {selectedProjectId && (
         <ProjectDetailModal
           projectId={selectedProjectId}
+          mode="edit"
           open={detailModalOpen}
           onOpenChange={setDetailModalOpen}
-          onProjectDeleted={handleProjectDeleted}
           onProjectUpdated={handleProjectUpdated}
+          onProjectDeleted={handleProjectDeleted}
         />
       )}
     </div>

@@ -9,6 +9,7 @@ import { MaintenanceTicket, SprintLength, Developer, MaintenanceStatus, TicketTy
 import { formatMinutes, getTimeEntriesForProject, addTimeEntry, deleteTimeEntry, getWeekStartDate } from "@/lib/project-store"
 import { Clock, Trash2 } from "lucide-react"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
+import { CustomerSelector } from "@/components/ui/customer-selector"
 
 // ============================================================================
 // TYPES
@@ -52,8 +53,8 @@ export function TicketForm({
     ticketType: "Maintenance",
     numberOfErrors: 0,
     status: "errors-logged",
-    assignee: "Nick",
-    sprintLength: "1x",
+    assignee: initialData?.assignee || "Nick",
+    sprintLength: "" as SprintLength,
     startDate: "",
     endDate: "",
     notes: ""
@@ -97,8 +98,8 @@ export function TicketForm({
         ticketType: "Maintenance",
         numberOfErrors: 0,
         status: "errors-logged",
-        assignee: "Nick",
-        sprintLength: "1x",
+        assignee: initialData?.assignee || "Nick",
+        sprintLength: "" as SprintLength,
         startDate: "",
         endDate: "",
         notes: ""
@@ -182,8 +183,8 @@ export function TicketForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.ticketTitle.trim() || !formData.customer.trim()) {
-      alert("Ticket title and customer are required")
+    if (!formData.ticketTitle.trim()) {
+      alert("Ticket title is required")
       return
     }
 
@@ -228,15 +229,10 @@ export function TicketForm({
 
           {/* Customer */}
           <div className="space-y-2">
-            <Label htmlFor="customer" style={{fontFamily: 'var(--font-body)'}}>
-              Customer *
-            </Label>
-            <Input
-              id="customer"
+            <CustomerSelector
               value={formData.customer}
-              onChange={(e) => handleChange("customer", e.target.value)}
-              placeholder="Enter customer name"
-              required
+              onChange={(value) => handleChange("customer", value)}
+              required={false}
             />
           </div>
 
@@ -250,7 +246,7 @@ export function TicketForm({
                 id="ticketType"
                 value={formData.ticketType}
                 onChange={(e) => handleChange("ticketType", e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full h-10 rounded-md border border-input bg-white px-3 py-2 text-sm"
               >
                 <option value="Maintenance">Maintenance</option>
                 <option value="Customization">Customization</option>
@@ -282,8 +278,9 @@ export function TicketForm({
                 id="sprintLength"
                 value={formData.sprintLength}
                 onChange={(e) => handleChange("sprintLength", e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full h-10 rounded-md border border-input bg-white px-3 py-2 text-sm"
               >
+                <option value="">Select sprint length...</option>
                 <option value="0.5x">0.5x Sprint</option>
                 <option value="1x">1x Sprint</option>
                 <option value="1.5x">1.5x Sprint</option>
@@ -293,13 +290,14 @@ export function TicketForm({
 
             <div className="space-y-2">
               <Label htmlFor="assignee" style={{fontFamily: 'var(--font-body)'}}>
-                Assignee
+                Assignee *
               </Label>
               <select
                 id="assignee"
                 value={formData.assignee}
                 onChange={(e) => handleChange("assignee", e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full h-10 rounded-md border border-input bg-white px-3 py-2 text-sm"
+                disabled={mode === "create"}
               >
                 <option value="Nick">Nick</option>
                 <option value="Gon">Gon</option>
@@ -344,7 +342,7 @@ export function TicketForm({
                 id="status"
                 value={formData.status}
                 onChange={(e) => handleChange("status", e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="w-full h-10 rounded-md border border-input bg-white px-3 py-2 text-sm"
               >
                 <option value="errors-logged">Errors Logged</option>
                 <option value="on-hold">On Hold</option>
@@ -471,7 +469,7 @@ export function TicketForm({
               value={formData.notes}
               onChange={(e) => handleChange("notes", e.target.value)}
               placeholder="Add any notes or details about this ticket"
-              className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="w-full min-h-[80px] rounded-md border border-input bg-white px-3 py-2 text-sm"
               style={{fontFamily: 'var(--font-body)'}}
             />
           </div>
