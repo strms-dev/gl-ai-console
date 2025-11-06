@@ -17,13 +17,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Search, GripVertical, Clock, Calendar } from "lucide-react"
+import { Search, GripVertical, Clock, Calendar, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ProjectDetailModal } from "@/components/project-management/project-detail-modal"
 import { TicketDetailModal } from "@/components/maintenance/ticket-detail-modal"
 
 interface DeveloperUnifiedViewProps {
   developer: Developer
+  onDeveloperChange?: (developer: Developer) => void
 }
 
 type WorkItemType = "dev" | "maint"
@@ -42,7 +43,7 @@ interface UnifiedWorkItem {
   data: DevelopmentProject | MaintenanceTicket
 }
 
-export function DeveloperUnifiedView({ developer }: DeveloperUnifiedViewProps) {
+export function DeveloperUnifiedView({ developer, onDeveloperChange }: DeveloperUnifiedViewProps) {
   const [viewMode, setViewMode] = useState<"active" | "completed">("active")
   const [searchQuery, setSearchQuery] = useState("")
   const [workItems, setWorkItems] = useState<UnifiedWorkItem[]>([])
@@ -51,6 +52,8 @@ export function DeveloperUnifiedView({ developer }: DeveloperUnifiedViewProps) {
   const [dropPosition, setDropPosition] = useState<'above' | 'below' | null>(null)
   const [selectedItem, setSelectedItem] = useState<UnifiedWorkItem | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false)
+  const [createTicketModalOpen, setCreateTicketModalOpen] = useState(false)
 
   // Load and combine work items
   useEffect(() => {
@@ -124,7 +127,7 @@ export function DeveloperUnifiedView({ developer }: DeveloperUnifiedViewProps) {
     const query = searchQuery.toLowerCase()
     return (
       item.name.toLowerCase().includes(query) ||
-      item.customer.toLowerCase().includes(query)
+      (item.customer && item.customer.toLowerCase().includes(query))
     )
   })
 
@@ -223,6 +226,16 @@ export function DeveloperUnifiedView({ developer }: DeveloperUnifiedViewProps) {
     handleItemUpdated()
   }
 
+  // Handle project created
+  const handleProjectCreated = () => {
+    handleItemUpdated()
+  }
+
+  // Handle ticket created
+  const handleTicketCreated = () => {
+    handleItemUpdated()
+  }
+
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, itemId: string) => {
     setDraggedItemId(itemId)
@@ -310,37 +323,87 @@ export function DeveloperUnifiedView({ developer }: DeveloperUnifiedViewProps) {
           className="text-3xl font-bold text-[#463939] mb-2"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
-          {developer}'s Work
+          Developer Work
         </h1>
         <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
           Manage and prioritize your development projects and maintenance tickets
         </p>
       </div>
 
-      {/* Active/Completed Toggle */}
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={() => setViewMode("active")}
-          variant={viewMode === "active" ? "default" : "outline"}
-          className={cn(
-            "transition-all px-6 py-2",
-            viewMode === "active" && "bg-[#407B9D] hover:bg-[#407B9D]/90"
-          )}
-          style={{ fontFamily: 'var(--font-heading)' }}
-        >
-          Active Work
-        </Button>
-        <Button
-          onClick={() => setViewMode("completed")}
-          variant={viewMode === "completed" ? "default" : "outline"}
-          className={cn(
-            "transition-all px-6 py-2",
-            viewMode === "completed" && "bg-[#407B9D] hover:bg-[#407B9D]/90"
-          )}
-          style={{ fontFamily: 'var(--font-heading)' }}
-        >
-          Completed Work
-        </Button>
+      {/* Developer Selector (if callback provided) */}
+      {onDeveloperChange && (
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => onDeveloperChange("Nick")}
+            variant={developer === "Nick" ? "default" : "outline"}
+            className={cn(
+              "transition-all px-6 py-2",
+              developer === "Nick" && "bg-[#407B9D] hover:bg-[#407B9D]/90"
+            )}
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            Nick
+          </Button>
+          <Button
+            onClick={() => onDeveloperChange("Gon")}
+            variant={developer === "Gon" ? "default" : "outline"}
+            className={cn(
+              "transition-all px-6 py-2",
+              developer === "Gon" && "bg-[#407B9D] hover:bg-[#407B9D]/90"
+            )}
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            Gon
+          </Button>
+        </div>
+      )}
+
+      {/* Active/Completed Toggle and Create Buttons */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setViewMode("active")}
+            variant={viewMode === "active" ? "default" : "outline"}
+            className={cn(
+              "transition-all px-6 py-2",
+              viewMode === "active" && "bg-[#407B9D] hover:bg-[#407B9D]/90"
+            )}
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            Active Work
+          </Button>
+          <Button
+            onClick={() => setViewMode("completed")}
+            variant={viewMode === "completed" ? "default" : "outline"}
+            className={cn(
+              "transition-all px-6 py-2",
+              viewMode === "completed" && "bg-[#407B9D] hover:bg-[#407B9D]/90"
+            )}
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            Completed Work
+          </Button>
+        </div>
+
+        {/* Create Buttons */}
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setCreateProjectModalOpen(true)}
+            className="bg-[#407B9D] hover:bg-[#407B9D]/90 transition-all"
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Project
+          </Button>
+          <Button
+            onClick={() => setCreateTicketModalOpen(true)}
+            className="bg-[#95CBD7] hover:bg-[#95CBD7]/90 text-[#463939] transition-all"
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Ticket
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -489,6 +552,7 @@ export function DeveloperUnifiedView({ developer }: DeveloperUnifiedViewProps) {
       {selectedItem && selectedItem.type === "dev" && (
         <ProjectDetailModal
           projectId={selectedItem.id}
+          mode="edit"
           open={modalOpen}
           onOpenChange={setModalOpen}
           onProjectDeleted={handleItemDeleted}
@@ -498,12 +562,33 @@ export function DeveloperUnifiedView({ developer }: DeveloperUnifiedViewProps) {
       {selectedItem && selectedItem.type === "maint" && (
         <TicketDetailModal
           ticketId={selectedItem.id}
+          mode="edit"
           open={modalOpen}
           onOpenChange={setModalOpen}
           onTicketDeleted={handleItemDeleted}
           onTicketUpdated={handleItemUpdated}
         />
       )}
+
+      {/* Create Project Modal */}
+      <ProjectDetailModal
+        projectId={null}
+        mode="create"
+        initialAssignee={developer}
+        open={createProjectModalOpen}
+        onOpenChange={setCreateProjectModalOpen}
+        onProjectCreated={handleProjectCreated}
+      />
+
+      {/* Create Ticket Modal */}
+      <TicketDetailModal
+        ticketId={null}
+        mode="create"
+        initialAssignee={developer}
+        open={createTicketModalOpen}
+        onOpenChange={setCreateTicketModalOpen}
+        onTicketCreated={handleTicketCreated}
+      />
     </div>
   )
 }

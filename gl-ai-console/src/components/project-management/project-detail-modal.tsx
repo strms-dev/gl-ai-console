@@ -4,25 +4,32 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Clock, X } from "lucide-react"
+import { Trash2, Clock, X, XCircle } from "lucide-react"
 import { DevelopmentProject, SprintLength, Developer, DevelopmentStatus, TimeEntry } from "@/lib/dummy-data"
-import { getDevProjectById, updateDevProject, deleteDevProject, formatMinutes, getTimeEntriesForProject, addTimeEntry, deleteTimeEntry, getWeekStartDate } from "@/lib/project-store"
+import { getDevProjectById, updateDevProject, deleteDevProject, addDevProject, formatMinutes, getTimeEntriesForProject, addTimeEntry, deleteTimeEntry, getWeekStartDate } from "@/lib/project-store"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
+import { CustomerSelector } from "@/components/ui/customer-selector"
 
 interface ProjectDetailModalProps {
-  projectId: string
+  projectId?: string | null
+  mode: "create" | "edit"
+  initialAssignee?: Developer
   open: boolean
   onOpenChange: (open: boolean) => void
   onProjectDeleted?: () => void
   onProjectUpdated?: () => void
+  onProjectCreated?: () => void
 }
 
 export function ProjectDetailModal({
   projectId,
+  mode,
+  initialAssignee,
   open,
   onOpenChange,
   onProjectDeleted,
-  onProjectUpdated
+  onProjectUpdated,
+  onProjectCreated
 }: ProjectDetailModalProps) {
   const [project, setProject] = useState<DevelopmentProject | null>(null)
   const [loading, setLoading] = useState(true)
@@ -48,33 +55,74 @@ export function ProjectDetailModal({
 
   // Load project when modal opens
   useEffect(() => {
-    if (open && projectId) {
-      const fetchedProject = getDevProjectById(projectId)
-      if (fetchedProject) {
-        setProject(fetchedProject)
-        setProjectName(fetchedProject.projectName)
-        setCustomer(fetchedProject.customer)
-        setSprintLength(fetchedProject.sprintLength)
-        setStartDate(fetchedProject.startDate)
-        setEndDate(fetchedProject.endDate)
-        setStatus(fetchedProject.status)
-        setAssignee(fetchedProject.assignee)
-        setNotes(fetchedProject.notes)
+    if (open) {
+      if (mode === "edit" && projectId) {
+        const fetchedProject = getDevProjectById(projectId)
+        if (fetchedProject) {
+          setProject(fetchedProject)
+          setProjectName(fetchedProject.projectName)
+          setCustomer(fetchedProject.customer)
+          setSprintLength(fetchedProject.sprintLength)
+          setStartDate(fetchedProject.startDate)
+          setEndDate(fetchedProject.endDate)
+          setStatus(fetchedProject.status)
+          setAssignee(fetchedProject.assignee)
+          setNotes(fetchedProject.notes)
 
-        // Load time entries
-        const entries = getTimeEntriesForProject(fetchedProject.id)
-        setTimeEntries(entries)
+          // Load time entries
+          const entries = getTimeEntriesForProject(fetchedProject.id)
+          setTimeEntries(entries)
+        }
+        setLoading(false)
+      } else if (mode === "create") {
+        // Reset to defaults for create mode
+        setProject(null)
+        setProjectName("")
+        setCustomer("")
+        setSprintLength("" as SprintLength)
+        setStartDate("")
+        setEndDate("")
+        setStatus("" as DevelopmentStatus)
+        setAssignee(initialAssignee || "Nick")
+        setNotes("")
+        setTimeEntries([])
+        setLoading(false)
       }
-      setLoading(false)
     }
-  }, [projectId, open])
+  }, [projectId, open, mode, initialAssignee])
 
   // Calculate total time from entries
   const totalTimeTracked = timeEntries.reduce((sum, entry) => sum + entry.duration, 0)
 
+  // Helper to conditionally save (only in edit mode for auto-save)
+  const autoSave = () => {
+    if (mode === "edit") {
+      saveChanges()
+    }
+  }
+
   // Auto-save function
   const saveChanges = () => {
-    if (project && projectName.trim() && customer.trim()) {
+    if (mode === "create") {
+      // Create new project
+      if (projectName.trim()) {
+        const newProject = addDevProject({
+          projectName,
+          customer,
+          sprintLength,
+          startDate,
+          endDate,
+          status,
+          assignee,
+          notes,
+          timeTracked: totalTimeTracked
+        })
+        setProject(newProject)
+        onProjectCreated?.()
+        onOpenChange(false)
+      }
+    } else if (mode === "edit" && project) {
+      // Update existing project
       updateDevProject(project.id, {
         projectName,
         customer,
@@ -169,7 +217,7 @@ export function ProjectDetailModal({
     }
   }
 
-  if (!project && !loading) {
+  if (mode === "edit" && !project && !loading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-[900px] max-h-[90vh] overflow-y-auto">
@@ -183,11 +231,21 @@ export function ProjectDetailModal({
     )
   }
 
+  // Handle modal close
+  const handleModalClose = (isOpen: boolean) => {
+    if (!isOpen && mode === "create" && projectName.trim()) {
+      // Save when closing in create mode if there's a project name
+      saveChanges()
+    } else {
+      onOpenChange(isOpen)
+    }
+  }
+
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleModalClose}>
         <DialogContent className="max-w-[1400px] max-h-[90vh] p-0 rounded-xl overflow-y-auto">
-          {loading || !project ? (
+          {loading ? (
             <div className="flex items-center justify-center py-12">
               <p className="text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
                 Loading project...
@@ -198,10 +256,10 @@ export function ProjectDetailModal({
               {/* Header with Close Button */}
               <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-[#E5E5E5]">
                 <h2 className="text-xl font-semibold text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
-                  Project Details
+                  {mode === "create" ? "Create New Project" : "Project Details"}
                 </h2>
                 <button
-                  onClick={() => onOpenChange(false)}
+                  onClick={() => handleModalClose(false)}
                   className="text-[#666666] hover:text-[#463939] transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -216,7 +274,7 @@ export function ProjectDetailModal({
                     type="text"
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
-                    onBlur={saveChanges}
+                    onBlur={mode === "edit" ? saveChanges : undefined}
                     placeholder="Project name"
                     className="text-3xl font-bold text-[#463939] w-full bg-transparent border-none outline-none hover:bg-[#F5F5F5] focus:bg-[#F5F5F5] rounded px-2 py-1 -mx-2 transition-colors"
                     style={{fontFamily: 'var(--font-heading)'}}
@@ -230,15 +288,20 @@ export function ProjectDetailModal({
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
                       Customer
                     </span>
-                    <input
-                      type="text"
-                      value={customer}
-                      onChange={(e) => setCustomer(e.target.value)}
-                      onBlur={saveChanges}
-                      placeholder="Customer name"
-                      className="text-sm text-[#463939] bg-transparent border-none outline-none flex-1"
-                      style={{fontFamily: 'var(--font-body)'}}
-                    />
+                    <div className="flex-1">
+                      <CustomerSelector
+                        value={customer}
+                        onChange={(value) => {
+                          setCustomer(value)
+                          // Only auto-save in edit mode
+                          if (mode === "edit") {
+                            setTimeout(saveChanges, 100)
+                          }
+                        }}
+                        required={false}
+                        showLabel={false}
+                      />
+                    </div>
                   </div>
 
                   {/* Status */}
@@ -246,22 +309,37 @@ export function ProjectDetailModal({
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
                       Status
                     </span>
-                    <select
-                      value={status}
-                      onChange={(e) => {
-                        setStatus(e.target.value as DevelopmentStatus)
-                        saveChanges()
-                      }}
-                      className="text-sm text-[#463939] bg-transparent border-none outline-none cursor-pointer flex-1"
-                      style={{fontFamily: 'var(--font-body)'}}
-                    >
-                      <option value="setup">Setup</option>
-                      <option value="connections">Connections</option>
-                      <option value="dev-in-progress">Development In Progress</option>
-                      <option value="user-testing">User Testing</option>
-                      <option value="complete">Complete</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
+                    <div className="flex-1 flex items-center gap-2">
+                      <select
+                        value={status}
+                        onChange={(e) => {
+                          setStatus(e.target.value as DevelopmentStatus)
+                          autoSave()
+                        }}
+                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        style={{fontFamily: 'var(--font-body)'}}
+                      >
+                        <option value="">Select status...</option>
+                        <option value="setup">Setup</option>
+                        <option value="connections">Connections</option>
+                        <option value="dev-in-progress">Development In Progress</option>
+                        <option value="user-testing">User Testing</option>
+                        <option value="complete">Complete</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                      {status && (
+                        <button
+                          onClick={() => {
+                            setStatus("setup")
+                            autoSave()
+                          }}
+                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
+                          title="Clear selection"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Assignee */}
@@ -269,18 +347,33 @@ export function ProjectDetailModal({
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
                       Assignee
                     </span>
-                    <select
-                      value={assignee}
-                      onChange={(e) => {
-                        setAssignee(e.target.value as Developer)
-                        saveChanges()
-                      }}
-                      className="text-sm text-[#463939] bg-transparent border-none outline-none cursor-pointer flex-1"
-                      style={{fontFamily: 'var(--font-body)'}}
-                    >
-                      <option value="Nick">Nick</option>
-                      <option value="Gon">Gon</option>
-                    </select>
+                    <div className="flex-1 flex items-center gap-2">
+                      <select
+                        value={assignee}
+                        onChange={(e) => {
+                          setAssignee(e.target.value as Developer)
+                          autoSave()
+                        }}
+                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        style={{fontFamily: 'var(--font-body)'}}
+                      >
+                        <option value="">Select assignee...</option>
+                        <option value="Nick">Nick</option>
+                        <option value="Gon">Gon</option>
+                      </select>
+                      {assignee && (
+                        <button
+                          onClick={() => {
+                            setAssignee("Nick")
+                            autoSave()
+                          }}
+                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
+                          title="Clear selection"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Sprint Length */}
@@ -288,20 +381,35 @@ export function ProjectDetailModal({
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
                       Sprint Length
                     </span>
-                    <select
-                      value={sprintLength}
-                      onChange={(e) => {
-                        setSprintLength(e.target.value as SprintLength)
-                        saveChanges()
-                      }}
-                      className="text-sm text-[#463939] bg-transparent border-none outline-none cursor-pointer flex-1"
-                      style={{fontFamily: 'var(--font-body)'}}
-                    >
-                      <option value="0.5x">0.5x Sprint</option>
-                      <option value="1x">1x Sprint</option>
-                      <option value="1.5x">1.5x Sprint</option>
-                      <option value="2x">2x Sprint</option>
-                    </select>
+                    <div className="flex-1 flex items-center gap-2">
+                      <select
+                        value={sprintLength}
+                        onChange={(e) => {
+                          setSprintLength(e.target.value as SprintLength)
+                          autoSave()
+                        }}
+                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        style={{fontFamily: 'var(--font-body)'}}
+                      >
+                        <option value="">Select sprint length...</option>
+                        <option value="0.5x">0.5x Sprint</option>
+                        <option value="1x">1x Sprint</option>
+                        <option value="1.5x">1.5x Sprint</option>
+                        <option value="2x">2x Sprint</option>
+                      </select>
+                      {sprintLength && (
+                        <button
+                          onClick={() => {
+                            setSprintLength("" as SprintLength)
+                            autoSave()
+                          }}
+                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
+                          title="Clear selection"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Start Date */}
@@ -309,14 +417,28 @@ export function ProjectDetailModal({
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
                       Start Date
                     </span>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      onBlur={saveChanges}
-                      className="text-sm text-[#463939] bg-transparent border-none outline-none flex-1 cursor-pointer"
-                      style={{fontFamily: 'var(--font-body)'}}
-                    />
+                    <div className="flex-1 flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        onBlur={mode === "edit" ? saveChanges : undefined}
+                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        style={{fontFamily: 'var(--font-body)'}}
+                      />
+                      {startDate && (
+                        <button
+                          onClick={() => {
+                            setStartDate("")
+                            autoSave()
+                          }}
+                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
+                          title="Clear date"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* End Date */}
@@ -324,32 +446,48 @@ export function ProjectDetailModal({
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
                       End Date
                     </span>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      onBlur={saveChanges}
-                      className="text-sm text-[#463939] bg-transparent border-none outline-none flex-1 cursor-pointer"
-                      style={{fontFamily: 'var(--font-body)'}}
-                    />
+                    <div className="flex-1 flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        onBlur={mode === "edit" ? saveChanges : undefined}
+                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        style={{fontFamily: 'var(--font-body)'}}
+                      />
+                      {endDate && (
+                        <button
+                          onClick={() => {
+                            setEndDate("")
+                            autoSave()
+                          }}
+                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
+                          title="Clear date"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Track Time - Clickable to expand */}
-                  <div
-                    className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group cursor-pointer"
-                    onClick={() => setTimeEntriesExpanded(!timeEntriesExpanded)}
-                  >
-                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
-                      Track Time
-                    </span>
-                    <span className="text-sm text-[#463939] font-medium" style={{fontFamily: 'var(--font-body)'}}>
-                      {formatMinutes(totalTimeTracked)}
-                    </span>
-                  </div>
+                  {/* Track Time - Clickable to expand (only in edit mode) */}
+                  {mode === "edit" && (
+                    <div
+                      className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group cursor-pointer"
+                      onClick={() => setTimeEntriesExpanded(!timeEntriesExpanded)}
+                    >
+                      <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
+                        Track Time
+                      </span>
+                      <span className="text-sm text-[#463939] font-medium" style={{fontFamily: 'var(--font-body)'}}>
+                        {formatMinutes(totalTimeTracked)}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Time Tracking Section - Only visible when expanded */}
-                {timeEntriesExpanded && (
+                {/* Time Tracking Section - Only visible when expanded and in edit mode */}
+                {mode === "edit" && timeEntriesExpanded && (
                   <div className="space-y-3 pt-4 border-t border-[#E5E5E5]">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-[#407B9D]" />
@@ -447,15 +585,17 @@ export function ProjectDetailModal({
               </div>
 
               {/* Footer */}
-              <div className="px-8 py-4 border-t border-[#E5E5E5] flex justify-end">
-                <button
-                  onClick={handleDeleteProject}
-                  className="text-[#999999] hover:text-red-600 transition-colors p-2"
-                  title="Delete Project"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+              {mode === "edit" && (
+                <div className="px-8 py-4 border-t border-[#E5E5E5] flex justify-end">
+                  <button
+                    onClick={handleDeleteProject}
+                    className="text-[#999999] hover:text-red-600 transition-colors p-2"
+                    title="Delete Project"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
