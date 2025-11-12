@@ -109,7 +109,7 @@ export function CustomerSelector({ value, onChange, required = false, showLabel 
           required={required}
           className={cn(
             "pr-8",
-            !showLabel && "text-sm bg-transparent border-none outline-none"
+            !showLabel && "text-sm bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
           )}
           style={!showLabel ? { fontFamily: 'var(--font-body)' } : undefined}
         />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,7 +25,9 @@ import {
   getWeekStartDate
 } from "@/lib/project-store"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
+import { AlertDialog } from "@/components/ui/alert-dialog"
 import { CustomerSelector } from "@/components/ui/customer-selector"
+import { ChevronDown } from "lucide-react"
 
 interface TicketDetailModalProps {
   ticketId?: string | null
@@ -50,16 +52,17 @@ export function TicketDetailModal({
 }: TicketDetailModalProps) {
   const [ticket, setTicket] = useState<MaintenanceTicket | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(mode === "create")
 
   // Form fields
   const [ticketTitle, setTicketTitle] = useState("")
   const [customer, setCustomer] = useState("")
-  const [ticketType, setTicketType] = useState<TicketType>("Maintenance")
+  const [ticketType, setTicketType] = useState<TicketType>("" as TicketType)
   const [numberOfErrors, setNumberOfErrors] = useState(0)
   const [sprintLength, setSprintLength] = useState<SprintLength>("1x")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
-  const [status, setStatus] = useState<MaintenanceStatus>("errors-logged")
+  const [status, setStatus] = useState<MaintenanceStatus>("" as MaintenanceStatus)
   const [assignee, setAssignee] = useState<Developer>("Nick")
   const [notes, setNotes] = useState("")
 
@@ -74,6 +77,24 @@ export function TicketDetailModal({
   const [deleteEntryConfirmOpen, setDeleteEntryConfirmOpen] = useState(false)
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null)
 
+  // Alert dialog
+  const [alertOpen, setAlertOpen] = useState(false)
+  const [alertTitle, setAlertTitle] = useState("")
+  const [alertDescription, setAlertDescription] = useState("")
+  const [alertVariant, setAlertVariant] = useState<"default" | "warning" | "info">("warning")
+
+  // Refs for date inputs
+  const startDateRef = useRef<HTMLInputElement>(null)
+  const endDateRef = useRef<HTMLInputElement>(null)
+
+  // Show alert helper
+  const showAlert = (title: string, description: string, variant: "default" | "warning" | "info" = "warning") => {
+    setAlertTitle(title)
+    setAlertDescription(description)
+    setAlertVariant(variant)
+    setAlertOpen(true)
+  }
+
   // Load ticket when modal opens or ticketId changes
   useEffect(() => {
     if (open) {
@@ -81,6 +102,7 @@ export function TicketDetailModal({
         const fetchedTicket = getMaintTicketById(ticketId)
         setTicket(fetchedTicket || null)
         setLoading(false)
+        setIsEditing(false) // Start in view mode for edit
 
         if (fetchedTicket) {
           // Populate form fields
@@ -104,15 +126,16 @@ export function TicketDetailModal({
         setTicket(null)
         setTicketTitle("")
         setCustomer("")
-        setTicketType("Maintenance")
+        setTicketType("" as TicketType)
         setNumberOfErrors(0)
         setSprintLength("" as SprintLength)
         setStartDate("")
         setEndDate("")
-        setStatus("errors-logged")
+        setStatus("" as MaintenanceStatus)
         setAssignee(initialAssignee || "Nick")
         setNotes("")
         setTimeEntries([])
+        setIsEditing(true) // Start in edit mode for create
         setLoading(false)
       }
     }
@@ -121,31 +144,32 @@ export function TicketDetailModal({
   // Calculate total time from entries
   const totalTimeTracked = timeEntries.reduce((sum, entry) => sum + entry.duration, 0)
 
-  // Auto-save function
-  const saveChanges = () => {
+  // Save function
+  const handleSave = (): MaintenanceTicket | null => {
     if (mode === "create") {
-      // Create new ticket
-      if (ticketTitle.trim()) {
-        const newTicket = addMaintTicket({
-          ticketTitle,
-          customer,
-          ticketType,
-          numberOfErrors,
-          sprintLength,
-          startDate,
-          endDate,
-          status,
-          assignee,
-          notes,
-          timeTracked: totalTimeTracked
-        })
-        setTicket(newTicket)
-        onTicketCreated?.()
-        onOpenChange(false)
+      if (!ticketTitle.trim()) {
+        showAlert("Ticket Title Required", "Please enter a ticket title before creating the ticket.")
+        return null
       }
+      const newTicket = addMaintTicket({
+        ticketTitle,
+        customer,
+        ticketType,
+        numberOfErrors,
+        sprintLength,
+        startDate,
+        endDate,
+        status,
+        assignee,
+        notes,
+        timeTracked: totalTimeTracked
+      })
+      setTicket(newTicket)
+      onTicketCreated?.()
+      onOpenChange(false)
+      return newTicket
     } else if (mode === "edit" && ticket) {
-      // Update existing ticket
-      updateMaintTicket(ticket.id, {
+      const updatedTicket = updateMaintTicket(ticket.id, {
         ticketTitle,
         customer,
         ticketType,
@@ -159,14 +183,10 @@ export function TicketDetailModal({
         timeTracked: totalTimeTracked
       })
       onTicketUpdated?.()
+      setIsEditing(false)
+      return updatedTicket
     }
-  }
-
-  // Helper to conditionally save (only in edit mode for auto-save)
-  const autoSave = () => {
-    if (mode === "edit") {
-      saveChanges()
-    }
+    return null
   }
 
   // Parse time increment string and return minutes
@@ -174,15 +194,23 @@ export function TicketDetailModal({
     const trimmed = input.trim().toLowerCase()
     if (!trimmed) return null
 
-    // Match patterns like: 1hr, 1h, 30m, 30min, 1.5h, 1.5hr
-    const hourMatch = trimmed.match(/^(\d+\.?\d*)\s*(h|hr|hour|hours)$/i)
-    const minMatch = trimmed.match(/^(\d+)\s*(m|min|minute|minutes)$/i)
+    // Check for combined format: "1h30m" or "1h 30m"
+    const combinedMatch = trimmed.match(/^(\d+\.?\d*)\s*(h|hr|hour|hours)\s*(\d+)\s*(m|min|minute|minutes)$/i)
+    if (combinedMatch) {
+      const hours = parseFloat(combinedMatch[1])
+      const minutes = parseInt(combinedMatch[3])
+      return Math.round(hours * 60) + minutes
+    }
 
+    // Check for hours only
+    const hourMatch = trimmed.match(/^(\d+\.?\d*)\s*(h|hr|hour|hours)$/i)
     if (hourMatch) {
       const hours = parseFloat(hourMatch[1])
       return Math.round(hours * 60)
     }
 
+    // Check for minutes only
+    const minMatch = trimmed.match(/^(\d+)\s*(m|min|minute|minutes)$/i)
     if (minMatch) {
       return parseInt(minMatch[1])
     }
@@ -191,21 +219,27 @@ export function TicketDetailModal({
   }
 
   const handleAddTime = () => {
-    if (!ticket) return
-
     const minutes = parseTimeIncrement(timeIncrement)
 
     if (minutes === null) {
-      alert("Invalid time format. Use formats like: 1hr, 30m, 1.5h")
+      showAlert("Invalid Time Format", "Please use formats like: 1hr, 30m, 1.5h, 1h30m, or 1h 30m")
       return
     }
 
     if (minutes <= 0) {
-      alert("Time increment must be greater than 0")
+      showAlert("Invalid Time Entry", "Time increment must be greater than 0")
       return
     }
 
-    // Create a new time entry
+    // In create mode, time entries will be saved when the Create button is clicked
+    if (mode === "create" && !ticket) {
+      showAlert("Ticket Not Created", "Please click 'Create Ticket' before adding time entries")
+      return
+    }
+
+    // Edit mode - ticket already exists
+    if (!ticket) return
+
     const now = new Date()
     const newEntry = addTimeEntry({
       projectId: ticket.id,
@@ -214,15 +248,19 @@ export function TicketDetailModal({
       startTime: now.toISOString(),
       endTime: now.toISOString(),
       duration: minutes,
-      notes: timeEntryNotes.trim() || `Manual entry: ${formatMinutes(minutes)}`,
+      notes: timeEntryNotes.trim() || "",
       weekStartDate: getWeekStartDate(now)
     })
 
-    // Update local state
-    setTimeEntries([...timeEntries, newEntry])
+    // Update local state and update ticket's total time
+    const updatedEntries = [...timeEntries, newEntry]
+    setTimeEntries(updatedEntries)
     setTimeIncrement("")
     setTimeEntryNotes("")
-    saveChanges()
+
+    // Update ticket with new total time
+    const newTotalTime = updatedEntries.reduce((sum, entry) => sum + entry.duration, 0)
+    updateMaintTicket(ticket.id, { timeTracked: newTotalTime })
   }
 
   const handleDeleteTimeEntry = (entryId: string) => {
@@ -231,11 +269,15 @@ export function TicketDetailModal({
   }
 
   const confirmDeleteTimeEntry = () => {
-    if (entryToDelete) {
+    if (entryToDelete && ticket) {
       deleteTimeEntry(entryToDelete)
-      setTimeEntries(timeEntries.filter(e => e.id !== entryToDelete))
+      const updatedEntries = timeEntries.filter(e => e.id !== entryToDelete)
+      setTimeEntries(updatedEntries)
       setEntryToDelete(null)
-      saveChanges()
+
+      // Update ticket with new total time
+      const newTotalTime = updatedEntries.reduce((sum, entry) => sum + entry.duration, 0)
+      updateMaintTicket(ticket.id, { timeTracked: newTotalTime })
     }
   }
 
@@ -265,20 +307,9 @@ export function TicketDetailModal({
     )
   }
 
-  // Handle modal close
-  const handleModalClose = (isOpen: boolean) => {
-    if (!isOpen && mode === "create" && ticketTitle.trim()) {
-      // Save when closing in create mode if there's a ticket title
-      saveChanges()
-      // Note: saveChanges() already calls onOpenChange(false) after creating the ticket
-    } else {
-      onOpenChange(isOpen)
-    }
-  }
-
   return (
     <>
-      <Dialog open={open} onOpenChange={handleModalClose}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-[1400px] max-h-[90vh] p-0 rounded-xl overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -287,14 +318,11 @@ export function TicketDetailModal({
               </p>
             </div>
           ) : (
-            <div className="rounded-xl overflow-hidden">
-              {/* Header with Close Button */}
-              <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-[#E5E5E5]">
-                <h2 className="text-xl font-semibold text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
-                  {mode === "create" ? "Create New Ticket" : "Ticket Details"}
-                </h2>
+            <div className="relative rounded-xl overflow-hidden">
+              {/* Close Button */}
+              <div className="absolute top-4 right-4 z-10">
                 <button
-                  onClick={() => handleModalClose(false)}
+                  onClick={() => onOpenChange(false)}
                   className="text-[#666666] hover:text-[#463939] transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -302,70 +330,100 @@ export function TicketDetailModal({
               </div>
 
               {/* Content */}
-              <div className="px-8 py-6 space-y-6">
+              <div className="px-8 py-8 space-y-6">
                 {/* Ticket Title - Large editable title */}
                 <div className="group">
                   <input
                     type="text"
                     value={ticketTitle}
                     onChange={(e) => setTicketTitle(e.target.value)}
-                    onBlur={mode === "edit" ? saveChanges : undefined}
+                    disabled={!isEditing}
                     placeholder="Ticket title"
-                    className="text-3xl font-bold text-[#463939] w-full bg-transparent border-none outline-none hover:bg-[#F5F5F5] focus:bg-[#F5F5F5] rounded px-2 py-1 -mx-2 transition-colors"
+                    className={`text-3xl font-bold text-[#463939] w-full border-none outline-none rounded px-2 py-1 -mx-2 transition-colors ${
+                      isEditing ? 'bg-transparent hover:bg-[#F5F5F5] focus:bg-[#F5F5F5]' : 'bg-transparent cursor-default'
+                    }`}
                     style={{fontFamily: 'var(--font-heading)'}}
                   />
                 </div>
 
                 {/* Fields Grid */}
-                <div className="space-y-4 pt-4">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4 pt-4">
                   {/* Customer */}
                   <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
                       Customer
                     </span>
                     <div className="flex-1">
-                      <CustomerSelector
-                        value={customer}
-                        onChange={(value) => {
-                          setCustomer(value)
-                          // Only auto-save in edit mode
-                          if (mode === "edit") {
-                            setTimeout(saveChanges, 100)
-                          }
-                        }}
-                        required={false}
-                        showLabel={false}
-                      />
+                      {isEditing ? (
+                        <CustomerSelector
+                          value={customer}
+                          onChange={(value) => {
+                            setCustomer(value)
+                            // Only auto-save in edit mode
+                            if (mode === "edit") {
+
+                            }
+                          }}
+                          required={false}
+                          showLabel={false}
+                        />
+                      ) : (
+                        <div className="text-sm text-[#463939] px-3 py-1.5" style={{fontFamily: 'var(--font-body)'}}>
+                          {customer || "Not set"}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Status */}
+                  {/* Number of Errors */}
                   <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
-                      Status
+                      Number of Errors
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={numberOfErrors}
+                      onChange={(e) => setNumberOfErrors(parseInt(e.target.value) || 0)}
+                      disabled={!isEditing}
+                      className={`text-sm text-[#463939] outline-none flex-1 px-3 py-1.5 transition-all ${
+                        isEditing
+                          ? 'bg-white border border-[#E5E5E5] rounded-md hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                          : 'border-none bg-transparent cursor-default'
+                      }`}
+                      style={{fontFamily: 'var(--font-body)'}}
+                    />
+                  </div>
+
+                  {/* Assignee */}
+                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
+                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
+                      Assignee
                     </span>
                     <div className="flex-1 flex items-center gap-2">
                       <select
-                        value={status}
+                        disabled={!isEditing}
+                        value={assignee}
                         onChange={(e) => {
-                          setStatus(e.target.value as MaintenanceStatus)
-                          autoSave()
+                          setAssignee(e.target.value as Developer)
+
                         }}
-                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
                         style={{fontFamily: 'var(--font-body)'}}
                       >
-                        <option value="">Select status...</option>
-                        <option value="errors-logged">Errors Logged</option>
-                        <option value="on-hold">On Hold</option>
-                        <option value="fix-requests">Fix Requests</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="closed">Closed</option>
+                        <option value="">Select assignee...</option>
+                        <option value="Nick">Nick</option>
+                        <option value="Gon">Gon</option>
                       </select>
-                      {status && (
+                      {assignee && isEditing && (
                         <button
                           onClick={() => {
-                            setStatus("errors-logged")
-                            autoSave()
+                            setAssignee("Nick")
+
                           }}
                           className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
                           title="Clear selection"
@@ -383,23 +441,28 @@ export function TicketDetailModal({
                     </span>
                     <div className="flex-1 flex items-center gap-2">
                       <select
+                        disabled={!isEditing}
                         value={ticketType}
                         onChange={(e) => {
                           setTicketType(e.target.value as TicketType)
-                          autoSave()
+
                         }}
-                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
                         style={{fontFamily: 'var(--font-body)'}}
                       >
                         <option value="">Select type...</option>
                         <option value="Maintenance">Maintenance</option>
                         <option value="Customization">Customization</option>
                       </select>
-                      {ticketType && (
+                      {ticketType && isEditing && (
                         <button
                           onClick={() => {
                             setTicketType("Maintenance")
-                            autoSave()
+
                           }}
                           className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
                           title="Clear selection"
@@ -410,46 +473,39 @@ export function TicketDetailModal({
                     </div>
                   </div>
 
-                  {/* Number of Errors */}
+                  {/* Status */}
                   <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
-                      Number of Errors
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={numberOfErrors}
-                      onChange={(e) => setNumberOfErrors(parseInt(e.target.value) || 0)}
-                      onBlur={mode === "edit" ? saveChanges : undefined}
-                      className="text-sm text-[#463939] bg-transparent border-none outline-none flex-1"
-                      style={{fontFamily: 'var(--font-body)'}}
-                    />
-                  </div>
-
-                  {/* Assignee */}
-                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
-                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
-                      Assignee
+                      Status
                     </span>
                     <div className="flex-1 flex items-center gap-2">
                       <select
-                        value={assignee}
+                        disabled={!isEditing}
+                        value={status}
                         onChange={(e) => {
-                          setAssignee(e.target.value as Developer)
-                          autoSave()
+                          const newStatus = e.target.value as MaintenanceStatus
+                          setStatus(newStatus)
+
                         }}
-                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
                         style={{fontFamily: 'var(--font-body)'}}
                       >
-                        <option value="">Select assignee...</option>
-                        <option value="Nick">Nick</option>
-                        <option value="Gon">Gon</option>
+                        <option value="">Select status...</option>
+                        <option value="errors-logged">Errors Logged</option>
+                        <option value="on-hold">On Hold</option>
+                        <option value="fix-requests">Fix Requests</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="closed">Closed</option>
                       </select>
-                      {assignee && (
+                      {status && isEditing && (
                         <button
                           onClick={() => {
-                            setAssignee("Nick")
-                            autoSave()
+                            setStatus("errors-logged")
+
                           }}
                           className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
                           title="Clear selection"
@@ -467,18 +523,31 @@ export function TicketDetailModal({
                     </span>
                     <div className="flex-1 flex items-center gap-2">
                       <input
+                        ref={startDateRef}
                         type="date"
+                        disabled={!isEditing}
                         value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        onBlur={mode === "edit" ? saveChanges : undefined}
-                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        onChange={(e) => {
+                          setStartDate(e.target.value)
+                          if (mode === "edit") {
+
+                          }
+                        }}
+                        onClick={() => {
+                          if (isEditing) startDateRef.current?.showPicker()
+                        }}
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
                         style={{fontFamily: 'var(--font-body)'}}
                       />
-                      {startDate && (
+                      {startDate && isEditing && (
                         <button
                           onClick={() => {
                             setStartDate("")
-                            autoSave()
+
                           }}
                           className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
                           title="Clear date"
@@ -488,6 +557,26 @@ export function TicketDetailModal({
                       )}
                     </div>
                   </div>
+
+                  {/* Track Time - Always visible in edit mode, shows total time */}
+                  {mode === "edit" && (
+                    <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
+                      <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
+                        Track Time
+                      </span>
+                      <div
+                        className={`flex-1 text-sm text-[#463939] px-3 py-1.5 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D]'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
+                        style={{fontFamily: 'var(--font-body)'}}
+                        onClick={isEditing ? () => setTimeEntriesExpanded(!timeEntriesExpanded) : undefined}
+                      >
+                        {formatMinutes(totalTimeTracked)}
+                      </div>
+                    </div>
+                  )}
 
                   {/* End Date */}
                   <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
@@ -496,18 +585,31 @@ export function TicketDetailModal({
                     </span>
                     <div className="flex-1 flex items-center gap-2">
                       <input
+                        ref={endDateRef}
                         type="date"
+                        disabled={!isEditing}
                         value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        onBlur={mode === "edit" ? saveChanges : undefined}
-                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        onChange={(e) => {
+                          setEndDate(e.target.value)
+                          if (mode === "edit") {
+
+                          }
+                        }}
+                        onClick={() => {
+                          if (isEditing) endDateRef.current?.showPicker()
+                        }}
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
                         style={{fontFamily: 'var(--font-body)'}}
                       />
-                      {endDate && (
+                      {endDate && isEditing && (
                         <button
                           onClick={() => {
                             setEndDate("")
-                            autoSave()
+
                           }}
                           className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
                           title="Clear date"
@@ -517,26 +619,11 @@ export function TicketDetailModal({
                       )}
                     </div>
                   </div>
-
-                  {/* Track Time - Clickable to expand (only in edit mode) */}
-                  {mode === "edit" && (
-                    <div
-                      className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group cursor-pointer"
-                      onClick={() => setTimeEntriesExpanded(!timeEntriesExpanded)}
-                    >
-                      <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
-                        Track Time
-                      </span>
-                      <span className="text-sm text-[#463939] font-medium" style={{fontFamily: 'var(--font-body)'}}>
-                        {formatMinutes(totalTimeTracked)}
-                      </span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Time Tracking Section - Only visible when expanded and in edit mode */}
-                {mode === "edit" && timeEntriesExpanded && (
-                  <div className="space-y-3 pt-4 border-t border-[#E5E5E5]">
+                {/* Time Tracking Section - Only editable when isEditing is true */}
+                {mode === "edit" && isEditing && timeEntriesExpanded && (
+                  <div className="col-span-2 space-y-3 pt-4 border-t border-[#E5E5E5]">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-[#407B9D]" />
                       <h3 className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
@@ -617,33 +704,67 @@ export function TicketDetailModal({
                 )}
 
                 {/* Notes Section */}
-                <div className="space-y-2 pt-4 border-t border-[#E5E5E5]">
+                <div className="col-span-2 space-y-2 pt-4 border-t border-[#E5E5E5]">
                   <h3 className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
                     Notes
                   </h3>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    onBlur={saveChanges}
+                    disabled={!isEditing}
                     placeholder="Add any notes or details about this ticket..."
-                    className="w-full min-h-[100px] rounded-md border border-[#E5E5E5] bg-transparent hover:bg-[#F5F5F5] focus:bg-white px-3 py-2 text-sm transition-colors"
+                    className="w-full min-h-[100px] rounded-md border border-[#E5E5E5] bg-white px-3 py-2 text-sm outline-none hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all resize-y disabled:cursor-not-allowed disabled:opacity-70"
                     style={{fontFamily: 'var(--font-body)'}}
                   />
                 </div>
               </div>
 
               {/* Footer */}
-              {mode === "edit" && (
-                <div className="px-8 py-4 border-t border-[#E5E5E5] flex justify-end">
-                  <button
-                    onClick={handleDeleteTicket}
-                    className="text-[#999999] hover:text-red-600 transition-colors p-2"
-                    title="Delete Ticket"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+              <div className="px-8 py-4 border-t border-[#E5E5E5] flex justify-between items-center">
+                <div>
+                  {mode === "edit" && !isEditing && (
+                    <button
+                      onClick={handleDeleteTicket}
+                      className="text-[#999999] hover:text-red-600 transition-colors p-2"
+                      title="Delete Ticket"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
-              )}
+                <div className="flex gap-2">
+                  {mode === "create" ? (
+                    <Button
+                      onClick={handleSave}
+                      className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                    >
+                      Create Ticket
+                    </Button>
+                  ) : isEditing ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsEditing(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSave}
+                        className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                      >
+                        Save Changes
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={() => setIsEditing(true)}
+                      className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                    >
+                      Edit
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </DialogContent>
@@ -671,6 +792,15 @@ export function TicketDetailModal({
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"
+      />
+
+      {/* Alert Dialog */}
+      <AlertDialog
+        open={alertOpen}
+        onOpenChange={setAlertOpen}
+        title={alertTitle}
+        description={alertDescription}
+        variant={alertVariant}
       />
     </>
   )

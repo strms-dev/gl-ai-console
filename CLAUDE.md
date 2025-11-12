@@ -141,6 +141,11 @@ Reference these existing components as templates:
 - **Color Variables**: Brand colors are defined in `:root` and Tailwind's `@theme` block
 - **Icons**: ALWAYS use Lucide React icons - NEVER use emojis in the UI
 
+### User Preferences
+- **Custom Dialogs**: NEVER use Chrome browser alerts (`alert()`). Always use custom dialog components like `AlertDialog` and `ConfirmationDialog` from `src/components/ui/`
+  - Use `AlertDialog` for simple informational popups with just an OK button
+  - Use `ConfirmationDialog` for actions requiring user confirmation (OK/Cancel)
+
 ## Timeline Component Development Patterns
 
 ### Adding New Interactive Actions (Buttons) to Timeline Stages

@@ -3,10 +3,7 @@
 import {
   DevelopmentProject,
   MaintenanceTicket,
-  TimeEntry,
-  dummyDevProjects,
-  dummyMaintTickets,
-  dummyTimeEntries
+  TimeEntry
 } from "@/lib/dummy-data"
 
 // ============================================================================
@@ -25,7 +22,7 @@ const STORAGE_KEYS = {
 // ============================================================================
 
 /**
- * Initialize localStorage with dummy data if not already initialized
+ * Initialize localStorage with empty arrays if not already initialized
  */
 function initializeStorage(): void {
   if (typeof window === 'undefined') return
@@ -33,9 +30,9 @@ function initializeStorage(): void {
   const isInitialized = localStorage.getItem(STORAGE_KEYS.INITIALIZED)
 
   if (!isInitialized) {
-    localStorage.setItem(STORAGE_KEYS.DEV_PROJECTS, JSON.stringify(dummyDevProjects))
-    localStorage.setItem(STORAGE_KEYS.MAINT_TICKETS, JSON.stringify(dummyMaintTickets))
-    localStorage.setItem(STORAGE_KEYS.TIME_ENTRIES, JSON.stringify(dummyTimeEntries))
+    localStorage.setItem(STORAGE_KEYS.DEV_PROJECTS, JSON.stringify([]))
+    localStorage.setItem(STORAGE_KEYS.MAINT_TICKETS, JSON.stringify([]))
+    localStorage.setItem(STORAGE_KEYS.TIME_ENTRIES, JSON.stringify([]))
     localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true')
   }
 }
@@ -111,10 +108,28 @@ export function updateDevProject(id: string, updates: Partial<Omit<DevelopmentPr
     throw new Error(`Development project with id ${id} not found`)
   }
 
+  const now = new Date().toISOString()
+
+  // If status is being changed to complete or cancelled, set completedDate
+  const completedDate =
+    updates.status && (updates.status === "complete" || updates.status === "cancelled") &&
+    projects[index].status !== updates.status
+      ? now
+      : projects[index].completedDate
+
+  console.log('updateDevProject:', {
+    id,
+    oldStatus: projects[index].status,
+    newStatus: updates.status,
+    willSetCompletedDate: updates.status && (updates.status === "complete" || updates.status === "cancelled") && projects[index].status !== updates.status,
+    completedDate
+  })
+
   const updatedProject: DevelopmentProject = {
     ...projects[index],
     ...updates,
-    updatedAt: new Date().toISOString(),
+    completedDate,
+    updatedAt: now,
     lastActivity: "Just now"
   }
 
@@ -216,10 +231,19 @@ export function updateMaintTicket(id: string, updates: Partial<Omit<MaintenanceT
     throw new Error(`Maintenance ticket with id ${id} not found`)
   }
 
+  const now = new Date().toISOString()
+
+  // If status is being changed to closed, set completedDate
+  const completedDate =
+    updates.status && updates.status === "closed" && tickets[index].status !== "closed"
+      ? now
+      : tickets[index].completedDate
+
   const updatedTicket: MaintenanceTicket = {
     ...tickets[index],
     ...updates,
-    updatedAt: new Date().toISOString(),
+    completedDate,
+    updatedAt: now,
     lastActivity: "Just now"
   }
 

@@ -87,6 +87,7 @@ export interface DevelopmentProject {
   lastActivity: string           // Relative time string
   createdAt: string              // ISO timestamp
   updatedAt: string              // ISO timestamp
+  completedDate?: string         // ISO timestamp when status changed to complete/cancelled
 }
 
 // Maintenance Ticket Types
@@ -110,6 +111,7 @@ export interface MaintenanceTicket {
   lastActivity: string
   createdAt: string
   updatedAt: string
+  completedDate?: string         // ISO timestamp when status changed to closed
 }
 
 // Time Entry Types
@@ -235,7 +237,8 @@ export const dummyDevProjects: DevelopmentProject[] = [
     notes: "Drag-and-drop email template builder",
     lastActivity: "1 week ago",
     createdAt: "2024-11-20T09:00:00Z",
-    updatedAt: "2024-12-29T17:00:00Z"
+    updatedAt: "2024-12-29T17:00:00Z",
+    completedDate: "2024-12-29T17:00:00Z"
   },
   {
     id: "dev-5",
@@ -299,7 +302,8 @@ export const dummyDevProjects: DevelopmentProject[] = [
     notes: "Client decided to use different solution",
     lastActivity: "2 months ago",
     createdAt: "2024-11-10T09:00:00Z",
-    updatedAt: "2024-11-18T10:00:00Z"
+    updatedAt: "2024-11-18T10:00:00Z",
+    completedDate: "2024-11-18T10:00:00Z"
   },
   {
     id: "dev-9",
@@ -331,7 +335,8 @@ export const dummyDevProjects: DevelopmentProject[] = [
     notes: "Redis-based rate limiting middleware",
     lastActivity: "3 days ago",
     createdAt: "2024-12-20T13:00:00Z",
-    updatedAt: "2025-01-01T16:00:00Z"
+    updatedAt: "2025-01-01T16:00:00Z",
+    completedDate: "2025-01-01T16:00:00Z"
   }
 ]
 
@@ -442,7 +447,8 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     notes: "Updated PDF library, resolved layout issues",
     lastActivity: "2 weeks ago",
     createdAt: "2024-12-18T11:00:00Z",
-    updatedAt: "2024-12-23T14:00:00Z"
+    updatedAt: "2024-12-23T14:00:00Z",
+    completedDate: "2024-12-23T14:00:00Z"
   },
   {
     id: "maint-7",
@@ -495,7 +501,8 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     notes: "Added database indexes, implemented caching",
     lastActivity: "2 weeks ago",
     createdAt: "2024-12-12T09:00:00Z",
-    updatedAt: "2024-12-22T17:00:00Z"
+    updatedAt: "2024-12-22T17:00:00Z",
+    completedDate: "2024-12-22T17:00:00Z"
   },
   {
     id: "maint-10",
@@ -566,7 +573,8 @@ export const dummyMaintTickets: MaintenanceTicket[] = [
     notes: "Increased server upload limit configuration",
     lastActivity: "2 weeks ago",
     createdAt: "2024-12-16T13:00:00Z",
-    updatedAt: "2024-12-21T15:00:00Z"
+    updatedAt: "2024-12-21T15:00:00Z",
+    completedDate: "2024-12-21T15:00:00Z"
   },
   {
     id: "maint-14",

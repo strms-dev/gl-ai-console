@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Clock, X, XCircle } from "lucide-react"
+import { Trash2, Clock, X, XCircle, ChevronDown } from "lucide-react"
 import { DevelopmentProject, SprintLength, Developer, DevelopmentStatus, TimeEntry } from "@/lib/dummy-data"
 import { getDevProjectById, updateDevProject, deleteDevProject, addDevProject, formatMinutes, getTimeEntriesForProject, addTimeEntry, deleteTimeEntry, getWeekStartDate } from "@/lib/project-store"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
+import { AlertDialog } from "@/components/ui/alert-dialog"
 import { CustomerSelector } from "@/components/ui/customer-selector"
 
 interface ProjectDetailModalProps {
@@ -33,6 +34,7 @@ export function ProjectDetailModal({
 }: ProjectDetailModalProps) {
   const [project, setProject] = useState<DevelopmentProject | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(mode === "create")
 
   // Form fields
   const [projectName, setProjectName] = useState("")
@@ -52,11 +54,23 @@ export function ProjectDetailModal({
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null)
   const [deleteProjectConfirmOpen, setDeleteProjectConfirmOpen] = useState(false)
   const [timeEntriesExpanded, setTimeEntriesExpanded] = useState(false)
+  const [timeEntriesListExpanded, setTimeEntriesListExpanded] = useState(false)
+
+  // Alert dialog state
+  const [alertOpen, setAlertOpen] = useState(false)
+  const [alertTitle, setAlertTitle] = useState("")
+  const [alertDescription, setAlertDescription] = useState("")
+  const [alertVariant, setAlertVariant] = useState<"default" | "warning" | "info">("default")
+
+  // Refs for date inputs
+  const startDateRef = useRef<HTMLInputElement>(null)
+  const endDateRef = useRef<HTMLInputElement>(null)
 
   // Load project when modal opens
   useEffect(() => {
     if (open) {
       if (mode === "edit" && projectId) {
+        setIsEditing(false) // Start in view mode for existing projects
         const fetchedProject = getDevProjectById(projectId)
         if (fetchedProject) {
           setProject(fetchedProject)
@@ -76,6 +90,7 @@ export function ProjectDetailModal({
         setLoading(false)
       } else if (mode === "create") {
         // Reset to defaults for create mode
+        setIsEditing(true) // Start in edit mode for new projects
         setProject(null)
         setProjectName("")
         setCustomer("")
@@ -94,36 +109,25 @@ export function ProjectDetailModal({
   // Calculate total time from entries
   const totalTimeTracked = timeEntries.reduce((sum, entry) => sum + entry.duration, 0)
 
-  // Helper to conditionally save (only in edit mode for auto-save)
-  const autoSave = () => {
-    if (mode === "edit") {
-      saveChanges()
-    }
+  // Helper to show alert
+  const showAlert = (title: string, description: string, variant: "default" | "warning" | "info" = "warning") => {
+    setAlertTitle(title)
+    setAlertDescription(description)
+    setAlertVariant(variant)
+    setAlertOpen(true)
   }
 
-  // Auto-save function
-  const saveChanges = () => {
+  // Save function (called on button click only)
+  const handleSave = (): DevelopmentProject | null => {
     if (mode === "create") {
       // Create new project
-      if (projectName.trim()) {
-        const newProject = addDevProject({
-          projectName,
-          customer,
-          sprintLength,
-          startDate,
-          endDate,
-          status,
-          assignee,
-          notes,
-          timeTracked: totalTimeTracked
-        })
-        setProject(newProject)
-        onProjectCreated?.()
-        onOpenChange(false)
+      if (!projectName.trim()) {
+        showAlert("Project Name Required", "Please enter a project name before creating the project.")
+        return null
       }
-    } else if (mode === "edit" && project) {
-      // Update existing project
-      updateDevProject(project.id, {
+
+      console.log('Creating new project')
+      const newProject = addDevProject({
         projectName,
         customer,
         sprintLength,
@@ -134,8 +138,30 @@ export function ProjectDetailModal({
         notes,
         timeTracked: totalTimeTracked
       })
+      setProject(newProject)
+      onProjectCreated?.()
+      onOpenChange(false)
+      return newProject
+    } else if (mode === "edit" && project) {
+      // Update existing project
+      console.log('Updating project', project.id)
+      const updatedProject = updateDevProject(project.id, {
+        projectName,
+        customer,
+        sprintLength,
+        startDate,
+        endDate,
+        status,
+        assignee,
+        notes,
+        timeTracked: totalTimeTracked
+      })
+      console.log('Project updated')
       onProjectUpdated?.()
+      setIsEditing(false) // Exit edit mode after save
+      return updatedProject
     }
+    return null
   }
 
   // Parse time increment string
@@ -143,14 +169,23 @@ export function ProjectDetailModal({
     const trimmed = input.trim().toLowerCase()
     if (!trimmed) return null
 
-    const hourMatch = trimmed.match(/^(\d+\.?\d*)\s*(h|hr|hour|hours)$/i)
-    const minMatch = trimmed.match(/^(\d+)\s*(m|min|minute|minutes)$/i)
+    // Check for combined format: "1h30m" or "1h 30m"
+    const combinedMatch = trimmed.match(/^(\d+\.?\d*)\s*(h|hr|hour|hours)\s*(\d+)\s*(m|min|minute|minutes)$/i)
+    if (combinedMatch) {
+      const hours = parseFloat(combinedMatch[1])
+      const minutes = parseInt(combinedMatch[3])
+      return Math.round(hours * 60) + minutes
+    }
 
+    // Check for hours only
+    const hourMatch = trimmed.match(/^(\d+\.?\d*)\s*(h|hr|hour|hours)$/i)
     if (hourMatch) {
       const hours = parseFloat(hourMatch[1])
       return Math.round(hours * 60)
     }
 
+    // Check for minutes only
+    const minMatch = trimmed.match(/^(\d+)\s*(m|min|minute|minutes)$/i)
     if (minMatch) {
       return parseInt(minMatch[1])
     }
@@ -159,19 +194,27 @@ export function ProjectDetailModal({
   }
 
   const handleAddTime = () => {
-    if (!project) return
-
     const minutes = parseTimeIncrement(timeIncrement)
 
     if (minutes === null) {
-      alert("Invalid time format. Use formats like: 1hr, 30m, 1.5h")
+      showAlert("Invalid Time Format", "Please use formats like: 1hr, 30m, 1.5h, 1h30m, or 1h 30m")
       return
     }
 
     if (minutes <= 0) {
-      alert("Time increment must be greater than 0")
+      showAlert("Invalid Time Entry", "Time increment must be greater than 0")
       return
     }
+
+    // In create mode, time entries will be saved when the Create button is clicked
+    // For now, just store them in state
+    if (mode === "create" && !project) {
+      showAlert("Project Not Created", "Please click 'Create Project' before adding time entries")
+      return
+    }
+
+    // Edit mode - project already exists
+    if (!project) return
 
     const now = new Date()
     const newEntry = addTimeEntry({
@@ -181,14 +224,18 @@ export function ProjectDetailModal({
       startTime: now.toISOString(),
       endTime: now.toISOString(),
       duration: minutes,
-      notes: timeEntryNotes.trim() || `Manual entry: ${formatMinutes(minutes)}`,
+      notes: timeEntryNotes.trim() || "",
       weekStartDate: getWeekStartDate(now)
     })
 
     setTimeEntries([...timeEntries, newEntry])
     setTimeIncrement("")
     setTimeEntryNotes("")
-    saveChanges()
+    // Time entry is saved to store, update local state to reflect new total
+    const updatedProject = getDevProjectById(project.id)
+    if (updatedProject) {
+      setProject(updatedProject)
+    }
   }
 
   const handleDeleteTimeEntry = (entryId: string) => {
@@ -197,11 +244,15 @@ export function ProjectDetailModal({
   }
 
   const confirmDeleteTimeEntry = () => {
-    if (entryToDelete) {
+    if (entryToDelete && project) {
       deleteTimeEntry(entryToDelete)
       setTimeEntries(timeEntries.filter(e => e.id !== entryToDelete))
       setEntryToDelete(null)
-      saveChanges()
+      // Refresh project to get updated totals
+      const updatedProject = getDevProjectById(project.id)
+      if (updatedProject) {
+        setProject(updatedProject)
+      }
     }
   }
 
@@ -233,12 +284,7 @@ export function ProjectDetailModal({
 
   // Handle modal close
   const handleModalClose = (isOpen: boolean) => {
-    if (!isOpen && mode === "create" && projectName.trim()) {
-      // Save when closing in create mode if there's a project name
-      saveChanges()
-    } else {
-      onOpenChange(isOpen)
-    }
+    onOpenChange(isOpen)
   }
 
   return (
@@ -252,12 +298,9 @@ export function ProjectDetailModal({
               </p>
             </div>
           ) : (
-            <div className="rounded-xl overflow-hidden">
-              {/* Header with Close Button */}
-              <div className="flex items-center justify-between px-8 pt-8 pb-4 border-b border-[#E5E5E5]">
-                <h2 className="text-xl font-semibold text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
-                  {mode === "create" ? "Create New Project" : "Project Details"}
-                </h2>
+            <div className="relative rounded-xl overflow-hidden">
+              {/* Close Button */}
+              <div className="absolute top-4 right-4 z-10">
                 <button
                   onClick={() => handleModalClose(false)}
                   className="text-[#666666] hover:text-[#463939] transition-colors"
@@ -267,40 +310,42 @@ export function ProjectDetailModal({
               </div>
 
               {/* Content */}
-              <div className="px-8 py-6 space-y-6">
+              <div className="px-8 py-8 space-y-6">
                 {/* Project Name - Large editable title */}
                 <div className="group">
                   <input
                     type="text"
                     value={projectName}
                     onChange={(e) => setProjectName(e.target.value)}
-                    onBlur={mode === "edit" ? saveChanges : undefined}
                     placeholder="Project name"
-                    className="text-3xl font-bold text-[#463939] w-full bg-transparent border-none outline-none hover:bg-[#F5F5F5] focus:bg-[#F5F5F5] rounded px-2 py-1 -mx-2 transition-colors"
+                    disabled={!isEditing}
+                    className={`text-3xl font-bold text-[#463939] w-full border-none outline-none rounded px-2 py-1 -mx-2 transition-colors ${
+                      isEditing ? 'bg-transparent hover:bg-[#F5F5F5] focus:bg-[#F5F5F5]' : 'bg-transparent cursor-default'
+                    }`}
                     style={{fontFamily: 'var(--font-heading)'}}
                   />
                 </div>
 
                 {/* Fields Grid */}
-                <div className="space-y-4 pt-4">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4 pt-4">
                   {/* Customer */}
                   <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
                       Customer
                     </span>
                     <div className="flex-1">
-                      <CustomerSelector
-                        value={customer}
-                        onChange={(value) => {
-                          setCustomer(value)
-                          // Only auto-save in edit mode
-                          if (mode === "edit") {
-                            setTimeout(saveChanges, 100)
-                          }
-                        }}
-                        required={false}
-                        showLabel={false}
-                      />
+                      {isEditing ? (
+                        <CustomerSelector
+                          value={customer}
+                          onChange={setCustomer}
+                          required={false}
+                          showLabel={false}
+                        />
+                      ) : (
+                        <div className="text-sm text-[#463939] px-3 py-1.5" style={{fontFamily: 'var(--font-body)'}}>
+                          {customer || "Not set"}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -311,12 +356,19 @@ export function ProjectDetailModal({
                     </span>
                     <div className="flex-1 flex items-center gap-2">
                       <select
+                        disabled={!isEditing}
                         value={status}
                         onChange={(e) => {
-                          setStatus(e.target.value as DevelopmentStatus)
-                          autoSave()
+                          const newStatus = e.target.value as DevelopmentStatus
+                          console.log('Status changed to:', newStatus)
+                          setStatus(newStatus)
+
                         }}
-                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
                         style={{fontFamily: 'var(--font-body)'}}
                       >
                         <option value="">Select status...</option>
@@ -327,11 +379,11 @@ export function ProjectDetailModal({
                         <option value="complete">Complete</option>
                         <option value="cancelled">Cancelled</option>
                       </select>
-                      {status && (
+                      {status && isEditing && (
                         <button
                           onClick={() => {
                             setStatus("setup")
-                            autoSave()
+
                           }}
                           className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
                           title="Clear selection"
@@ -349,59 +401,28 @@ export function ProjectDetailModal({
                     </span>
                     <div className="flex-1 flex items-center gap-2">
                       <select
+                        disabled={!isEditing}
                         value={assignee}
                         onChange={(e) => {
                           setAssignee(e.target.value as Developer)
-                          autoSave()
+
                         }}
-                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
                         style={{fontFamily: 'var(--font-body)'}}
                       >
                         <option value="">Select assignee...</option>
                         <option value="Nick">Nick</option>
                         <option value="Gon">Gon</option>
                       </select>
-                      {assignee && (
+                      {assignee && isEditing && (
                         <button
                           onClick={() => {
                             setAssignee("Nick")
-                            autoSave()
-                          }}
-                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
-                          title="Clear selection"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Sprint Length */}
-                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
-                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
-                      Sprint Length
-                    </span>
-                    <div className="flex-1 flex items-center gap-2">
-                      <select
-                        value={sprintLength}
-                        onChange={(e) => {
-                          setSprintLength(e.target.value as SprintLength)
-                          autoSave()
-                        }}
-                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
-                        style={{fontFamily: 'var(--font-body)'}}
-                      >
-                        <option value="">Select sprint length...</option>
-                        <option value="0.5x">0.5x Sprint</option>
-                        <option value="1x">1x Sprint</option>
-                        <option value="1.5x">1.5x Sprint</option>
-                        <option value="2x">2x Sprint</option>
-                      </select>
-                      {sprintLength && (
-                        <button
-                          onClick={() => {
-                            setSprintLength("" as SprintLength)
-                            autoSave()
                           }}
                           className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
                           title="Clear selection"
@@ -419,21 +440,67 @@ export function ProjectDetailModal({
                     </span>
                     <div className="flex-1 flex items-center gap-2">
                       <input
+                        ref={startDateRef}
                         type="date"
+                        disabled={!isEditing}
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        onBlur={mode === "edit" ? saveChanges : undefined}
-                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        onClick={() => {
+                          if (isEditing) startDateRef.current?.showPicker()
+                        }}
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
                         style={{fontFamily: 'var(--font-body)'}}
                       />
-                      {startDate && (
+                      {startDate && isEditing && (
                         <button
-                          onClick={() => {
-                            setStartDate("")
-                            autoSave()
-                          }}
+                          onClick={() => setStartDate("")}
                           className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
                           title="Clear date"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sprint Length */}
+                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
+                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
+                      Sprint Length
+                    </span>
+                    <div className="flex-1 flex items-center gap-2">
+                      <select
+                        disabled={!isEditing}
+                        value={sprintLength}
+                        onChange={(e) => {
+                          setSprintLength(e.target.value as SprintLength)
+
+                        }}
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
+                        style={{fontFamily: 'var(--font-body)'}}
+                      >
+                        <option value="">Select sprint length...</option>
+                        <option value="0.5x">0.5x Sprint</option>
+                        <option value="1x">1x Sprint</option>
+                        <option value="1.5x">1.5x Sprint</option>
+                        <option value="2x">2x Sprint</option>
+                      </select>
+                      {sprintLength && isEditing && (
+                        <button
+                          onClick={() => {
+                            setSprintLength("" as SprintLength)
+
+                          }}
+                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
+                          title="Clear selection"
                         >
                           <XCircle className="w-4 h-4" />
                         </button>
@@ -448,19 +515,24 @@ export function ProjectDetailModal({
                     </span>
                     <div className="flex-1 flex items-center gap-2">
                       <input
+                        ref={endDateRef}
                         type="date"
+                        disabled={!isEditing}
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        onBlur={mode === "edit" ? saveChanges : undefined}
-                        className="text-sm text-[#463939] bg-white border border-[#E5E5E5] rounded-md px-3 py-1.5 outline-none cursor-pointer flex-1 hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all"
+                        onClick={() => {
+                          if (isEditing) endDateRef.current?.showPicker()
+                        }}
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
                         style={{fontFamily: 'var(--font-body)'}}
                       />
-                      {endDate && (
+                      {endDate && isEditing && (
                         <button
-                          onClick={() => {
-                            setEndDate("")
-                            autoSave()
-                          }}
+                          onClick={() => setEndDate("")}
                           className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
                           title="Clear date"
                         >
@@ -470,63 +542,74 @@ export function ProjectDetailModal({
                     </div>
                   </div>
 
-                  {/* Track Time - Clickable to expand (only in edit mode) */}
+                  {/* Track Time - Always visible in edit mode, shows total time */}
                   {mode === "edit" && (
-                    <div
-                      className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group cursor-pointer"
-                      onClick={() => setTimeEntriesExpanded(!timeEntriesExpanded)}
-                    >
+                    <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
                       <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
                         Track Time
                       </span>
-                      <span className="text-sm text-[#463939] font-medium" style={{fontFamily: 'var(--font-body)'}}>
+                      <div
+                        className={`flex-1 text-sm text-[#463939] px-3 py-1.5 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D]'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
+                        style={{fontFamily: 'var(--font-body)'}}
+                        onClick={isEditing ? () => setTimeEntriesExpanded(!timeEntriesExpanded) : undefined}
+                      >
                         {formatMinutes(totalTimeTracked)}
-                      </span>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Time Tracking Section - Only visible when expanded and in edit mode */}
-                {mode === "edit" && timeEntriesExpanded && (
-                  <div className="space-y-3 pt-4 border-t border-[#E5E5E5]">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-[#407B9D]" />
-                      <h3 className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
-                        Time Entries
-                      </h3>
-                    </div>
-
-                    {/* Time Entries List */}
+                {/* Time Tracking Section - Only editable when isEditing is true */}
+                {mode === "edit" && isEditing && timeEntriesExpanded && (
+                  <div className="col-span-2 space-y-3 pt-4 border-t border-[#E5E5E5]">
+                    {/* Time Entries List - Collapsible */}
                     {timeEntries.length > 0 && (
-                      <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                        {timeEntries.map((entry) => (
-                          <div
-                            key={entry.id}
-                            className="flex items-center justify-between p-2 bg-[#F5F5F5] rounded hover:bg-[#E5E5E5] transition-colors group"
-                          >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
-                                  {formatMinutes(entry.duration)}
-                                </span>
-                                <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                                  {new Date(entry.startTime).toLocaleDateString()} at {new Date(entry.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
+                      <div>
+                        <button
+                          onClick={() => setTimeEntriesListExpanded(!timeEntriesListExpanded)}
+                          className="flex items-center gap-2 text-sm font-semibold text-[#463939] hover:text-[#407B9D] transition-colors"
+                          style={{fontFamily: 'var(--font-body)'}}
+                        >
+                          <Clock className="w-4 h-4" />
+                          <span>Time Entries ({timeEntries.length})</span>
+                          <ChevronDown className={`w-4 h-4 transition-transform ${timeEntriesListExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                        {timeEntriesListExpanded && (
+                          <div className="space-y-2 max-h-[200px] overflow-y-auto mt-2">
+                            {timeEntries.map((entry) => (
+                              <div
+                                key={entry.id}
+                                className="flex items-center justify-between p-2 bg-[#F5F5F5] rounded hover:bg-[#E5E5E5] transition-colors group"
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                                      {formatMinutes(entry.duration)}
+                                    </span>
+                                    <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                                      {new Date(entry.startTime).toLocaleDateString()} at {new Date(entry.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  {entry.notes && !entry.notes.startsWith('Manual entry:') && (
+                                    <p className="text-xs text-[#666666] mt-1 line-clamp-1" style={{fontFamily: 'var(--font-body)'}}>
+                                      {entry.notes}
+                                    </p>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteTimeEntry(entry.id)}
+                                  className="ml-2 text-[#666666] hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
                               </div>
-                              {entry.notes && (
-                                <p className="text-xs text-[#666666] mt-1 line-clamp-1" style={{fontFamily: 'var(--font-body)'}}>
-                                  {entry.notes}
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => handleDeleteTimeEntry(entry.id)}
-                              className="ml-2 text-[#666666] hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
 
@@ -569,24 +652,25 @@ export function ProjectDetailModal({
                 )}
 
                 {/* Notes Section */}
-                <div className="space-y-2 pt-4 border-t border-[#E5E5E5]">
+                <div className="col-span-2 space-y-2 pt-4 border-t border-[#E5E5E5]">
                   <h3 className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
                     Notes
                   </h3>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    onBlur={saveChanges}
+                    disabled={!isEditing}
                     placeholder="Add any notes or details about this project..."
-                    className="w-full min-h-[100px] rounded-md border border-[#E5E5E5] bg-transparent hover:bg-[#F5F5F5] focus:bg-white px-3 py-2 text-sm transition-colors"
+                    className="w-full min-h-[100px] rounded-md border border-[#E5E5E5] bg-white px-3 py-2 text-sm outline-none hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all resize-y disabled:cursor-not-allowed disabled:opacity-70"
                     style={{fontFamily: 'var(--font-body)'}}
                   />
                 </div>
               </div>
 
               {/* Footer */}
-              {mode === "edit" && (
-                <div className="px-8 py-4 border-t border-[#E5E5E5] flex justify-end">
+              <div className="px-8 py-4 border-t border-[#E5E5E5] flex justify-between items-center">
+                {/* Delete button (only show in edit mode for existing projects) */}
+                {mode === "edit" && !isEditing && (
                   <button
                     onClick={handleDeleteProject}
                     className="text-[#999999] hover:text-red-600 transition-colors p-2"
@@ -594,8 +678,57 @@ export function ProjectDetailModal({
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+                )}
+                {mode === "edit" && isEditing && <div />}
+                {mode === "create" && <div />}
+
+                {/* Action buttons */}
+                <div className="flex gap-2">
+                  {mode === "create" ? (
+                    <Button
+                      onClick={handleSave}
+                      className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                    >
+                      Create Project
+                    </Button>
+                  ) : isEditing ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditing(false)
+                          // Reset fields to project values
+                          if (project) {
+                            setProjectName(project.projectName)
+                            setCustomer(project.customer)
+                            setSprintLength(project.sprintLength)
+                            setStartDate(project.startDate)
+                            setEndDate(project.endDate)
+                            setStatus(project.status)
+                            setAssignee(project.assignee)
+                            setNotes(project.notes)
+                          }
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSave}
+                        className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                      >
+                        Save Changes
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={() => setIsEditing(true)}
+                      className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                    >
+                      Edit
+                    </Button>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
         </DialogContent>
@@ -623,6 +756,15 @@ export function ProjectDetailModal({
         confirmText="Delete Project"
         cancelText="Cancel"
         variant="danger"
+      />
+
+      {/* Alert Dialog */}
+      <AlertDialog
+        open={alertOpen}
+        onOpenChange={setAlertOpen}
+        title={alertTitle}
+        description={alertDescription}
+        variant={alertVariant}
       />
     </>
   )

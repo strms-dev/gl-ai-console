@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Clock, User, Code, Wrench } from "lucide-react"
+import { ChevronLeft, ChevronRight, Clock, User, Code, Wrench, ChevronDown } from "lucide-react"
 import { TimeEntry, Developer } from "@/lib/dummy-data"
 import { getTimeEntries, getWeekStartDate, formatMinutes, getDevProjects, getMaintTickets } from "@/lib/project-store"
 
@@ -12,6 +12,7 @@ export default function TimeTrackingPage() {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [selectedWeekStart, setSelectedWeekStart] = useState<string>("")
   const [currentWeekStart, setCurrentWeekStart] = useState<string>("")
+  const [timeEntriesExpanded, setTimeEntriesExpanded] = useState(false)
 
   // Load data on mount
   useEffect(() => {
@@ -21,11 +22,38 @@ export default function TimeTrackingPage() {
     setTimeEntries(getTimeEntries())
   }, [])
 
-  // Get all unique weeks from time entries
+  // Generate all weeks from October 1st, 2025 to current week
   const availableWeeks = useMemo(() => {
-    const weeks = new Set(timeEntries.map(e => e.weekStartDate))
-    return Array.from(weeks).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
-  }, [timeEntries])
+    const weeks: string[] = []
+
+    // Start from October 1st, 2025 (find the Monday of that week)
+    const firstDate = new Date('2025-10-01')
+    const firstDayOfWeek = firstDate.getDay()
+    const daysToMonday = firstDayOfWeek === 0 ? -6 : 1 - firstDayOfWeek
+    firstDate.setDate(firstDate.getDate() + daysToMonday)
+    firstDate.setHours(0, 0, 0, 0)
+
+    // Get current week's Monday using the same logic as getWeekStartDate()
+    const today = new Date()
+    const currentDayOfWeek = today.getDay()
+    const daysToCurrentMonday = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek
+    const currentMonday = new Date(today)
+    currentMonday.setDate(currentMonday.getDate() + daysToCurrentMonday)
+    currentMonday.setHours(0, 0, 0, 0)
+
+    // Generate weeks from first week to current week
+    const currentDate = new Date(firstDate)
+    const currentMondayTimestamp = currentMonday.getTime()
+
+    while (currentDate.getTime() <= currentMondayTimestamp) {
+      const weekStart = currentDate.toISOString().split('T')[0]
+      weeks.push(weekStart)
+      currentDate.setDate(currentDate.getDate() + 7)
+    }
+
+    // Sort in reverse (most recent first)
+    return weeks.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+  }, [])
 
   // Filter entries for selected week
   const weekEntries = useMemo(() => {
@@ -120,8 +148,9 @@ export default function TimeTrackingPage() {
   }
 
   const isCurrentWeek = selectedWeekStart === currentWeekStart
-  const canGoPrevious = availableWeeks.indexOf(selectedWeekStart) < availableWeeks.length - 1
-  const canGoNext = availableWeeks.indexOf(selectedWeekStart) > 0
+  const currentIndex = availableWeeks.indexOf(selectedWeekStart)
+  const canGoPrevious = currentIndex < availableWeeks.length - 1
+  const canGoNext = currentIndex > 0 && !isCurrentWeek
 
   return (
     <div className="p-8">
@@ -308,63 +337,76 @@ export default function TimeTrackingPage() {
       {/* Time Entries Detail */}
       <Card>
         <CardHeader>
-          <CardTitle style={{fontFamily: 'var(--font-heading)'}}>
-            Time Entries ({weekEntries.length})
-          </CardTitle>
+          <button
+            onClick={() => setTimeEntriesExpanded(!timeEntriesExpanded)}
+            className="flex items-center gap-2 w-full hover:opacity-80 transition-opacity"
+          >
+            <CardTitle style={{fontFamily: 'var(--font-heading)'}}>
+              Time Entries ({weekEntries.length})
+            </CardTitle>
+            <ChevronDown className={`w-5 h-5 text-[#666666] transition-transform ${timeEntriesExpanded ? 'rotate-180' : ''}`} />
+          </button>
         </CardHeader>
-        <CardContent>
-          {weekEntries.length === 0 ? (
-            <div className="text-center py-12">
-              <Clock className="w-12 h-12 text-[#999999] mx-auto mb-4" />
-              <p className="text-[#999999]" style={{fontFamily: 'var(--font-body)'}}>
-                No time entries for this week
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {weekEntries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-center justify-between p-4 rounded-lg border border-[#E5E5E5] hover:border-[#407B9D] transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Badge className={
-                        entry.projectType === "development"
-                          ? "bg-[#95CBD7] text-[#463939] hover:bg-[#95CBD7]/90 border-none"
-                          : "bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/90 border-none"
-                      }>
-                        {entry.projectType === "development" ? "Development" : "Maintenance"}
-                      </Badge>
-                      <span className="font-medium text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
-                        {getProjectName(entry)}
-                      </span>
+        {timeEntriesExpanded && (
+          <CardContent>
+            {weekEntries.length === 0 ? (
+              <div className="text-center py-12">
+                <Clock className="w-12 h-12 text-[#999999] mx-auto mb-4" />
+                <p className="text-[#999999]" style={{fontFamily: 'var(--font-body)'}}>
+                  No time entries for this week
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {weekEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between p-4 rounded-lg border border-[#E5E5E5] hover:border-[#407B9D] transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Badge className={
+                          entry.projectType === "development"
+                            ? "bg-[#95CBD7] text-[#463939] hover:bg-[#95CBD7]/90 border-none"
+                            : "bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/90 border-none"
+                        }>
+                          {entry.projectType === "development" ? "Development" : "Maintenance"}
+                        </Badge>
+                        <span className="font-medium text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
+                          {getProjectName(entry)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                          {new Date(entry.startTime).toLocaleDateString()} at {new Date(entry.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      {entry.notes && (
+                        <p className="text-sm text-[#666666] ml-0" style={{fontFamily: 'var(--font-body)'}}>
+                          {entry.notes}
+                        </p>
+                      )}
                     </div>
-                    {entry.notes && (
-                      <p className="text-sm text-[#666666] ml-0" style={{fontFamily: 'var(--font-body)'}}>
-                        {entry.notes}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-[#407B9D]" />
+                        <span className="text-sm text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                          {entry.assignee}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-[#407B9D]" />
+                        <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                          {formatMinutes(entry.duration)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-[#407B9D]" />
-                      <span className="text-sm text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                        {entry.assignee}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-[#407B9D]" />
-                      <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
-                        {formatMinutes(entry.duration)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
     </div>
   )

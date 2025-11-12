@@ -12,12 +12,15 @@ import {
   getDevProjects,
   getMaintTickets,
   updateDevProjectPriority,
-  updateMaintTicketPriority
+  updateMaintTicketPriority,
+  deleteDevProject,
+  deleteMaintTicket
 } from "@/lib/project-store"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Search, GripVertical, Clock, Calendar, Plus } from "lucide-react"
+import { Search, GripVertical, Clock, Calendar, Plus, Trash2 } from "lucide-react"
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { cn } from "@/lib/utils"
 import { ProjectDetailModal } from "@/components/project-management/project-detail-modal"
 import { TicketDetailModal } from "@/components/maintenance/ticket-detail-modal"
@@ -40,6 +43,7 @@ interface UnifiedWorkItem {
   startDate: string
   endDate: string
   priority: number
+  completedDate?: string
   data: DevelopmentProject | MaintenanceTicket
 }
 
@@ -48,6 +52,8 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
   const [searchQuery, setSearchQuery] = useState("")
   const [workItems, setWorkItems] = useState<UnifiedWorkItem[]>([])
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<UnifiedWorkItem | null>(null)
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
   const [dropPosition, setDropPosition] = useState<'above' | 'below' | null>(null)
   const [selectedItem, setSelectedItem] = useState<UnifiedWorkItem | null>(null)
@@ -98,6 +104,7 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
       startDate: p.startDate,
       endDate: p.endDate,
       priority: p.priority,
+      completedDate: p.completedDate,
       data: p
     }))
 
@@ -112,11 +119,24 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
       startDate: t.startDate,
       endDate: t.endDate,
       priority: t.priority,
+      completedDate: t.completedDate,
       data: t
     }))
 
-    // Combine and sort by priority
-    const combined = [...devItems, ...maintItems].sort((a, b) => a.priority - b.priority)
+    // Combine and sort
+    let combined = [...devItems, ...maintItems]
+
+    // Sort by completion date (most recent first) for completed view, or by priority for active view
+    if (viewMode === "completed") {
+      combined.sort((a, b) => {
+        // Sort by completion date descending (most recent first)
+        const dateA = a.completedDate ? new Date(a.completedDate).getTime() : 0
+        const dateB = b.completedDate ? new Date(b.completedDate).getTime() : 0
+        return dateB - dateA
+      })
+    } else {
+      combined.sort((a, b) => a.priority - b.priority)
+    }
 
     setWorkItems(combined)
   }, [developer, viewMode])
@@ -148,6 +168,13 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
     return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
   }
 
+  // Format completion date
+  const formatCompletedDate = (date?: string): string => {
+    if (!date) return "Unknown"
+    const completedDate = new Date(date)
+    return completedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
   // Handle item click
   const handleItemClick = (item: UnifiedWorkItem) => {
     setSelectedItem(item)
@@ -162,9 +189,11 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
 
   // Handle item updated
   const handleItemUpdated = () => {
+    console.log('handleItemUpdated called - reloading work items')
     // Reload work items to reflect changes
     const devProjects = getDevProjects()
     const maintTickets = getMaintTickets()
+    console.log('Loaded projects:', devProjects.length, 'tickets:', maintTickets.length)
 
     const devFiltered = devProjects.filter(p => p.assignee === developer)
     const maintFiltered = maintTickets.filter(t => t.assignee === developer)
@@ -199,6 +228,7 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
       startDate: p.startDate,
       endDate: p.endDate,
       priority: p.priority,
+      completedDate: p.completedDate,
       data: p
     }))
 
@@ -213,10 +243,25 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
       startDate: t.startDate,
       endDate: t.endDate,
       priority: t.priority,
+      completedDate: t.completedDate,
       data: t
     }))
 
-    const combined = [...devItems, ...maintItems].sort((a, b) => a.priority - b.priority)
+    // Combine and sort
+    let combined = [...devItems, ...maintItems]
+
+    // Sort by completion date (most recent first) for completed view, or by priority for active view
+    if (viewMode === "completed") {
+      combined.sort((a, b) => {
+        // Sort by completion date descending (most recent first)
+        const dateA = a.completedDate ? new Date(a.completedDate).getTime() : 0
+        const dateB = b.completedDate ? new Date(b.completedDate).getTime() : 0
+        return dateB - dateA
+      })
+    } else {
+      combined.sort((a, b) => a.priority - b.priority)
+    }
+
     setWorkItems(combined)
   }
 
@@ -224,6 +269,26 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
   const handleItemDeleted = () => {
     handleModalClose()
     handleItemUpdated()
+  }
+
+  // Handle delete button click
+  const handleDeleteClick = (e: React.MouseEvent, item: UnifiedWorkItem) => {
+    e.stopPropagation() // Prevent opening the modal
+    setItemToDelete(item)
+    setDeleteConfirmOpen(true)
+  }
+
+  // Confirm delete
+  const confirmDelete = () => {
+    if (itemToDelete) {
+      if (itemToDelete.type === "dev") {
+        deleteDevProject(itemToDelete.id)
+      } else {
+        deleteMaintTicket(itemToDelete.id)
+      }
+      setItemToDelete(null)
+      handleItemUpdated()
+    }
   }
 
   // Handle project created
@@ -435,14 +500,15 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
             {filteredItems.map((item) => (
               <div
                 key={item.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, item.id)}
-                onDragEnd={handleDragEnd}
-                onDragOver={(e) => handleDragOver(e, item.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, item.id)}
+                draggable={viewMode === "active"}
+                onDragStart={(e) => viewMode === "active" ? handleDragStart(e, item.id) : undefined}
+                onDragEnd={viewMode === "active" ? handleDragEnd : undefined}
+                onDragOver={(e) => viewMode === "active" ? handleDragOver(e, item.id) : undefined}
+                onDragLeave={viewMode === "active" ? handleDragLeave : undefined}
+                onDrop={(e) => viewMode === "active" ? handleDrop(e, item.id) : undefined}
                 className={cn(
-                  "flex items-center gap-4 p-4 transition-all cursor-move relative",
+                  "flex items-center gap-4 p-4 transition-all relative group",
+                  viewMode === "active" ? "cursor-move" : "cursor-default",
                   "hover:bg-[#95CBD7]/10",
                   draggedItemId === item.id && "opacity-30 bg-gray-100"
                 )}
@@ -462,10 +528,12 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
                   </div>
                 )}
 
-                {/* Drag Handle */}
-                <div className="flex-shrink-0">
-                  <GripVertical className="w-5 h-5 text-muted-foreground" />
-                </div>
+                {/* Drag Handle (only show for active items) */}
+                {viewMode === "active" && (
+                  <div className="flex-shrink-0">
+                    <GripVertical className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                )}
 
                 {/* Content */}
                 <div
@@ -518,14 +586,16 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
                     </span>
                   </div>
 
-                  {/* Date Range */}
+                  {/* Date Range or Completion Date */}
                   <div className="col-span-2 flex items-center gap-1">
                     <Calendar className="w-3 h-3 text-muted-foreground" />
                     <span
                       className="text-xs text-muted-foreground"
                       style={{ fontFamily: 'var(--font-body)' }}
                     >
-                      {formatDateRange(item.startDate, item.endDate)}
+                      {viewMode === "completed"
+                        ? formatCompletedDate(item.completedDate)
+                        : formatDateRange(item.startDate, item.endDate)}
                     </span>
                   </div>
 
@@ -536,6 +606,15 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
                     </Badge>
                   </div>
                 </div>
+
+                {/* Delete Button */}
+                <button
+                  onClick={(e) => handleDeleteClick(e, item)}
+                  className="flex-shrink-0 text-[#999999] hover:text-red-600 transition-colors p-2 opacity-0 group-hover:opacity-100"
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             ))}
           </div>
@@ -545,7 +624,11 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
       {/* Summary */}
       <div className="flex items-center justify-between text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
         <span>{filteredItems.length} {filteredItems.length === 1 ? 'item' : 'items'}</span>
-        <span>Drag items to reorder by priority</span>
+        <span>
+          {viewMode === "completed"
+            ? "Sorted by completion date (most recent first)"
+            : "Drag items to reorder by priority"}
+        </span>
       </div>
 
       {/* Detail Modals */}
@@ -588,6 +671,18 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
         open={createTicketModalOpen}
         onOpenChange={setCreateTicketModalOpen}
         onTicketCreated={handleTicketCreated}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={confirmDelete}
+        title={`Delete ${itemToDelete?.type === "dev" ? "Project" : "Ticket"}`}
+        description={`Are you sure you want to delete "${itemToDelete?.name}"? This action cannot be undone and all associated time entries will be lost.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
       />
     </div>
   )
