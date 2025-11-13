@@ -13,6 +13,7 @@ export default function TimeTrackingPage() {
   const [selectedWeekStart, setSelectedWeekStart] = useState<string>("")
   const [currentWeekStart, setCurrentWeekStart] = useState<string>("")
   const [timeEntriesExpanded, setTimeEntriesExpanded] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   // Load data on mount
   useEffect(() => {
@@ -114,6 +115,71 @@ export default function TimeTrackingPage() {
       const ticket = tickets.find(t => t.id === entry.projectId)
       return ticket?.ticketTitle || "Unknown Ticket"
     }
+  }
+
+  // Group time entries by developer, then by project/ticket
+  const groupedByDeveloper = useMemo(() => {
+    const developerGroups = new Map<string, {
+      developer: string
+      totalMinutes: number
+      projects: Map<string, {
+        projectId: string
+        projectName: string
+        projectType: "development" | "maintenance"
+        entries: TimeEntry[]
+        totalMinutes: number
+      }>
+    }>()
+
+    weekEntries.forEach(entry => {
+      // Get or create developer group
+      if (!developerGroups.has(entry.assignee)) {
+        developerGroups.set(entry.assignee, {
+          developer: entry.assignee,
+          totalMinutes: 0,
+          projects: new Map()
+        })
+      }
+
+      const devGroup = developerGroups.get(entry.assignee)!
+      devGroup.totalMinutes += entry.duration
+
+      // Get or create project group within developer
+      const projectKey = `${entry.projectType}-${entry.projectId}`
+      if (!devGroup.projects.has(projectKey)) {
+        devGroup.projects.set(projectKey, {
+          projectId: entry.projectId,
+          projectName: getProjectName(entry),
+          projectType: entry.projectType,
+          entries: [],
+          totalMinutes: 0
+        })
+      }
+
+      const projectGroup = devGroup.projects.get(projectKey)!
+      projectGroup.entries.push(entry)
+      projectGroup.totalMinutes += entry.duration
+    })
+
+    // Convert to array and sort developers by total minutes (descending)
+    return Array.from(developerGroups.values())
+      .sort((a, b) => b.totalMinutes - a.totalMinutes)
+      .map(devGroup => ({
+        ...devGroup,
+        projects: Array.from(devGroup.projects.values())
+          .sort((a, b) => b.totalMinutes - a.totalMinutes)
+      }))
+  }, [weekEntries])
+
+  // Toggle group expansion
+  const toggleGroup = (groupKey: string) => {
+    const newExpanded = new Set(expandedGroups)
+    if (newExpanded.has(groupKey)) {
+      newExpanded.delete(groupKey)
+    } else {
+      newExpanded.add(groupKey)
+    }
+    setExpandedGroups(newExpanded)
   }
 
   // Navigation handlers
@@ -349,7 +415,7 @@ export default function TimeTrackingPage() {
         </CardHeader>
         {timeEntriesExpanded && (
           <CardContent>
-            {weekEntries.length === 0 ? (
+            {groupedByDeveloper.length === 0 ? (
               <div className="text-center py-12">
                 <Clock className="w-12 h-12 text-[#999999] mx-auto mb-4" />
                 <p className="text-[#999999]" style={{fontFamily: 'var(--font-body)'}}>
@@ -357,52 +423,114 @@ export default function TimeTrackingPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {weekEntries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between p-4 rounded-lg border border-[#E5E5E5] hover:border-[#407B9D] transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <Badge className={
-                          entry.projectType === "development"
-                            ? "bg-[#95CBD7] text-[#463939] hover:bg-[#95CBD7]/90 border-none"
-                            : "bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/90 border-none"
-                        }>
-                          {entry.projectType === "development" ? "Development" : "Maintenance"}
-                        </Badge>
-                        <span className="font-medium text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
-                          {getProjectName(entry)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                          {new Date(entry.startTime).toLocaleDateString()} at {new Date(entry.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      {entry.notes && (
-                        <p className="text-sm text-[#666666] ml-0" style={{fontFamily: 'var(--font-body)'}}>
-                          {entry.notes}
-                        </p>
+              <div className="space-y-4">
+                {groupedByDeveloper.map((devGroup) => {
+                  const devKey = `dev-${devGroup.developer}`
+                  const isDevExpanded = expandedGroups.has(devKey)
+
+                  return (
+                    <div key={devKey} className="border-2 border-[#407B9D] rounded-lg overflow-hidden">
+                      {/* Developer Header */}
+                      <button
+                        onClick={() => toggleGroup(devKey)}
+                        className="w-full p-4 flex items-center justify-between bg-[#407B9D]/5 hover:bg-[#407B9D]/10 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <ChevronDown className={`w-5 h-5 text-[#407B9D] transition-transform ${isDevExpanded ? 'rotate-180' : ''}`} />
+                          <User className="w-5 h-5 text-[#407B9D]" />
+                          <span className="text-lg font-semibold text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
+                            {devGroup.developer}
+                          </span>
+                          <span className="text-sm text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                            ({devGroup.projects.length} {devGroup.projects.length === 1 ? 'project' : 'projects'})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-5 h-5 text-[#407B9D]" />
+                          <span className="text-lg font-bold text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
+                            {formatMinutes(devGroup.totalMinutes)}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Projects for this Developer */}
+                      {isDevExpanded && (
+                        <div className="p-4 space-y-3 bg-white">
+                          {devGroup.projects.map((project) => {
+                            const projectKey = `${devKey}-${project.projectType}-${project.projectId}`
+                            const isProjectExpanded = expandedGroups.has(projectKey)
+
+                            return (
+                              <div key={projectKey} className="border border-[#E5E5E5] rounded-lg overflow-hidden">
+                                {/* Project Header */}
+                                <button
+                                  onClick={() => toggleGroup(projectKey)}
+                                  className="w-full p-3 flex items-center justify-between hover:bg-[#F5F5F5] transition-colors"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <ChevronDown className={`w-4 h-4 text-[#666666] transition-transform ${isProjectExpanded ? 'rotate-180' : ''}`} />
+                                    <Badge className={
+                                      project.projectType === "development"
+                                        ? "bg-[#95CBD7] text-[#463939] hover:bg-[#95CBD7]/90 border-none"
+                                        : "bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/90 border-none"
+                                    }>
+                                      {project.projectType === "development" ? "Development" : "Maintenance"}
+                                    </Badge>
+                                    <span className="font-medium text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
+                                      {project.projectName}
+                                    </span>
+                                    <span className="text-xs text-[#999999]" style={{fontFamily: 'var(--font-body)'}}>
+                                      ({project.entries.length} {project.entries.length === 1 ? 'entry' : 'entries'})
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-[#407B9D]" />
+                                    <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                                      {formatMinutes(project.totalMinutes)}
+                                    </span>
+                                  </div>
+                                </button>
+
+                                {/* Individual Entries */}
+                                {isProjectExpanded && (
+                                  <div className="border-t border-[#E5E5E5] bg-[#FAFAFA]">
+                                    {project.entries.map((entry) => (
+                                      <div
+                                        key={entry.id}
+                                        className="p-3 border-b border-[#E5E5E5] last:border-b-0 hover:bg-white transition-colors"
+                                      >
+                                        <div className="flex items-start justify-between">
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2">
+                                              <span className="text-sm text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                                                {new Date(entry.startTime).toLocaleDateString()} at {new Date(entry.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                              </span>
+                                            </div>
+                                            {entry.notes && (
+                                              <p className="text-sm text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                                                {entry.notes}
+                                              </p>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-2 ml-4">
+                                            <Clock className="w-4 h-4 text-[#407B9D]" />
+                                            <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                                              {formatMinutes(entry.duration)}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-[#407B9D]" />
-                        <span className="text-sm text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                          {entry.assignee}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-[#407B9D]" />
-                        <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
-                          {formatMinutes(entry.duration)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </CardContent>

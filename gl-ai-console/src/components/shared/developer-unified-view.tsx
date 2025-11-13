@@ -163,15 +163,20 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
   // Format date range
   const formatDateRange = (start: string, end: string): string => {
     if (!start || !end) return "Not scheduled"
-    const startDate = new Date(start)
-    const endDate = new Date(end)
+    // Parse dates as local dates to avoid timezone shifts
+    const [startYear, startMonth, startDay] = start.split('-').map(Number)
+    const [endYear, endMonth, endDay] = end.split('-').map(Number)
+    const startDate = new Date(startYear, startMonth - 1, startDay)
+    const endDate = new Date(endYear, endMonth - 1, endDay)
     return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
   }
 
   // Format completion date
   const formatCompletedDate = (date?: string): string => {
     if (!date) return "Unknown"
-    const completedDate = new Date(date)
+    // Parse date as local date to avoid timezone shifts
+    const [year, month, day] = date.split('-').map(Number)
+    const completedDate = new Date(year, month - 1, day)
     return completedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
@@ -476,7 +481,7 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
         <Input
           type="text"
-          placeholder="Search projects and tickets..."
+          placeholder="Search by project/ticket name or customer..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10"

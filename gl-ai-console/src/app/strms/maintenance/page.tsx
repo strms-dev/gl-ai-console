@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, User, Calendar, Clock, AlertCircle } from "lucide-react"
-import { MaintenanceTicket, maintStageLabels, maintStageColors, sprintLengthLabels } from "@/lib/dummy-data"
+import { MaintenanceTicket, maintStageLabels, maintStageColors, sprintLengthLabels, Developer } from "@/lib/dummy-data"
 import { getMaintTickets, updateMaintTicket, addMaintTicket, deleteMaintTicket, formatMinutes } from "@/lib/project-store"
 import { KanbanBoard, StageConfig } from "@/components/shared/kanban-board"
 import { ListView, ColumnConfig } from "@/components/shared/list-view"
@@ -16,13 +16,12 @@ import { TicketDetailModal } from "@/components/maintenance/ticket-detail-modal"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
-type SortField = "ticketTitle" | "customer" | "assignee" | "lastActivity"
-type SortOrder = "asc" | "desc"
+type StatusFilter = "all" | "active" | "completed"
 
 export default function MaintenancePage() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [sortField, setSortField] = useState<SortField>("lastActivity")
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [tickets, setTickets] = useState<MaintenanceTicket[]>([])
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
@@ -170,68 +169,46 @@ export default function MaintenancePage() {
     setDetailModalOpen(true)
   }
 
-  // Filter and sort tickets
+  // Filter tickets
   const filteredAndSortedTickets = useMemo(() => {
     let filtered = tickets
+
+    // Filter by assignee
+    if (assigneeFilter !== "all") {
+      filtered = filtered.filter(ticket => ticket.assignee === assigneeFilter)
+    }
+
+    // Filter by status
+    if (statusFilter === "active") {
+      filtered = filtered.filter(ticket =>
+        ticket.status === "errors-logged" ||
+        ticket.status === "on-hold" ||
+        ticket.status === "fix-requests" ||
+        ticket.status === "in-progress"
+      )
+    } else if (statusFilter === "completed") {
+      filtered = filtered.filter(ticket =>
+        ticket.status === "closed"
+      )
+    }
 
     // Filter by search term
     if (searchTerm) {
       const search = searchTerm.toLowerCase()
-      filtered = tickets.filter(ticket =>
+      filtered = filtered.filter(ticket =>
         ticket.ticketTitle.toLowerCase().includes(search) ||
-        ticket.customer.toLowerCase().includes(search) ||
-        ticket.assignee.toLowerCase().includes(search)
+        ticket.customer.toLowerCase().includes(search)
       )
     }
 
-    // Sort tickets
+    // Sort by last activity (most recent first)
     return filtered.sort((a, b) => {
-      let aValue: string | number
-      let bValue: string | number
-
-      switch (sortField) {
-        case "ticketTitle":
-          aValue = a.ticketTitle
-          bValue = b.ticketTitle
-          break
-        case "customer":
-          aValue = a.customer
-          bValue = b.customer
-          break
-        case "assignee":
-          aValue = a.assignee
-          bValue = b.assignee
-          break
-        case "lastActivity":
-          aValue = new Date(a.updatedAt).getTime()
-          bValue = new Date(b.updatedAt).getTime()
-          break
-        default:
-          aValue = new Date(a.updatedAt).getTime()
-          bValue = new Date(b.updatedAt).getTime()
-      }
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        const result = aValue.localeCompare(bValue)
-        return sortOrder === "asc" ? result : -result
-      } else {
-        const result = (aValue as number) - (bValue as number)
-        return sortOrder === "asc" ? result : -result
-      }
+      const aValue = new Date(a.updatedAt).getTime()
+      const bValue = new Date(b.updatedAt).getTime()
+      return bValue - aValue // Descending order (newest first)
     })
-  }, [searchTerm, sortField, sortOrder, tickets])
+  }, [searchTerm, assigneeFilter, statusFilter, tickets])
 
-  // Handle list view sorting
-  const handleSort = (key: string) => {
-    if (key === sortField) {
-      // Toggle order if same field
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc")
-    } else {
-      // Set new field with ascending order
-      setSortField(key as SortField)
-      setSortOrder("asc")
-    }
-  }
 
   return (
     <div className="p-8">
@@ -265,40 +242,40 @@ export default function MaintenancePage() {
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          {/* Search and Sort Controls */}
+          {/* Search and Filter Controls */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="flex-1">
               <Input
-                placeholder="Search by ticket title, customer, or assignee..."
+                placeholder="Search by ticket title or customer..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full"
               />
             </div>
-            {viewMode === "list" && (
-              <div className="flex gap-2">
+            <div className="flex gap-2">
+              <select
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                className="h-10 w-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#407B9D]"
+                style={{fontFamily: 'var(--font-body)'}}
+              >
+                <option value="all">All Assignees</option>
+                <option value="Nick">Nick</option>
+                <option value="Gon">Gon</option>
+              </select>
+              {viewMode === "list" && (
                 <select
-                  value={sortField}
-                  onChange={(e) => setSortField(e.target.value as SortField)}
-                  className="h-10 w-[160px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#407B9D]"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                  className="h-10 w-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#407B9D]"
                   style={{fontFamily: 'var(--font-body)'}}
                 >
-                  <option value="lastActivity">Last Activity</option>
-                  <option value="ticketTitle">Ticket Title</option>
-                  <option value="customer">Customer</option>
-                  <option value="assignee">Assignee</option>
+                  <option value="all">All Statuses</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
                 </select>
-                <select
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                  className="h-10 w-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#407B9D]"
-                  style={{fontFamily: 'var(--font-body)'}}
-                >
-                  <option value="desc">Newest</option>
-                  <option value="asc">Oldest</option>
-                </select>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* View Content */}
@@ -318,9 +295,6 @@ export default function MaintenancePage() {
               items={filteredAndSortedTickets}
               columns={columns}
               onItemClick={handleTicketClick}
-              onSort={handleSort}
-              sortField={sortField}
-              sortOrder={sortOrder}
               emptyMessage="No tickets found"
             />
           )}
@@ -332,6 +306,7 @@ export default function MaintenancePage() {
       <TicketDetailModal
         ticketId={null}
         mode="create"
+        initialAssignee={assigneeFilter !== "all" ? assigneeFilter as Developer : undefined}
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         onTicketCreated={handleTicketCreated}

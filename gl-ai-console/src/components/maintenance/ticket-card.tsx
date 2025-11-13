@@ -1,7 +1,7 @@
 "use client"
 
 import { MaintenanceTicket, maintStageColors, sprintLengthLabels } from "@/lib/dummy-data"
-import { formatMinutes } from "@/lib/project-store"
+import { formatMinutes, formatDate } from "@/lib/project-store"
 import { User, Clock, Calendar, AlertCircle, Wrench } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -78,11 +78,11 @@ export function TicketCard({ ticket }: TicketCardProps) {
         {ticket.startDate && (
           <div className="flex items-center gap-2 text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
             <Calendar className="w-3.5 h-3.5 text-[#407B9D]" />
-            <span>{new Date(ticket.startDate).toLocaleDateString()}</span>
+            <span>{formatDate(ticket.startDate)}</span>
             {ticket.endDate && (
               <>
                 <span>→</span>
-                <span>{new Date(ticket.endDate).toLocaleDateString()}</span>
+                <span>{formatDate(ticket.endDate)}</span>
               </>
             )}
           </div>

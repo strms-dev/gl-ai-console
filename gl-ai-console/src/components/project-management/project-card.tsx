@@ -1,7 +1,7 @@
 "use client"
 
 import { DevelopmentProject, devStageColors, sprintLengthLabels } from "@/lib/dummy-data"
-import { formatMinutes } from "@/lib/project-store"
+import { formatMinutes, formatDate } from "@/lib/project-store"
 import { User, Clock, Calendar } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -62,11 +62,11 @@ export function ProjectCard({ project }: ProjectCardProps) {
         {project.startDate && (
           <div className="flex items-center gap-2 text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
             <Calendar className="w-3.5 h-3.5 text-[#407B9D]" />
-            <span>{new Date(project.startDate).toLocaleDateString()}</span>
+            <span>{formatDate(project.startDate)}</span>
             {project.endDate && (
               <>
                 <span>→</span>
-                <span>{new Date(project.endDate).toLocaleDateString()}</span>
+                <span>{formatDate(project.endDate)}</span>
               </>
             )}
           </div>

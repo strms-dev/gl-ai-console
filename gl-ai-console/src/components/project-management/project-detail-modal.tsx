@@ -43,7 +43,7 @@ export function ProjectDetailModal({
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [status, setStatus] = useState<DevelopmentStatus>("setup")
-  const [assignee, setAssignee] = useState<Developer>("Nick")
+  const [assignee, setAssignee] = useState<Developer | "">("")
   const [notes, setNotes] = useState("")
 
   // Time tracking
@@ -98,7 +98,7 @@ export function ProjectDetailModal({
         setStartDate("")
         setEndDate("")
         setStatus("" as DevelopmentStatus)
-        setAssignee(initialAssignee || "Nick")
+        setAssignee(initialAssignee || "")
         setNotes("")
         setTimeEntries([])
         setLoading(false)

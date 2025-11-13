@@ -83,12 +83,17 @@ export function addDevProject(project: Omit<DevelopmentProject, 'id' | 'createdA
   const newId = `dev-${maxId + 1}`
 
   const now = new Date().toISOString()
+
+  // If project is created with a completed status, set completedDate
+  const completedDate = (project.status === "complete" || project.status === "cancelled") ? now : undefined
+
   const newProject: DevelopmentProject = {
     ...project,
     id: newId,
     lastActivity: "Just now",
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    completedDate
   }
 
   projects.push(newProject)
@@ -206,12 +211,17 @@ export function addMaintTicket(ticket: Omit<MaintenanceTicket, 'id' | 'createdAt
   const newId = `maint-${maxId + 1}`
 
   const now = new Date().toISOString()
+
+  // If ticket is created with a closed status, set completedDate
+  const completedDate = ticket.status === "closed" ? now : undefined
+
   const newTicket: MaintenanceTicket = {
     ...ticket,
     id: newId,
     lastActivity: "Just now",
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    completedDate
   }
 
   tickets.push(newTicket)
@@ -397,6 +407,20 @@ export function formatMinutes(minutes: number): string {
   if (hours === 0) return `${mins}m`
   if (mins === 0) return `${hours}h`
   return `${hours}h ${mins}m`
+}
+
+/**
+ * Format date string (YYYY-MM-DD) to localized date without timezone conversion
+ * This prevents dates from shifting due to timezone offsets
+ */
+export function formatDate(dateString: string): string {
+  if (!dateString) return ""
+
+  // Parse the date string as local date (YYYY-MM-DD format)
+  const [year, month, day] = dateString.split('-').map(Number)
+  const date = new Date(year, month - 1, day) // month is 0-indexed
+
+  return date.toLocaleDateString()
 }
 
 /**

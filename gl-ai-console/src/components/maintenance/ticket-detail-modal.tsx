@@ -63,7 +63,7 @@ export function TicketDetailModal({
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [status, setStatus] = useState<MaintenanceStatus>("" as MaintenanceStatus)
-  const [assignee, setAssignee] = useState<Developer>("Nick")
+  const [assignee, setAssignee] = useState<Developer | "">("")
   const [notes, setNotes] = useState("")
 
   // Time tracking
@@ -132,7 +132,7 @@ export function TicketDetailModal({
         setStartDate("")
         setEndDate("")
         setStatus("" as MaintenanceStatus)
-        setAssignee(initialAssignee || "Nick")
+        setAssignee(initialAssignee || "")
         setNotes("")
         setTimeEntries([])
         setIsEditing(true) // Start in edit mode for create
@@ -348,6 +348,7 @@ export function TicketDetailModal({
 
                 {/* Fields Grid */}
                 <div className="grid grid-cols-2 gap-x-8 gap-y-4 pt-4">
+                  {/* Row 1: Customer | Status */}
                   {/* Customer */}
                   <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
@@ -371,104 +372,6 @@ export function TicketDetailModal({
                         <div className="text-sm text-[#463939] px-3 py-1.5" style={{fontFamily: 'var(--font-body)'}}>
                           {customer || "Not set"}
                         </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Number of Errors */}
-                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
-                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
-                      Number of Errors
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={numberOfErrors}
-                      onChange={(e) => setNumberOfErrors(parseInt(e.target.value) || 0)}
-                      disabled={!isEditing}
-                      className={`text-sm text-[#463939] outline-none flex-1 px-3 py-1.5 transition-all ${
-                        isEditing
-                          ? 'bg-white border border-[#E5E5E5] rounded-md hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
-                          : 'border-none bg-transparent cursor-default'
-                      }`}
-                      style={{fontFamily: 'var(--font-body)'}}
-                    />
-                  </div>
-
-                  {/* Assignee */}
-                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
-                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
-                      Assignee
-                    </span>
-                    <div className="flex-1 flex items-center gap-2">
-                      <select
-                        disabled={!isEditing}
-                        value={assignee}
-                        onChange={(e) => {
-                          setAssignee(e.target.value as Developer)
-
-                        }}
-                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
-                          isEditing
-                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
-                            : 'border-none bg-transparent cursor-default'
-                        }`}
-                        style={{fontFamily: 'var(--font-body)'}}
-                      >
-                        <option value="">Select assignee...</option>
-                        <option value="Nick">Nick</option>
-                        <option value="Gon">Gon</option>
-                      </select>
-                      {assignee && isEditing && (
-                        <button
-                          onClick={() => {
-                            setAssignee("Nick")
-
-                          }}
-                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
-                          title="Clear selection"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Ticket Type */}
-                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
-                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
-                      Ticket Type
-                    </span>
-                    <div className="flex-1 flex items-center gap-2">
-                      <select
-                        disabled={!isEditing}
-                        value={ticketType}
-                        onChange={(e) => {
-                          setTicketType(e.target.value as TicketType)
-
-                        }}
-                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
-                          isEditing
-                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
-                            : 'border-none bg-transparent cursor-default'
-                        }`}
-                        style={{fontFamily: 'var(--font-body)'}}
-                      >
-                        <option value="">Select type...</option>
-                        <option value="Maintenance">Maintenance</option>
-                        <option value="Customization">Customization</option>
-                      </select>
-                      {ticketType && isEditing && (
-                        <button
-                          onClick={() => {
-                            setTicketType("Maintenance")
-
-                          }}
-                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
-                          title="Clear selection"
-                        >
-                          <XCircle className="w-4 h-4" />
-                        </button>
                       )}
                     </div>
                   </div>
@@ -505,6 +408,46 @@ export function TicketDetailModal({
                         <button
                           onClick={() => {
                             setStatus("errors-logged")
+
+                          }}
+                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
+                          title="Clear selection"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 2: Assignee | Start Date */}
+                  {/* Assignee */}
+                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
+                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
+                      Assignee
+                    </span>
+                    <div className="flex-1 flex items-center gap-2">
+                      <select
+                        disabled={!isEditing}
+                        value={assignee}
+                        onChange={(e) => {
+                          setAssignee(e.target.value as Developer)
+
+                        }}
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
+                        style={{fontFamily: 'var(--font-body)'}}
+                      >
+                        <option value="">Select assignee...</option>
+                        <option value="Nick">Nick</option>
+                        <option value="Gon">Gon</option>
+                      </select>
+                      {assignee && isEditing && (
+                        <button
+                          onClick={() => {
+                            setAssignee("Nick")
 
                           }}
                           className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
@@ -558,25 +501,45 @@ export function TicketDetailModal({
                     </div>
                   </div>
 
-                  {/* Track Time - Always visible in edit mode, shows total time */}
-                  {mode === "edit" && (
-                    <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
-                      <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
-                        Track Time
-                      </span>
-                      <div
-                        className={`flex-1 text-sm text-[#463939] px-3 py-1.5 transition-all ${
+                  {/* Row 3: Ticket Type | End Date */}
+                  {/* Ticket Type */}
+                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
+                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
+                      Ticket Type
+                    </span>
+                    <div className="flex-1 flex items-center gap-2">
+                      <select
+                        disabled={!isEditing}
+                        value={ticketType}
+                        onChange={(e) => {
+                          setTicketType(e.target.value as TicketType)
+
+                        }}
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
                           isEditing
-                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D]'
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
                             : 'border-none bg-transparent cursor-default'
                         }`}
                         style={{fontFamily: 'var(--font-body)'}}
-                        onClick={isEditing ? () => setTimeEntriesExpanded(!timeEntriesExpanded) : undefined}
                       >
-                        {formatMinutes(totalTimeTracked)}
-                      </div>
+                        <option value="">Select type...</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Customization">Customization</option>
+                      </select>
+                      {ticketType && isEditing && (
+                        <button
+                          onClick={() => {
+                            setTicketType("Maintenance")
+
+                          }}
+                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
+                          title="Clear selection"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   {/* End Date */}
                   <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
@@ -619,6 +582,47 @@ export function TicketDetailModal({
                       )}
                     </div>
                   </div>
+
+                  {/* Row 4: Number of Errors | Track Time (Only edit mode) */}
+                  {/* Number of Errors */}
+                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
+                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
+                      Number of Errors
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={numberOfErrors}
+                      onChange={(e) => setNumberOfErrors(parseInt(e.target.value) || 0)}
+                      disabled={!isEditing}
+                      className={`text-sm text-[#463939] outline-none flex-1 px-3 py-1.5 transition-all ${
+                        isEditing
+                          ? 'bg-white border border-[#E5E5E5] rounded-md hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                          : 'border-none bg-transparent cursor-default'
+                      }`}
+                      style={{fontFamily: 'var(--font-body)'}}
+                    />
+                  </div>
+
+                  {/* Track Time - Always visible in edit mode, shows total time */}
+                  {mode === "edit" && (
+                    <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
+                      <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
+                        Track Time
+                      </span>
+                      <div
+                        className={`flex-1 text-sm text-[#463939] px-3 py-1.5 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D]'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
+                        style={{fontFamily: 'var(--font-body)'}}
+                        onClick={isEditing ? () => setTimeEntriesExpanded(!timeEntriesExpanded) : undefined}
+                      >
+                        {formatMinutes(totalTimeTracked)}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Time Tracking Section - Only editable when isEditing is true */}
