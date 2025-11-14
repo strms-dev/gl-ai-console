@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, User, Calendar, Clock } from "lucide-react"
-import { DevelopmentProject, devStageLabels, devStageColors, sprintLengthLabels, Developer } from "@/lib/dummy-data"
-import { getDevProjects, updateDevProject, addDevProject, deleteDevProject, formatMinutes, formatDate } from "@/lib/project-store"
+import { DevelopmentProject, devStageLabels, devStageColors, sprintLengthLabels, Developer } from "@/lib/types"
+import { getDevProjects, updateDevProject, createDevProject, deleteDevProject } from "@/lib/services/project-service"
+import { formatMinutes, formatDate } from "@/lib/services/time-tracking-service"
 import { KanbanBoard, StageConfig } from "@/components/shared/kanban-board"
 import { ListView, ColumnConfig } from "@/components/shared/list-view"
 import { ViewToggle, ViewMode } from "@/components/shared/view-toggle"
@@ -23,6 +24,7 @@ export default function ProjectManagementPage() {
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [projects, setProjects] = useState<DevelopmentProject[]>([])
+  const [loading, setLoading] = useState(true)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
@@ -30,9 +32,16 @@ export default function ProjectManagementPage() {
 
   // Load projects on mount
   useEffect(() => {
-    const loadProjects = () => {
-      const fetchedProjects = getDevProjects()
-      setProjects(fetchedProjects)
+    const loadProjects = async () => {
+      try {
+        setLoading(true)
+        const fetchedProjects = await getDevProjects()
+        setProjects(fetchedProjects)
+      } catch (error) {
+        console.error("Error loading projects:", error)
+      } finally {
+        setLoading(false)
+      }
     }
     loadProjects()
   }, [])
@@ -143,26 +152,46 @@ export default function ProjectManagementPage() {
   ]
 
   // Handle creating a new project
-  const handleProjectCreated = () => {
-    setProjects(getDevProjects())
+  const handleProjectCreated = async () => {
+    try {
+      const fetchedProjects = await getDevProjects()
+      setProjects(fetchedProjects)
+    } catch (error) {
+      console.error("Error reloading projects:", error)
+    }
   }
 
   // Handle project updated
-  const handleProjectUpdated = () => {
-    setProjects(getDevProjects())
+  const handleProjectUpdated = async () => {
+    try {
+      const fetchedProjects = await getDevProjects()
+      setProjects(fetchedProjects)
+    } catch (error) {
+      console.error("Error reloading projects:", error)
+    }
   }
 
   // Handle project deleted
-  const handleProjectDeleted = () => {
-    setProjects(getDevProjects())
-    setSelectedProjectId(null)
-    setDetailModalOpen(false)
+  const handleProjectDeleted = async () => {
+    try {
+      const fetchedProjects = await getDevProjects()
+      setProjects(fetchedProjects)
+      setSelectedProjectId(null)
+      setDetailModalOpen(false)
+    } catch (error) {
+      console.error("Error reloading projects:", error)
+    }
   }
 
   // Handle stage change from kanban drag-and-drop
-  const handleStageChange = (projectId: string, newStage: string) => {
-    updateDevProject(projectId, { status: newStage as DevelopmentProject["status"] })
-    setProjects(getDevProjects())
+  const handleStageChange = async (projectId: string, newStage: string) => {
+    try {
+      await updateDevProject(projectId, { status: newStage as DevelopmentProject["status"] })
+      const fetchedProjects = await getDevProjects()
+      setProjects(fetchedProjects)
+    } catch (error) {
+      console.error("Error updating project status:", error)
+    }
   }
 
   // Handle project click (open modal)
@@ -282,7 +311,13 @@ export default function ProjectManagementPage() {
           </div>
 
           {/* View Content */}
-          {viewMode === "kanban" ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                Loading projects...
+              </div>
+            </div>
+          ) : viewMode === "kanban" ? (
             <KanbanBoard
               items={filteredAndSortedProjects}
               stages={stages}

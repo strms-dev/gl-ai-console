@@ -1,7 +1,7 @@
 "use client"
 
-import { MaintenanceTicket, maintStageColors, sprintLengthLabels } from "@/lib/dummy-data"
-import { formatMinutes, formatDate } from "@/lib/project-store"
+import { MaintenanceTicket, maintStageColors } from "@/lib/dummy-data"
+import { formatMinutes, formatDate } from "@/lib/services/time-tracking-service"
 import { User, Clock, Calendar, AlertCircle, Wrench } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -37,8 +37,8 @@ export function TicketCard({ ticket }: TicketCardProps) {
         {ticket.customer}
       </p>
 
-      {/* Ticket Type & Sprint Length Badges */}
-      <div className="flex gap-2">
+      {/* Ticket Type & Platform Badges */}
+      <div className="flex gap-2 flex-wrap">
         <Badge className={cn(
           "text-xs border-none",
           ticket.ticketType === "Maintenance"
@@ -47,9 +47,11 @@ export function TicketCard({ ticket }: TicketCardProps) {
         )}>
           {ticket.ticketType}
         </Badge>
-        <Badge className="bg-[#95CBD7] text-[#463939] hover:bg-[#95CBD7]/90 border-none text-xs">
-          {sprintLengthLabels[ticket.sprintLength]}
-        </Badge>
+        {ticket.platform && (
+          <Badge className="bg-[#407B9D] text-white hover:bg-[#407B9D]/90 border-none text-xs">
+            {ticket.platform}
+          </Badge>
+        )}
       </div>
 
       {/* Metadata */}

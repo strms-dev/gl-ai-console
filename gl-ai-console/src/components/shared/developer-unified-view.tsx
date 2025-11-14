@@ -7,15 +7,9 @@ import {
   Developer,
   devStageLabels,
   maintStageLabels
-} from "@/lib/dummy-data"
-import {
-  getDevProjects,
-  getMaintTickets,
-  updateDevProjectPriority,
-  updateMaintTicketPriority,
-  deleteDevProject,
-  deleteMaintTicket
-} from "@/lib/project-store"
+} from "@/lib/types"
+import { getDevProjects, updateDevProjectPriority, deleteDevProject } from "@/lib/services/project-service"
+import { getMaintTickets, updateMaintTicketPriority, deleteMaintTicket } from "@/lib/services/maintenance-service"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -60,11 +54,15 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
   const [modalOpen, setModalOpen] = useState(false)
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false)
   const [createTicketModalOpen, setCreateTicketModalOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   // Load and combine work items
   useEffect(() => {
-    const devProjects = getDevProjects()
-    const maintTickets = getMaintTickets()
+    const loadWorkItems = async () => {
+      try {
+        setLoading(true)
+        const devProjects = await getDevProjects()
+        const maintTickets = await getMaintTickets()
 
     // Filter by developer
     const devFiltered = devProjects.filter(p => p.assignee === developer)
@@ -139,6 +137,13 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
     }
 
     setWorkItems(combined)
+      } catch (error) {
+        console.error("Error loading work items:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadWorkItems()
   }, [developer, viewMode])
 
   // Filter by search query
@@ -174,9 +179,8 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
   // Format completion date
   const formatCompletedDate = (date?: string): string => {
     if (!date) return "Unknown"
-    // Parse date as local date to avoid timezone shifts
-    const [year, month, day] = date.split('-').map(Number)
-    const completedDate = new Date(year, month - 1, day)
+    // Parse ISO timestamp
+    const completedDate = new Date(date)
     return completedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
@@ -193,11 +197,12 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
   }
 
   // Handle item updated
-  const handleItemUpdated = () => {
+  const handleItemUpdated = async () => {
     console.log('handleItemUpdated called - reloading work items')
-    // Reload work items to reflect changes
-    const devProjects = getDevProjects()
-    const maintTickets = getMaintTickets()
+    try {
+      // Reload work items to reflect changes
+      const devProjects = await getDevProjects()
+      const maintTickets = await getMaintTickets()
     console.log('Loaded projects:', devProjects.length, 'tickets:', maintTickets.length)
 
     const devFiltered = devProjects.filter(p => p.assignee === developer)
@@ -268,6 +273,9 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
     }
 
     setWorkItems(combined)
+    } catch (error) {
+      console.error("Error reloading work items:", error)
+    }
   }
 
   // Handle item deleted
@@ -284,15 +292,19 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
   }
 
   // Confirm delete
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (itemToDelete) {
-      if (itemToDelete.type === "dev") {
-        deleteDevProject(itemToDelete.id)
-      } else {
-        deleteMaintTicket(itemToDelete.id)
+      try {
+        if (itemToDelete.type === "dev") {
+          await deleteDevProject(itemToDelete.id)
+        } else {
+          await deleteMaintTicket(itemToDelete.id)
+        }
+        setItemToDelete(null)
+        await handleItemUpdated()
+      } catch (error) {
+        console.error("Error deleting item:", error)
       }
-      setItemToDelete(null)
-      handleItemUpdated()
     }
   }
 
@@ -312,7 +324,7 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
     e.dataTransfer.effectAllowed = "move"
   }
 
-  const handleDragEnd = () => {
+  const handleDragEnd = async () => {
     setDraggedItemId(null)
     setDragOverItemId(null)
     setDropPosition(null)
@@ -338,7 +350,7 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
     setDropPosition(null)
   }
 
-  const handleDrop = (e: React.DragEvent, targetItemId: string) => {
+  const handleDrop = async (e: React.DragEvent, targetItemId: string) => {
     e.preventDefault()
 
     if (!draggedItemId || draggedItemId === targetItemId) {
@@ -353,32 +365,37 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
 
     if (draggedIndex === -1 || targetIndex === -1) return
 
-    // Reorder items
-    const newItems = [...filteredItems]
-    const [draggedItem] = newItems.splice(draggedIndex, 1)
-    newItems.splice(targetIndex, 0, draggedItem)
+    try {
+      // Reorder items
+      const newItems = [...filteredItems]
+      const [draggedItem] = newItems.splice(draggedIndex, 1)
+      newItems.splice(targetIndex, 0, draggedItem)
 
-    // Update priorities
-    newItems.forEach((item, index) => {
-      const newPriority = index + 1
-      if (item.type === "dev") {
-        updateDevProjectPriority(item.id, newPriority)
-      } else {
-        updateMaintTicketPriority(item.id, newPriority)
-      }
-    })
-
-    // Refresh the list
-    setWorkItems(prev => {
-      const updated = [...prev]
-      newItems.forEach((item, index) => {
-        const itemIndex = updated.findIndex(i => i.id === item.id)
-        if (itemIndex !== -1) {
-          updated[itemIndex].priority = index + 1
+      // Update priorities
+      for (let index = 0; index < newItems.length; index++) {
+        const item = newItems[index]
+        const newPriority = index + 1
+        if (item.type === "dev") {
+          await updateDevProjectPriority(item.id, newPriority)
+        } else {
+          await updateMaintTicketPriority(item.id, newPriority)
         }
+      }
+
+      // Refresh the list
+      setWorkItems(prev => {
+        const updated = [...prev]
+        newItems.forEach((item, index) => {
+          const itemIndex = updated.findIndex(i => i.id === item.id)
+          if (itemIndex !== -1) {
+            updated[itemIndex].priority = index + 1
+          }
+        })
+        return updated.sort((a, b) => a.priority - b.priority)
       })
-      return updated.sort((a, b) => a.priority - b.priority)
-    })
+    } catch (error) {
+      console.error("Error updating priorities:", error)
+    }
 
     setDraggedItemId(null)
     setDragOverItemId(null)

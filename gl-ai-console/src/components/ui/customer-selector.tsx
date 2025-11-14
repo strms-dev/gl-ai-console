@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Check, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { getDevProjects, getMaintTickets } from "@/lib/project-store"
+import { getMaintTickets } from "@/lib/services/maintenance-service"
+import { getDevProjects } from "@/lib/services/project-service"
 
 interface CustomerSelectorProps {
   value: string
@@ -18,25 +19,39 @@ export function CustomerSelector({ value, onChange, required = false, showLabel 
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddingNew, setIsAddingNew] = useState(false)
+  const [existingCustomers, setExistingCustomers] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Get unique customers from existing projects and tickets
-  const getExistingCustomers = (): string[] => {
-    const projects = getDevProjects()
-    const tickets = getMaintTickets()
+  // Fetch unique customers from existing projects and tickets
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        setLoading(true)
+        const [projects, tickets] = await Promise.all([
+          getDevProjects(),
+          getMaintTickets()
+        ])
 
-    const allCustomers = [
-      ...projects.map(p => p.customer),
-      ...tickets.map(t => t.customer)
-    ]
+        const allCustomers = [
+          ...projects.map(p => p.customer),
+          ...tickets.map(t => t.customer)
+        ]
 
-    // Get unique, non-empty customers and sort alphabetically
-    const uniqueCustomers = Array.from(new Set(allCustomers.filter(c => c && c.trim())))
-    return uniqueCustomers.sort((a, b) => a.localeCompare(b))
-  }
+        // Get unique, non-empty customers and sort alphabetically
+        const uniqueCustomers = Array.from(new Set(allCustomers.filter(c => c && c.trim())))
+        setExistingCustomers(uniqueCustomers.sort((a, b) => a.localeCompare(b)))
+      } catch (error) {
+        console.error('Error fetching customers:', error)
+        setExistingCustomers([])
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const existingCustomers = getExistingCustomers()
+    fetchCustomers()
+  }, [])
 
   // Filter customers based on search query
   const filteredCustomers = existingCustomers.filter(customer =>
@@ -125,7 +140,11 @@ export function CustomerSelector({ value, onChange, required = false, showLabel 
       {/* Dropdown */}
       {isOpen && (
         <div className="absolute z-[9999] w-full mt-1 bg-white border border-border rounded-md shadow-lg max-h-[240px] overflow-y-auto">
-          {filteredCustomers.length > 0 ? (
+          {loading ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+              Loading customers...
+            </div>
+          ) : filteredCustomers.length > 0 ? (
             <>
               {filteredCustomers.map((customer) => (
                 <div

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { DeveloperUnifiedView } from "@/components/shared/developer-unified-view"
-import { Developer } from "@/lib/dummy-data"
+import { Developer } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 

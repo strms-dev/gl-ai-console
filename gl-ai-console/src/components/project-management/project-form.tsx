@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { DevelopmentProject, SprintLength, Developer, DevelopmentStatus, TimeEntry } from "@/lib/dummy-data"
-import { formatMinutes, getTimeEntriesForProject, addTimeEntry, deleteTimeEntry, getWeekStartDate } from "@/lib/project-store"
+import { formatMinutes, getTimeEntriesForProject, createTimeEntry, deleteTimeEntry, getWeekStartDate } from "@/lib/services/time-tracking-service"
 import { Clock, Trash2 } from "lucide-react"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { CustomerSelector } from "@/components/ui/customer-selector"
@@ -142,12 +142,10 @@ export function ProjectForm({
 
     // Create a new time entry
     const now = new Date()
-    const newEntry = addTimeEntry({
+    const newEntry = createTimeEntry({
       projectId: initialData.id,
       projectType: "development",
       assignee: initialData.assignee,
-      startTime: now.toISOString(),
-      endTime: now.toISOString(),
       duration: minutes,
       notes: timeEntryNotes.trim() || `Manual entry: ${formatMinutes(minutes)}`,
       weekStartDate: getWeekStartDate(now)
@@ -351,7 +349,7 @@ export function ProjectForm({
                             {formatMinutes(entry.duration)}
                           </span>
                           <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                            {new Date(entry.startTime).toLocaleDateString()} at {new Date(entry.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(entry.createdAt).toLocaleDateString()} at {new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                         {entry.notes && (

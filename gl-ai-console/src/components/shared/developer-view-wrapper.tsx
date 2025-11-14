@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { DevelopmentProject, MaintenanceTicket, devStageLabels, devStageColors, maintStageLabels, maintStageColors, sprintLengthLabels, Developer } from "@/lib/dummy-data"
-import { getDevProjects, getMaintTickets, updateDevProject, updateMaintTicket, formatMinutes } from "@/lib/project-store"
+import { getMaintTickets, updateMaintTicket } from "@/lib/services/maintenance-service"
+import { getDevProjects, updateDevProject } from "@/lib/services/project-service"
+import { formatMinutes } from "@/lib/services/time-tracking-service"
 import { DeveloperView, DeveloperViewType } from "@/components/shared/developer-view"
 import { StageConfig } from "@/components/shared/kanban-board"
 import { ColumnConfig } from "@/components/shared/list-view"

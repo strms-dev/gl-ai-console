@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, Clock, User, Code, Wrench, ChevronDown } from "lucide-react"
-import { TimeEntry, Developer } from "@/lib/dummy-data"
-import { getTimeEntries, getWeekStartDate, formatMinutes, getDevProjects, getMaintTickets } from "@/lib/project-store"
+import { TimeEntry, Developer } from "@/lib/types"
+import { getTimeEntries, getWeekStartDate, formatMinutes, formatDate } from "@/lib/services/time-tracking-service"
+import { getDevProjects } from "@/lib/services/project-service"
+import { getMaintTickets } from "@/lib/services/maintenance-service"
 
 export default function TimeTrackingPage() {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
@@ -14,13 +16,25 @@ export default function TimeTrackingPage() {
   const [currentWeekStart, setCurrentWeekStart] = useState<string>("")
   const [timeEntriesExpanded, setTimeEntriesExpanded] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
 
   // Load data on mount
   useEffect(() => {
-    const weekStart = getWeekStartDate()
-    setCurrentWeekStart(weekStart)
-    setSelectedWeekStart(weekStart)
-    setTimeEntries(getTimeEntries())
+    const loadTimeEntries = async () => {
+      try {
+        setLoading(true)
+        const weekStart = getWeekStartDate()
+        setCurrentWeekStart(weekStart)
+        setSelectedWeekStart(weekStart)
+        const entries = await getTimeEntries()
+        setTimeEntries(entries)
+      } catch (error) {
+        console.error("Error loading time entries:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadTimeEntries()
   }, [])
 
   // Generate all weeks from October 1st, 2025 to current week
@@ -104,14 +118,35 @@ export default function TimeTrackingPage() {
       .reduce((sum, entry) => sum + entry.duration, 0)
   }, [weekEntries])
 
+  // Store projects and tickets for lookup
+  const [projects, setProjects] = useState<any[]>([])
+  const [tickets, setTickets] = useState<any[]>([])
+
+  // Load projects and tickets when time entries are loaded
+  useEffect(() => {
+    const loadProjectsAndTickets = async () => {
+      try {
+        const [fetchedProjects, fetchedTickets] = await Promise.all([
+          getDevProjects(),
+          getMaintTickets()
+        ])
+        setProjects(fetchedProjects)
+        setTickets(fetchedTickets)
+      } catch (error) {
+        console.error("Error loading projects and tickets:", error)
+      }
+    }
+    if (timeEntries.length > 0) {
+      loadProjectsAndTickets()
+    }
+  }, [timeEntries])
+
   // Get project/ticket names for entries
   const getProjectName = (entry: TimeEntry): string => {
     if (entry.projectType === "development") {
-      const projects = getDevProjects()
       const project = projects.find(p => p.id === entry.projectId)
       return project?.projectName || "Unknown Project"
     } else {
-      const tickets = getMaintTickets()
       const ticket = tickets.find(t => t.id === entry.projectId)
       return ticket?.ticketTitle || "Unknown Ticket"
     }
@@ -169,7 +204,7 @@ export default function TimeTrackingPage() {
         projects: Array.from(devGroup.projects.values())
           .sort((a, b) => b.totalMinutes - a.totalMinutes)
       }))
-  }, [weekEntries])
+  }, [weekEntries, projects, tickets])
 
   // Toggle group expansion
   const toggleGroup = (groupKey: string) => {
@@ -231,6 +266,14 @@ export default function TimeTrackingPage() {
       </div>
 
       {/* Week Navigation */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+            Loading time entries...
+          </div>
+        </div>
+      ) : (
+        <>
       <Card className="mb-6">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
@@ -503,7 +546,7 @@ export default function TimeTrackingPage() {
                                           <div className="flex-1">
                                             <div className="flex items-center gap-3 mb-2">
                                               <span className="text-sm text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                                                {new Date(entry.startTime).toLocaleDateString()} at {new Date(entry.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {new Date(entry.createdAt).toLocaleDateString()} at {new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                               </span>
                                             </div>
                                             {entry.notes && (
@@ -536,6 +579,8 @@ export default function TimeTrackingPage() {
           </CardContent>
         )}
       </Card>
+        </>
+      )}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { DevelopmentProject, devStageColors, sprintLengthLabels } from "@/lib/dummy-data"
-import { formatMinutes, formatDate } from "@/lib/project-store"
+import { formatMinutes, formatDate } from "@/lib/services/time-tracking-service"
 import { User, Clock, Calendar } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"

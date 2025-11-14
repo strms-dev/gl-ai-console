@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { getLeads } from "@/lib/leads-store"
-import { getDevProjects, getMaintTickets, getTimeEntries, getWeekStartDate } from "@/lib/project-store"
+import { getDevProjects } from "@/lib/services/project-service"
+import { getMaintTickets } from "@/lib/services/maintenance-service"
+import { getTimeEntries, getWeekStartDate } from "@/lib/services/time-tracking-service"
 import { RotateCw, ArrowRight, Code, AlertCircle, Clock } from "lucide-react"
 import Link from "next/link"
 
@@ -17,27 +19,31 @@ export default function STRMSHomePage() {
 
   useEffect(() => {
     const loadStats = async () => {
-      // Sales Pipeline stats
-      const leads = await getLeads()
-      setTotalProjects(leads.length)
+      try {
+        // Sales Pipeline stats
+        const leads = await getLeads()
+        setTotalProjects(leads.length)
 
-      // Development projects stats
-      const devProjects = getDevProjects()
-      const activeDevProjects = devProjects.filter(p => !["complete", "cancelled"].includes(p.status))
-      setTotalDevProjects(activeDevProjects.length)
+        // Development projects stats
+        const devProjects = await getDevProjects()
+        const activeDevProjects = devProjects.filter(p => !["complete", "cancelled"].includes(p.status))
+        setTotalDevProjects(activeDevProjects.length)
 
-      // Maintenance tickets stats
-      const maintTickets = getMaintTickets()
-      const openTickets = maintTickets.filter(t => t.status !== "closed")
-      setTotalMaintTickets(openTickets.length)
+        // Maintenance tickets stats
+        const maintTickets = await getMaintTickets()
+        const openTickets = maintTickets.filter(t => t.status !== "closed")
+        setTotalMaintTickets(openTickets.length)
 
-      // Time tracking stats - this week's total hours
-      const weekStart = getWeekStartDate()
-      const timeEntries = getTimeEntries()
-      const weekEntries = timeEntries.filter(e => e.weekStartDate === weekStart)
-      const totalMinutes = weekEntries.reduce((sum, entry) => sum + entry.duration, 0)
-      const hours = Math.round((totalMinutes / 60) * 10) / 10 // Round to 1 decimal
-      setWeeklyHours(hours)
+        // Time tracking stats - this week's total hours
+        const weekStart = getWeekStartDate()
+        const timeEntries = await getTimeEntries()
+        const weekEntries = timeEntries.filter(e => e.weekStartDate === weekStart)
+        const totalMinutes = weekEntries.reduce((sum, entry) => sum + entry.duration, 0)
+        const hours = Math.round((totalMinutes / 60) * 10) / 10 // Round to 1 decimal
+        setWeeklyHours(hours)
+      } catch (error) {
+        console.error("Error loading stats:", error)
+      }
     }
     loadStats()
   }, [])

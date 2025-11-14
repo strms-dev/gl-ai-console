@@ -7,23 +7,25 @@ import { Input } from "@/components/ui/input"
 import { Clock, Trash2, X, XCircle } from "lucide-react"
 import {
   MaintenanceTicket,
-  SprintLength,
   Developer,
   MaintenanceStatus,
   TicketType,
+  Platform,
   TimeEntry
-} from "@/lib/dummy-data"
+} from "@/lib/types"
 import {
   getMaintTicketById,
   updateMaintTicket,
   deleteMaintTicket,
-  addMaintTicket,
+  createMaintTicket
+} from "@/lib/services/maintenance-service"
+import {
   formatMinutes,
+  getWeekStartDate,
   getTimeEntriesForProject,
-  addTimeEntry,
-  deleteTimeEntry,
-  getWeekStartDate
-} from "@/lib/project-store"
+  createTimeEntry,
+  deleteTimeEntry
+} from "@/lib/services/time-tracking-service"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { AlertDialog } from "@/components/ui/alert-dialog"
 import { CustomerSelector } from "@/components/ui/customer-selector"
@@ -58,13 +60,14 @@ export function TicketDetailModal({
   const [ticketTitle, setTicketTitle] = useState("")
   const [customer, setCustomer] = useState("")
   const [ticketType, setTicketType] = useState<TicketType>("" as TicketType)
+  const [platform, setPlatform] = useState<Platform | "">("")
   const [numberOfErrors, setNumberOfErrors] = useState(0)
-  const [sprintLength, setSprintLength] = useState<SprintLength>("1x")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [status, setStatus] = useState<MaintenanceStatus>("" as MaintenanceStatus)
   const [assignee, setAssignee] = useState<Developer | "">("")
   const [notes, setNotes] = useState("")
+  const [errorMessage, setErrorMessage] = useState("")
 
   // Time tracking
   const [timeIncrement, setTimeIncrement] = useState("")
@@ -97,36 +100,45 @@ export function TicketDetailModal({
 
   // Load ticket when modal opens or ticketId changes
   useEffect(() => {
-    if (open) {
-      if (mode === "edit" && ticketId) {
-        const fetchedTicket = getMaintTicketById(ticketId)
-        setTicket(fetchedTicket || null)
-        setLoading(false)
-        setIsEditing(false) // Start in view mode for edit
+    const loadTicket = async () => {
+      if (open) {
+        if (mode === "edit" && ticketId) {
+          setLoading(true)
+          try {
+            const fetchedTicket = await getMaintTicketById(ticketId)
+            setTicket(fetchedTicket || null)
+            setIsEditing(false) // Start in view mode for edit
 
-        if (fetchedTicket) {
-          // Populate form fields
-          setTicketTitle(fetchedTicket.ticketTitle)
-          setCustomer(fetchedTicket.customer)
-          setTicketType(fetchedTicket.ticketType)
-          setNumberOfErrors(fetchedTicket.numberOfErrors)
-          setSprintLength(fetchedTicket.sprintLength)
-          setStartDate(fetchedTicket.startDate)
-          setEndDate(fetchedTicket.endDate)
-          setStatus(fetchedTicket.status)
-          setAssignee(fetchedTicket.assignee)
-          setNotes(fetchedTicket.notes)
+            if (fetchedTicket) {
+              // Populate form fields
+              setTicketTitle(fetchedTicket.ticketTitle)
+              setCustomer(fetchedTicket.customer)
+              setTicketType(fetchedTicket.ticketType)
+              setPlatform(fetchedTicket.platform)
+              setNumberOfErrors(fetchedTicket.numberOfErrors)
+              setStartDate(fetchedTicket.startDate)
+              setEndDate(fetchedTicket.endDate)
+              setStatus(fetchedTicket.status)
+              setAssignee(fetchedTicket.assignee)
+              setNotes(fetchedTicket.notes)
+              setErrorMessage(fetchedTicket.errorMessage)
 
-          // Load time entries
-          const entries = getTimeEntriesForProject(fetchedTicket.id)
-          setTimeEntries(entries)
-        }
-      } else if (mode === "create") {
+              // Load time entries
+              const entries = await getTimeEntriesForProject(fetchedTicket.id, 'maintenance')
+              setTimeEntries(entries)
+            }
+          } catch (error) {
+            console.error("Error loading ticket:", error)
+          } finally {
+            setLoading(false)
+          }
+        } else if (mode === "create") {
         // Reset to defaults for create mode
         setTicket(null)
         setTicketTitle("")
         setCustomer("")
         setTicketType("" as TicketType)
+        setPlatform("")
         setNumberOfErrors(0)
         setSprintLength("" as SprintLength)
         setStartDate("")
@@ -134,57 +146,72 @@ export function TicketDetailModal({
         setStatus("" as MaintenanceStatus)
         setAssignee(initialAssignee || "")
         setNotes("")
+        setErrorMessage("")
         setTimeEntries([])
         setIsEditing(true) // Start in edit mode for create
         setLoading(false)
+        }
       }
     }
+    loadTicket()
   }, [ticketId, open, mode, initialAssignee])
 
   // Calculate total time from entries
   const totalTimeTracked = timeEntries.reduce((sum, entry) => sum + entry.duration, 0)
 
   // Save function
-  const handleSave = (): MaintenanceTicket | null => {
+  const handleSave = async (): Promise<MaintenanceTicket | null> => {
     if (mode === "create") {
       if (!ticketTitle.trim()) {
         showAlert("Ticket Title Required", "Please enter a ticket title before creating the ticket.")
         return null
       }
-      const newTicket = addMaintTicket({
+      try {
+        const newTicket = await createMaintTicket({
         ticketTitle,
         customer,
         ticketType,
+        platform,
         numberOfErrors,
-        sprintLength,
         startDate,
         endDate,
         status,
         assignee,
         notes,
-        timeTracked: totalTimeTracked
+        errorMessage
       })
-      setTicket(newTicket)
-      onTicketCreated?.()
-      onOpenChange(false)
-      return newTicket
+        setTicket(newTicket)
+        onTicketCreated?.()
+        onOpenChange(false)
+        return newTicket
+      } catch (error) {
+        console.error("Error creating ticket:", error)
+        showAlert("Error", "Failed to create ticket. Please try again.")
+        return null
+      }
     } else if (mode === "edit" && ticket) {
-      const updatedTicket = updateMaintTicket(ticket.id, {
-        ticketTitle,
-        customer,
-        ticketType,
-        numberOfErrors,
-        sprintLength,
-        startDate,
-        endDate,
-        status,
-        assignee,
-        notes,
-        timeTracked: totalTimeTracked
-      })
-      onTicketUpdated?.()
-      setIsEditing(false)
-      return updatedTicket
+      try {
+        const updatedTicket = await updateMaintTicket(ticket.id, {
+          ticketTitle,
+          customer,
+          ticketType,
+          platform,
+          numberOfErrors,
+          startDate,
+          endDate,
+          status,
+          assignee,
+          notes,
+          errorMessage
+        })
+        onTicketUpdated?.()
+        setIsEditing(false)
+        return updatedTicket
+      } catch (error) {
+        console.error("Error updating ticket:", error)
+        showAlert("Error", "Failed to update ticket. Please try again.")
+        return null
+      }
     }
     return null
   }
@@ -218,7 +245,7 @@ export function TicketDetailModal({
     return null
   }
 
-  const handleAddTime = () => {
+  const handleAddTime = async () => {
     const minutes = parseTimeIncrement(timeIncrement)
 
     if (minutes === null) {
@@ -241,12 +268,11 @@ export function TicketDetailModal({
     if (!ticket) return
 
     const now = new Date()
-    const newEntry = addTimeEntry({
+    try {
+      const newEntry = await createTimeEntry({
       projectId: ticket.id,
       projectType: "maintenance",
       assignee: assignee,
-      startTime: now.toISOString(),
-      endTime: now.toISOString(),
       duration: minutes,
       notes: timeEntryNotes.trim() || "",
       weekStartDate: getWeekStartDate(now)
@@ -261,6 +287,10 @@ export function TicketDetailModal({
     // Update ticket with new total time
     const newTotalTime = updatedEntries.reduce((sum, entry) => sum + entry.duration, 0)
     updateMaintTicket(ticket.id, { timeTracked: newTotalTime })
+    } catch (error) {
+      console.error("Error adding time entry:", error)
+      showAlert("Error", "Failed to add time entry. Please try again.")
+    }
   }
 
   const handleDeleteTimeEntry = (entryId: string) => {
@@ -268,7 +298,7 @@ export function TicketDetailModal({
     setDeleteEntryConfirmOpen(true)
   }
 
-  const confirmDeleteTimeEntry = () => {
+  const confirmDeleteTimeEntry = async () => {
     if (entryToDelete && ticket) {
       deleteTimeEntry(entryToDelete)
       const updatedEntries = timeEntries.filter(e => e.id !== entryToDelete)
@@ -285,11 +315,16 @@ export function TicketDetailModal({
     setDeleteTicketConfirmOpen(true)
   }
 
-  const confirmDeleteTicket = () => {
+  const confirmDeleteTicket = async () => {
     if (ticket) {
-      deleteMaintTicket(ticket.id)
-      onOpenChange(false)
-      onTicketDeleted?.()
+      try {
+        await deleteMaintTicket(ticket.id)
+        onOpenChange(false)
+        onTicketDeleted?.()
+      } catch (error) {
+        console.error("Error deleting ticket:", error)
+        showAlert("Error", "Failed to delete ticket. Please try again.")
+      }
     }
   }
 
@@ -583,7 +618,48 @@ export function TicketDetailModal({
                     </div>
                   </div>
 
-                  {/* Row 4: Number of Errors | Track Time (Only edit mode) */}
+                  {/* Row 4: Platform | Number of Errors */}
+                  {/* Platform */}
+                  <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
+                    <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
+                      Platform
+                    </span>
+                    <div className="flex-1 flex items-center gap-2">
+                      <select
+                        disabled={!isEditing}
+                        value={platform}
+                        onChange={(e) => {
+                          setPlatform(e.target.value as Platform)
+
+                        }}
+                        className={`text-sm text-[#463939] px-3 py-1.5 outline-none flex-1 transition-all ${
+                          isEditing
+                            ? 'bg-white border border-[#E5E5E5] rounded-md cursor-pointer hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20'
+                            : 'border-none bg-transparent cursor-default'
+                        }`}
+                        style={{fontFamily: 'var(--font-body)'}}
+                      >
+                        <option value="">Select platform...</option>
+                        <option value="n8n">n8n</option>
+                        <option value="Make">Make</option>
+                        <option value="Zapier">Zapier</option>
+                        <option value="Prismatic">Prismatic</option>
+                      </select>
+                      {platform && isEditing && (
+                        <button
+                          onClick={() => {
+                            setPlatform("")
+
+                          }}
+                          className="text-[#666666] hover:text-[#407B9D] transition-colors opacity-0 group-hover:opacity-100"
+                          title="Clear selection"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Number of Errors */}
                   <div className="flex items-center py-2 hover:bg-[#F5F5F5] rounded px-2 -mx-2 transition-colors group">
                     <span className="text-sm text-[#666666] w-32 flex-shrink-0" style={{fontFamily: 'var(--font-body)'}}>
@@ -649,7 +725,7 @@ export function TicketDetailModal({
                                   {formatMinutes(entry.duration)}
                                 </span>
                                 <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                                  {new Date(entry.startTime).toLocaleDateString()} at {new Date(entry.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  {new Date(entry.createdAt).toLocaleDateString()} at {new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </div>
                               {entry.notes && (
@@ -717,6 +793,20 @@ export function TicketDetailModal({
                     onChange={(e) => setNotes(e.target.value)}
                     disabled={!isEditing}
                     placeholder="Add any notes or details about this ticket..."
+                    className="w-full min-h-[100px] rounded-md border border-[#E5E5E5] bg-white px-3 py-2 text-sm outline-none hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all resize-y disabled:cursor-not-allowed disabled:opacity-70"
+                    style={{fontFamily: 'var(--font-body)'}}
+                  />
+                </div>
+
+                {/* Error Message Section */}
+                <div className="col-span-2 space-y-2 pt-4 border-t border-[#E5E5E5]">
+                  <h3 className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                    Error Message
+                  </h3>
+                  <textarea
+                    value={errorMessage}
+                    onChange={(e) => setErrorMessage(e.target.value)}
+                    disabled={!isEditing}
                     className="w-full min-h-[100px] rounded-md border border-[#E5E5E5] bg-white px-3 py-2 text-sm outline-none hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all resize-y disabled:cursor-not-allowed disabled:opacity-70"
                     style={{fontFamily: 'var(--font-body)'}}
                   />

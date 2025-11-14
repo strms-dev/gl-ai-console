@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, User, Calendar, Clock, AlertCircle } from "lucide-react"
-import { MaintenanceTicket, maintStageLabels, maintStageColors, sprintLengthLabels, Developer } from "@/lib/dummy-data"
-import { getMaintTickets, updateMaintTicket, addMaintTicket, deleteMaintTicket, formatMinutes } from "@/lib/project-store"
+import { MaintenanceTicket, maintStageLabels, maintStageColors, sprintLengthLabels, Developer } from "@/lib/types"
+import { getMaintTickets, updateMaintTicket, createMaintTicket, deleteMaintTicket } from "@/lib/services/maintenance-service"
+import { formatMinutes } from "@/lib/services/time-tracking-service"
 import { KanbanBoard, StageConfig } from "@/components/shared/kanban-board"
 import { ListView, ColumnConfig } from "@/components/shared/list-view"
 import { ViewToggle, ViewMode } from "@/components/shared/view-toggle"
@@ -23,6 +24,7 @@ export default function MaintenancePage() {
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [tickets, setTickets] = useState<MaintenanceTicket[]>([])
+  const [loading, setLoading] = useState(true)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
@@ -30,9 +32,16 @@ export default function MaintenancePage() {
 
   // Load tickets on mount
   useEffect(() => {
-    const loadTickets = () => {
-      const fetchedTickets = getMaintTickets()
-      setTickets(fetchedTickets)
+    const loadTickets = async () => {
+      try {
+        setLoading(true)
+        const fetchedTickets = await getMaintTickets()
+        setTickets(fetchedTickets)
+      } catch (error) {
+        console.error("Error loading tickets:", error)
+      } finally {
+        setLoading(false)
+      }
     }
     loadTickets()
   }, [])
@@ -141,26 +150,46 @@ export default function MaintenancePage() {
   ]
 
   // Handle creating a new ticket
-  const handleTicketCreated = () => {
-    setTickets(getMaintTickets())
+  const handleTicketCreated = async () => {
+    try {
+      const fetchedTickets = await getMaintTickets()
+      setTickets(fetchedTickets)
+    } catch (error) {
+      console.error("Error reloading tickets:", error)
+    }
   }
 
   // Handle ticket updated
-  const handleTicketUpdated = () => {
-    setTickets(getMaintTickets())
+  const handleTicketUpdated = async () => {
+    try {
+      const fetchedTickets = await getMaintTickets()
+      setTickets(fetchedTickets)
+    } catch (error) {
+      console.error("Error reloading tickets:", error)
+    }
   }
 
   // Handle ticket deleted
-  const handleTicketDeleted = () => {
-    setTickets(getMaintTickets())
-    setSelectedTicketId(null)
-    setDetailModalOpen(false)
+  const handleTicketDeleted = async () => {
+    try {
+      const fetchedTickets = await getMaintTickets()
+      setTickets(fetchedTickets)
+      setSelectedTicketId(null)
+      setDetailModalOpen(false)
+    } catch (error) {
+      console.error("Error reloading tickets:", error)
+    }
   }
 
   // Handle stage change from kanban drag-and-drop
-  const handleStageChange = (ticketId: string, newStage: string) => {
-    updateMaintTicket(ticketId, { status: newStage as MaintenanceTicket["status"] })
-    setTickets(getMaintTickets())
+  const handleStageChange = async (ticketId: string, newStage: string) => {
+    try {
+      await updateMaintTicket(ticketId, { status: newStage as MaintenanceTicket["status"] })
+      const fetchedTickets = await getMaintTickets()
+      setTickets(fetchedTickets)
+    } catch (error) {
+      console.error("Error updating ticket status:", error)
+    }
   }
 
   // Handle ticket click (open modal)
@@ -279,7 +308,13 @@ export default function MaintenancePage() {
           </div>
 
           {/* View Content */}
-          {viewMode === "kanban" ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                Loading tickets...
+              </div>
+            </div>
+          ) : viewMode === "kanban" ? (
             <KanbanBoard
               items={filteredAndSortedTickets}
               stages={stages}

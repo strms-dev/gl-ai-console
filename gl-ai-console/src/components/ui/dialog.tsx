@@ -33,6 +33,11 @@ const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
         document.documentElement.style.overflow = originalHtmlOverflow
         document.body.style.paddingRight = ''
       }
+    } else {
+      // Ensure cleanup happens when modal closes (open becomes false)
+      document.body.style.overflow = ''
+      document.documentElement.style.overflow = ''
+      document.body.style.paddingRight = ''
     }
   }, [open])
 

@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { TimeEntry, ProjectType, Developer } from "@/lib/dummy-data"
-import { addTimeEntry, getWeekStartDate, formatMinutes } from "@/lib/project-store"
+import { TimeEntry, ProjectType, Developer } from "@/lib/types"
+import { createTimeEntry, getWeekStartDate, formatMinutes } from "@/lib/services/time-tracking-service"
 import { cn } from "@/lib/utils"
 
 // ============================================================================
@@ -75,31 +75,33 @@ export function TimeTracker({
   }
 
   // Save timer entry
-  const handleSaveTimer = () => {
+  const handleSaveTimer = async () => {
     if (!startTime || elapsedSeconds === 0) return
 
-    const now = new Date()
-    const entry = addTimeEntry({
-      projectId,
-      projectType,
-      assignee,
-      startTime: startTime.toISOString(),
-      endTime: now.toISOString(),
-      duration: Math.floor(elapsedSeconds / 60), // Convert to minutes
-      notes: "",
-      weekStartDate: getWeekStartDate()
-    })
+    try {
+      const entry = await createTimeEntry({
+        projectId,
+        projectType,
+        assignee,
+        duration: Math.floor(elapsedSeconds / 60), // Convert to minutes
+        notes: "",
+        weekStartDate: getWeekStartDate()
+      })
 
-    onTimeLogged?.(entry)
+      onTimeLogged?.(entry)
 
-    // Reset timer
-    setIsRunning(false)
-    setStartTime(null)
-    setElapsedSeconds(0)
+      // Reset timer
+      setIsRunning(false)
+      setStartTime(null)
+      setElapsedSeconds(0)
+    } catch (error) {
+      console.error("Error saving time entry:", error)
+      alert("Failed to save time entry. Please try again.")
+    }
   }
 
   // Save manual entry
-  const handleSaveManual = () => {
+  const handleSaveManual = async () => {
     const hours = parseInt(manualHours) || 0
     const minutes = parseInt(manualMinutes) || 0
     const totalMinutes = (hours * 60) + minutes
@@ -109,27 +111,27 @@ export function TimeTracker({
       return
     }
 
-    const now = new Date()
-    const start = new Date(now.getTime() - (totalMinutes * 60 * 1000))
+    try {
+      const entry = await createTimeEntry({
+        projectId,
+        projectType,
+        assignee,
+        duration: totalMinutes,
+        notes: manualNotes,
+        weekStartDate: getWeekStartDate()
+      })
 
-    const entry = addTimeEntry({
-      projectId,
-      projectType,
-      assignee,
-      startTime: start.toISOString(),
-      endTime: now.toISOString(),
-      duration: totalMinutes,
-      notes: manualNotes,
-      weekStartDate: getWeekStartDate()
-    })
+      onTimeLogged?.(entry)
 
-    onTimeLogged?.(entry)
-
-    // Reset form
-    setManualHours("")
-    setManualMinutes("")
-    setManualNotes("")
-    setShowManualEntry(false)
+      // Reset form
+      setManualHours("")
+      setManualMinutes("")
+      setManualNotes("")
+      setShowManualEntry(false)
+    } catch (error) {
+      console.error("Error saving manual time entry:", error)
+      alert("Failed to save time entry. Please try again.")
+    }
   }
 
   return (

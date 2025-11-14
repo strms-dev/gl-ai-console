@@ -5,8 +5,9 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Trash2, Clock, X, XCircle, ChevronDown } from "lucide-react"
-import { DevelopmentProject, SprintLength, Developer, DevelopmentStatus, TimeEntry } from "@/lib/dummy-data"
-import { getDevProjectById, updateDevProject, deleteDevProject, addDevProject, formatMinutes, getTimeEntriesForProject, addTimeEntry, deleteTimeEntry, getWeekStartDate } from "@/lib/project-store"
+import { DevelopmentProject, SprintLength, Developer, DevelopmentStatus, TimeEntry } from "@/lib/types"
+import { getDevProjectById, updateDevProject, deleteDevProject, createDevProject } from "@/lib/services/project-service"
+import { formatMinutes, getWeekStartDate, getTimeEntriesForProject, createTimeEntry, deleteTimeEntry } from "@/lib/services/time-tracking-service"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { AlertDialog } from "@/components/ui/alert-dialog"
 import { CustomerSelector } from "@/components/ui/customer-selector"
@@ -68,42 +69,51 @@ export function ProjectDetailModal({
 
   // Load project when modal opens
   useEffect(() => {
-    if (open) {
-      if (mode === "edit" && projectId) {
-        setIsEditing(false) // Start in view mode for existing projects
-        const fetchedProject = getDevProjectById(projectId)
-        if (fetchedProject) {
-          setProject(fetchedProject)
-          setProjectName(fetchedProject.projectName)
-          setCustomer(fetchedProject.customer)
-          setSprintLength(fetchedProject.sprintLength)
-          setStartDate(fetchedProject.startDate)
+    const loadProject = async () => {
+      if (open) {
+        if (mode === "edit" && projectId) {
+          setIsEditing(false) // Start in view mode for existing projects
+          setLoading(true)
+          try {
+            const fetchedProject = await getDevProjectById(projectId)
+            if (fetchedProject) {
+              setProject(fetchedProject)
+              setProjectName(fetchedProject.projectName)
+              setCustomer(fetchedProject.customer)
+              setSprintLength(fetchedProject.sprintLength)
+              setStartDate(fetchedProject.startDate)
           setEndDate(fetchedProject.endDate)
           setStatus(fetchedProject.status)
           setAssignee(fetchedProject.assignee)
           setNotes(fetchedProject.notes)
 
-          // Load time entries
-          const entries = getTimeEntriesForProject(fetchedProject.id)
-          setTimeEntries(entries)
+              // Load time entries
+              const entries = await getTimeEntriesForProject(fetchedProject.id, 'development')
+              setTimeEntries(entries)
+            }
+          } catch (error) {
+            console.error("Error loading project:", error)
+          } finally {
+            setLoading(false)
+          }
+        } else if (mode === "create") {
+          // Reset to defaults for create mode
+          setIsEditing(true) // Start in edit mode for new projects
+          setProject(null)
+          setProjectName("")
+          setCustomer("")
+          setSprintLength("" as SprintLength)
+          setStartDate("")
+          setEndDate("")
+          setStatus("" as DevelopmentStatus)
+          setAssignee(initialAssignee || "")
+          setNotes("")
+          setTimeEntries([])
+          setLoading(false)
         }
-        setLoading(false)
-      } else if (mode === "create") {
-        // Reset to defaults for create mode
-        setIsEditing(true) // Start in edit mode for new projects
-        setProject(null)
-        setProjectName("")
-        setCustomer("")
-        setSprintLength("" as SprintLength)
-        setStartDate("")
-        setEndDate("")
-        setStatus("" as DevelopmentStatus)
-        setAssignee(initialAssignee || "")
-        setNotes("")
-        setTimeEntries([])
-        setLoading(false)
       }
     }
+    loadProject()
   }, [projectId, open, mode, initialAssignee])
 
   // Calculate total time from entries
@@ -118,7 +128,7 @@ export function ProjectDetailModal({
   }
 
   // Save function (called on button click only)
-  const handleSave = (): DevelopmentProject | null => {
+  const handleSave = async (): Promise<DevelopmentProject | null> => {
     if (mode === "create") {
       // Create new project
       if (!projectName.trim()) {
@@ -127,39 +137,50 @@ export function ProjectDetailModal({
       }
 
       console.log('Creating new project')
-      const newProject = addDevProject({
-        projectName,
-        customer,
-        sprintLength,
-        startDate,
-        endDate,
-        status,
-        assignee,
-        notes,
-        timeTracked: totalTimeTracked
-      })
-      setProject(newProject)
-      onProjectCreated?.()
-      onOpenChange(false)
-      return newProject
+      try {
+        const newProject = await createDevProject({
+          projectName,
+          customer,
+          sprintLength,
+          startDate,
+          endDate,
+          status,
+          assignee,
+          notes,
+          priority: 0
+        })
+        setProject(newProject)
+        onProjectCreated?.()
+        onOpenChange(false)
+        return newProject
+      } catch (error) {
+        console.error("Error creating project:", error)
+        showAlert("Error", "Failed to create project. Please try again.")
+        return null
+      }
     } else if (mode === "edit" && project) {
       // Update existing project
       console.log('Updating project', project.id)
-      const updatedProject = updateDevProject(project.id, {
-        projectName,
-        customer,
-        sprintLength,
-        startDate,
-        endDate,
-        status,
-        assignee,
-        notes,
-        timeTracked: totalTimeTracked
-      })
-      console.log('Project updated')
-      onProjectUpdated?.()
-      setIsEditing(false) // Exit edit mode after save
-      return updatedProject
+      try {
+        const updatedProject = await updateDevProject(project.id, {
+          projectName,
+          customer,
+          sprintLength,
+          startDate,
+          endDate,
+          status,
+          assignee,
+          notes
+        })
+        console.log('Project updated')
+        onProjectUpdated?.()
+        setIsEditing(false) // Exit edit mode after save
+        return updatedProject
+      } catch (error) {
+        console.error("Error updating project:", error)
+        showAlert("Error", "Failed to update project. Please try again.")
+        return null
+      }
     }
     return null
   }
@@ -193,7 +214,7 @@ export function ProjectDetailModal({
     return null
   }
 
-  const handleAddTime = () => {
+  const handleAddTime = async () => {
     const minutes = parseTimeIncrement(timeIncrement)
 
     if (minutes === null) {
@@ -217,24 +238,27 @@ export function ProjectDetailModal({
     if (!project) return
 
     const now = new Date()
-    const newEntry = addTimeEntry({
-      projectId: project.id,
-      projectType: "development",
-      assignee: project.assignee,
-      startTime: now.toISOString(),
-      endTime: now.toISOString(),
-      duration: minutes,
-      notes: timeEntryNotes.trim() || "",
-      weekStartDate: getWeekStartDate(now)
-    })
+    try {
+      const newEntry = await createTimeEntry({
+        projectId: project.id,
+        projectType: "development",
+        assignee: project.assignee,
+        duration: minutes,
+        notes: timeEntryNotes.trim() || "",
+        weekStartDate: getWeekStartDate(now)
+      })
 
-    setTimeEntries([...timeEntries, newEntry])
-    setTimeIncrement("")
-    setTimeEntryNotes("")
-    // Time entry is saved to store, update local state to reflect new total
-    const updatedProject = getDevProjectById(project.id)
-    if (updatedProject) {
-      setProject(updatedProject)
+      setTimeEntries([...timeEntries, newEntry])
+      setTimeIncrement("")
+      setTimeEntryNotes("")
+      // Refresh project to get updated totals
+      const updatedProject = await getDevProjectById(project.id)
+      if (updatedProject) {
+        setProject(updatedProject)
+      }
+    } catch (error) {
+      console.error("Error adding time entry:", error)
+      showAlert("Error", "Failed to add time entry. Please try again.")
     }
   }
 
@@ -243,15 +267,20 @@ export function ProjectDetailModal({
     setDeleteConfirmOpen(true)
   }
 
-  const confirmDeleteTimeEntry = () => {
+  const confirmDeleteTimeEntry = async () => {
     if (entryToDelete && project) {
-      deleteTimeEntry(entryToDelete)
-      setTimeEntries(timeEntries.filter(e => e.id !== entryToDelete))
-      setEntryToDelete(null)
-      // Refresh project to get updated totals
-      const updatedProject = getDevProjectById(project.id)
-      if (updatedProject) {
-        setProject(updatedProject)
+      try {
+        await deleteTimeEntry(entryToDelete)
+        setTimeEntries(timeEntries.filter(e => e.id !== entryToDelete))
+        setEntryToDelete(null)
+        // Refresh project to get updated totals
+        const updatedProject = await getDevProjectById(project.id)
+        if (updatedProject) {
+          setProject(updatedProject)
+        }
+      } catch (error) {
+        console.error("Error deleting time entry:", error)
+        showAlert("Error", "Failed to delete time entry. Please try again.")
       }
     }
   }
@@ -260,11 +289,16 @@ export function ProjectDetailModal({
     setDeleteProjectConfirmOpen(true)
   }
 
-  const confirmDeleteProject = () => {
+  const confirmDeleteProject = async () => {
     if (project) {
-      deleteDevProject(project.id)
-      onOpenChange(false)
-      onProjectDeleted?.()
+      try {
+        await deleteDevProject(project.id)
+        onOpenChange(false)
+        onProjectDeleted?.()
+      } catch (error) {
+        console.error("Error deleting project:", error)
+        showAlert("Error", "Failed to delete project. Please try again.")
+      }
     }
   }
 
@@ -591,7 +625,7 @@ export function ProjectDetailModal({
                                       {formatMinutes(entry.duration)}
                                     </span>
                                     <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                                      {new Date(entry.startTime).toLocaleDateString()} at {new Date(entry.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      {new Date(entry.createdAt).toLocaleDateString()} at {new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                   </div>
                                   {entry.notes && !entry.notes.startsWith('Manual entry:') && (
