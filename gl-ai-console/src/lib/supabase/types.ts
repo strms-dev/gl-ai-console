@@ -24,6 +24,7 @@ export interface Database {
           last_activity: string
           created_at: string
           updated_at: string
+          notes: string | null
         }
         Insert: {
           id?: string
@@ -36,6 +37,7 @@ export interface Database {
           last_activity?: string
           created_at?: string
           updated_at?: string
+          notes?: string | null
         }
         Update: {
           id?: string
@@ -48,6 +50,7 @@ export interface Database {
           last_activity?: string
           created_at?: string
           updated_at?: string
+          notes?: string | null
         }
       }
       strms_project_files: {

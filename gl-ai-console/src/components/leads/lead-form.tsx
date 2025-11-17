@@ -19,7 +19,8 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
     projectName: initialData?.projectName || "",
     company: initialData?.company || "",
     contact: initialData?.contact || "",
-    email: initialData?.email || ""
+    email: initialData?.email || "",
+    notes: initialData?.notes || ""
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -32,7 +33,8 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
           projectName: initialData.projectName || "",
           company: initialData.company || "",
           contact: initialData.contact || "",
-          email: initialData.email || ""
+          email: initialData.email || "",
+          notes: initialData.notes || ""
         })
       } else {
         // Reset form for create mode
@@ -40,7 +42,8 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
           projectName: "",
           company: "",
           contact: "",
-          email: ""
+          email: "",
+          notes: ""
         })
       }
     }
@@ -144,6 +147,20 @@ export function LeadForm({ open, onOpenChange, onSubmit, initialData, mode }: Le
             {errors.email && (
               <p className="text-red-500 text-sm mt-1">{errors.email}</p>
             )}
+          </div>
+
+          <div>
+            <label htmlFor="notes" className="block text-sm font-medium text-foreground mb-1">
+              Notes <span className="text-gray-500">(optional)</span>
+            </label>
+            <textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Add any notes or details about this project..."
+              className="w-full min-h-[100px] rounded-md border border-input bg-white px-3 py-2 text-sm outline-none hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all resize-y"
+              style={{fontFamily: 'var(--font-body)'}}
+            />
           </div>
 
           <DialogFooter>

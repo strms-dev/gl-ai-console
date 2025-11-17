@@ -12,6 +12,7 @@ export interface Lead {
   readinessScore?: number
   estimatedValue?: number
   nextAction?: string
+  notes?: string
 }
 
 export const dummyLeads: Lead[] = [

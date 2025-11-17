@@ -140,7 +140,6 @@ export function TicketDetailModal({
         setTicketType("" as TicketType)
         setPlatform("")
         setNumberOfErrors(0)
-        setSprintLength("" as SprintLength)
         setStartDate("")
         setEndDate("")
         setStatus("" as MaintenanceStatus)

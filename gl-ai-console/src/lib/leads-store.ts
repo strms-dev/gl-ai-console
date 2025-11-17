@@ -14,7 +14,8 @@ function projectToLead(project: Project): Lead {
     email: project.email,
     stage: project.current_stage as Lead['stage'],
     projectStatus: (project.project_status as Lead['projectStatus']) || 'active',
-    lastActivity: formatTimestamp(project.last_activity)
+    lastActivity: formatTimestamp(project.last_activity),
+    notes: project.notes || undefined
   }
 }
 
@@ -43,6 +44,7 @@ function leadToProject(lead: Partial<Lead>): ProjectInsert | ProjectUpdate {
   if (lead.contact !== undefined) project.contact_name = lead.contact
   if (lead.email !== undefined) project.email = lead.email
   if (lead.stage !== undefined) project.current_stage = lead.stage
+  if (lead.notes !== undefined) project.notes = lead.notes
 
   return project
 }
@@ -85,7 +87,8 @@ export async function addLead(lead: Omit<Lead, 'id'>): Promise<Lead> {
       contact_name: lead.contact,
       email: lead.email,
       current_stage: lead.stage || 'demo',
-      last_activity: new Date().toISOString()
+      last_activity: new Date().toISOString(),
+      notes: lead.notes || null
     }
 
     const project = await createProject(projectData)

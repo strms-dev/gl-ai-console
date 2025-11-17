@@ -521,6 +521,12 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
                   </div>
                 )}
               </div>
+              {lead.notes && (
+                <div className="mt-6 pt-6 border-t border-border">
+                  <label className="text-sm font-medium text-muted-foreground">Notes</label>
+                  <p className="text-foreground mt-2 whitespace-pre-wrap">{lead.notes}</p>
+                </div>
+              )}
             </CardContent>
           )}
         </Card>

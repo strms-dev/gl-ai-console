@@ -15,6 +15,7 @@ import { confirmSprintPricing, updateConfirmedPricing, getSprintPricing, deleteS
 import { updateProjectStatus } from "@/lib/supabase/project-status"
 import { getFileByType } from "@/lib/supabase/files"
 import { getProjectById } from "@/lib/supabase/projects"
+import { createDevProjectFromSTRMS } from "@/lib/supabase/dev-projects"
 import {
   CheckCircle2,
   XCircle,
@@ -1287,7 +1288,7 @@ Tim`
     )
   }
 
-  // Project Setup Actions - Create ClickUp Task and Airtable CRM & Inventory Record
+  // Project Setup Actions - Create Project Work Item and Airtable CRM & Inventory Record
   if (event.type === "setup") {
     // Extract developer from decisionMade (e.g., "proceed_nick" -> "nick")
     const getDeveloperName = () => {
@@ -1316,14 +1317,13 @@ Tim`
       <div className="mt-4 space-y-4">
         <div className="p-4 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
           <div className="space-y-3">
-            {/* Create ClickUp Task */}
+            {/* Create Project Work Item */}
             <div className="p-3 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <ClipboardList className="w-6 h-6 text-gray-600" />
                   <div>
-                    <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create ClickUp Task</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">Manual for now - soon automating with GL AI Console project management</p>
+                    <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create Project Work Item</h4>
                   </div>
                 </div>
                 <div className="flex items-center">
@@ -1338,7 +1338,7 @@ Tim`
                       size="sm"
                       className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                     >
-                      Confirm
+                      Create
                     </Button>
                   )}
                 </div>
@@ -2389,7 +2389,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         }
 
         // Load Setup stage data
-        const clickupTask = await getStageData(leadId, 'setup', 'clickup_task_created')
+        const clickupTask = await getStageData(leadId, 'setup', 'project_work_item_created')
         if (clickupTask === true) {
           setClickupTaskCreated(true)
         }
@@ -2587,6 +2587,9 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       setAnchorProposalCreated(false)
       setAnchorProposalLoading(false)
 
+      // Also reset Project Work Item since it's auto-created when EA is confirmed
+      setClickupTaskCreated(false)
+
       // Reset EA stage to pending
       setCompletedStages(prev => {
         const newSet = new Set(prev)
@@ -2604,6 +2607,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       // Delete all EA stage data from Supabase
       deleteAllStageData(leadId, 'ea').catch(error => {
         console.error("Failed to delete EA stage data from Supabase:", error)
+      })
+
+      // Also delete project work item data since it's auto-created when EA is confirmed
+      setStageData(leadId, 'setup', 'project_work_item_created', false).catch(error => {
+        console.error("Failed to reset project work item in Supabase:", error)
       })
 
       return
@@ -3674,6 +3682,38 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       // Mark the engagement agreement stage as completed
       setCompletedStages(prev => new Set(prev).add('ea'))
 
+      // Automatically mark Project Work Item as created
+      setClickupTaskCreated(true)
+
+      // Save to Supabase
+      setStageData(leadId, 'setup', 'project_work_item_created', true).catch(error => {
+        console.error("Failed to save project work item data to Supabase:", error)
+      })
+
+      // Create dev project in strms_dev_projects
+      const developer = decisionMade?.startsWith('proceed_')
+        ? decisionMade.replace('proceed_', '')
+        : null
+
+      if (developer) {
+        const assignee = developer === 'nick' ? 'Nick' : 'Gon'
+        console.log(`Creating dev project for ${assignee}`)
+
+        createDevProjectFromSTRMS(leadId, assignee)
+          .then((devProjectId) => {
+            console.log('Dev project created successfully:', devProjectId)
+            // Save the dev project ID to stage data for reference
+            setStageData(leadId, 'setup', 'dev_project_id', devProjectId).catch(error => {
+              console.error("Failed to save dev project ID to Supabase:", error)
+            })
+          })
+          .catch(error => {
+            console.error('Error creating dev project:', error)
+          })
+      } else {
+        console.error('Cannot create dev project: developer not found in decisionMade')
+      }
+
       // Automatically mark Airtable record as created
       setAirtableRecordCreated(true)
 
@@ -3743,12 +3783,36 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       })
     } else if (action === 'create_clickup_task') {
       setClickupTaskCreated(true)
-      console.log('ClickUp task created')
+      console.log('Project work item created')
 
       // Save to Supabase
-      setStageData(leadId, 'setup', 'clickup_task_created', true).catch(error => {
+      setStageData(leadId, 'setup', 'project_work_item_created', true).catch(error => {
         console.error("Failed to save Setup data to Supabase:", error)
       })
+
+      // Create dev project in strms_dev_projects (if not already created)
+      const developer = decisionMade?.startsWith('proceed_')
+        ? decisionMade.replace('proceed_', '')
+        : null
+
+      if (developer) {
+        const assignee = developer === 'nick' ? 'Nick' : 'Gon'
+        console.log(`Creating dev project for ${assignee}`)
+
+        createDevProjectFromSTRMS(leadId, assignee)
+          .then((devProjectId) => {
+            console.log('Dev project created successfully:', devProjectId)
+            // Save the dev project ID to stage data for reference
+            setStageData(leadId, 'setup', 'dev_project_id', devProjectId).catch(error => {
+              console.error("Failed to save dev project ID to Supabase:", error)
+            })
+          })
+          .catch(error => {
+            console.error('Error creating dev project:', error)
+          })
+      } else {
+        console.error('Cannot create dev project: developer not found in decisionMade')
+      }
     } else if (action === 'create_airtable_record') {
       // Immediately mark as created (no loading state)
       setAirtableRecordCreated(true)
