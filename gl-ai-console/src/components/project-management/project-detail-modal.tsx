@@ -127,6 +127,34 @@ export function ProjectDetailModal({
     setAlertOpen(true)
   }
 
+  // Convert URLs in text to clickable links
+  const linkifyText = (text: string) => {
+    if (!text) return null
+
+    // Regular expression to match URLs (with or without http/https)
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*)/g
+    const parts = text.split(urlRegex)
+
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        // Add https:// if the URL doesn't have a protocol
+        const href = part.match(/^https?:\/\//) ? part : `https://${part}`
+        return (
+          <a
+            key={index}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#407B9D] hover:text-[#407B9D]/80 underline"
+          >
+            {part}
+          </a>
+        )
+      }
+      return part
+    })
+  }
+
   // Save function (called on button click only)
   const handleSave = async (): Promise<DevelopmentProject | null> => {
     if (mode === "create") {
@@ -690,14 +718,24 @@ export function ProjectDetailModal({
                   <h3 className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
                     Notes
                   </h3>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Add any notes or details about this project..."
-                    className="w-full min-h-[100px] rounded-md border border-[#E5E5E5] bg-white px-3 py-2 text-sm outline-none hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all resize-y disabled:cursor-not-allowed disabled:opacity-70"
-                    style={{fontFamily: 'var(--font-body)'}}
-                  />
+                  {isEditing ? (
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Add any notes or details about this project..."
+                      className="w-full min-h-[100px] rounded-md border border-[#E5E5E5] bg-white px-3 py-2 text-sm outline-none hover:border-[#407B9D] focus:border-[#407B9D] focus:ring-2 focus:ring-[#407B9D]/20 transition-all resize-y"
+                      style={{fontFamily: 'var(--font-body)'}}
+                    />
+                  ) : (
+                    <div
+                      className="w-full min-h-[100px] rounded-md border border-[#E5E5E5] bg-[#F5F5F5] px-3 py-2 text-sm whitespace-pre-wrap"
+                      style={{fontFamily: 'var(--font-body)'}}
+                    >
+                      {notes ? linkifyText(notes) : (
+                        <span className="text-[#999999]">No notes</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
