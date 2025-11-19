@@ -195,6 +195,7 @@ const ActionZone = ({
   setupEmailSent,
   aiSprintEstimatesLoading,
   aiSprintEstimatesAvailable,
+  aiScopeLoading,
   leadId
 }: {
   event: TimelineEvent,
@@ -238,6 +239,7 @@ const ActionZone = ({
   setupEmailSent?: boolean,
   aiSprintEstimatesLoading?: boolean,
   aiSprintEstimatesAvailable?: boolean,
+  aiScopeLoading?: boolean,
   leadId: string
 }) => {
   const [emailCopied, setEmailCopied] = useState(false)
@@ -627,6 +629,21 @@ const ActionZone = ({
 
     // Show proposal email draft for pending/in-progress stage
     if (sprintPricingData) {
+      // If ai_scope is not yet available, show loading state
+      if (!sprintPricingData.aiScope && aiScopeLoading) {
+        return (
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <RotateCw className="w-5 h-5 text-[#407B9D] animate-spin" />
+              <h3 className="font-medium text-[#407B9D]" style={{fontFamily: 'var(--font-heading)'}}>Generating Proposal Email Draft...</h3>
+            </div>
+            <p className="text-sm text-gray-700">
+              Please wait while AI generates the detailed scope for your proposal email.
+            </p>
+          </div>
+        )
+      }
+
       const sprintOptions = {
         "0.5": { duration: "2.5 days", type: "1/2 sprint" },
         "1": { duration: "5 days", type: "1x sprint" },
@@ -1780,6 +1797,7 @@ const StageCard = ({
   setupEmailSent,
   aiSprintEstimatesLoading,
   aiSprintEstimatesAvailable,
+  aiScopeLoading,
   completionDate,
   leadId
 }: {
@@ -1828,6 +1846,7 @@ const StageCard = ({
   setupEmailSent?: boolean
   aiSprintEstimatesLoading?: boolean
   aiSprintEstimatesAvailable?: boolean
+  aiScopeLoading?: boolean
   completionDate?: string
   leadId: string
 }) => {
@@ -1997,6 +2016,7 @@ const StageCard = ({
                     setupEmailSent={event.id === "setup" ? setupEmailSent : false}
                     aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
                     aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
+                    aiScopeLoading={event.id === "proposal" ? aiScopeLoading : false}
                     leadId={leadId}
                   />
                 ) : null}
@@ -2331,6 +2351,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   // AI Sprint Pricing state - for polling n8n workflow results
   const [aiSprintEstimatesLoading, setAiSprintEstimatesLoading] = useState(false)
   const [aiSprintEstimatesAvailable, setAiSprintEstimatesAvailable] = useState(false)
+  // AI Scope loading state - for proposal email stage
+  const [aiScopeLoading, setAiScopeLoading] = useState(false)
 
   // Load stage data from Supabase on mount
   useEffect(() => {
@@ -2500,6 +2522,52 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     // Cleanup on unmount or when dependencies change
     return () => clearInterval(pollInterval)
   }, [leadId, completedStages, aiSprintEstimatesAvailable, sprintPricingData])
+
+  // Poll for ai_scope when on proposal email stage and ai_scope is not yet available
+  useEffect(() => {
+    // Only poll if:
+    // 1. We have sprint pricing data with ai_explanation
+    // 2. ai_scope is not yet available
+    // 3. The proposal stage is not completed
+    if (!sprintPricingData || sprintPricingData.aiScope || completedStages.has('proposal')) {
+      setAiScopeLoading(false)
+      return
+    }
+
+    // Only start polling if we have ai_explanation (meaning initial estimates are ready)
+    if (!sprintPricingData.aiExplanation) {
+      return
+    }
+
+    console.log('Starting polling for ai_scope...')
+    setAiScopeLoading(true)
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const sprintPricing = await getSprintPricing(leadId)
+        if (sprintPricing && sprintPricing.ai_scope) {
+          console.log('ai_scope detected:', sprintPricing.ai_scope)
+
+          // Update sprint pricing data with ai_scope
+          setSprintPricingData(prev => prev ? {
+            ...prev,
+            aiScope: sprintPricing.ai_scope
+          } : null)
+
+          setAiScopeLoading(false)
+          clearInterval(pollInterval)
+        }
+      } catch (error) {
+        console.error("Error polling for ai_scope:", error)
+      }
+    }, 3000) // Poll every 3 seconds
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      console.log('Stopping ai_scope polling')
+      clearInterval(pollInterval)
+    }
+  }, [leadId, sprintPricingData, completedStages])
 
   const completedCount = completedStages.size
   const totalCount = events.length
@@ -4585,6 +4653,7 @@ Tim`
                 setupEmailSent={event.id === "setup" ? setupEmailSent : false}
                 aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
                 aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
+                aiScopeLoading={event.id === "proposal" ? aiScopeLoading : false}
                 completionDate={completionDates[event.id]}
                 leadId={leadId}
               />
@@ -4687,6 +4756,7 @@ Tim`
                 setupEmailSent={event.id === "setup" ? setupEmailSent : false}
                 aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
                 aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
+                aiScopeLoading={event.id === "proposal" ? aiScopeLoading : false}
                 completionDate={completionDates[event.id]}
                 leadId={leadId}
               />
