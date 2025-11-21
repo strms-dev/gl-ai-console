@@ -146,6 +146,117 @@ Reference these existing components as templates:
   - Use `AlertDialog` for simple informational popups with just an OK button
   - Use `ConfirmationDialog` for actions requiring user confirmation (OK/Cancel)
 
+## Build Error Prevention Guidelines
+
+**CRITICAL**: These guidelines prevent production build failures. Follow them rigorously during development.
+
+### Run Builds During Development
+- **Run `npm run build` periodically** during feature development (not just at the end)
+- Build after completing each major component or section
+- **NEVER push to main without a successful local build first**
+- The dev server (`npm run dev`) does NOT catch all build errors - only `npm run build` does
+
+### TypeScript & ESLint Rules
+
+#### 1. NEVER Use `any` Type
+- ❌ **WRONG**: `const data: any = await fetchData()`
+- ✅ **CORRECT**: Define proper interfaces or use `Partial<Type>`
+```typescript
+interface ProjectData {
+  id: string
+  name: string
+  status: string
+}
+const data: ProjectData = await fetchData()
+```
+
+#### 2. Always Await Async Functions
+- ❌ **WRONG**: `updateProject(id, data)` (not awaiting)
+- ✅ **CORRECT**: `await updateProject(id, data)`
+- Make parent functions `async` when calling async functions
+
+#### 3. Escape HTML Entities in JSX
+- ❌ **WRONG**: `<p>Nick's Hours</p>` or `<p>Add "New Item"</p>`
+- ✅ **CORRECT**: `<p>Nick&apos;s Hours</p>` or `<p>Add &quot;New Item&quot;</p>`
+- Use `&apos;` for apostrophes and `&quot;` for quotes in JSX text
+
+#### 4. Use `const` Instead of `let` When Possible
+- ❌ **WRONG**: `let items = [...array]` (never reassigned)
+- ✅ **CORRECT**: `const items = [...array]`
+- Only use `let` if the variable will be reassigned
+
+#### 5. Supabase Insert Pattern
+- This codebase doesn't have generated Supabase types
+- **Standard pattern** for inserts (avoid `@typescript-eslint/no-explicit-any` errors):
+```typescript
+interface DataInsert {
+  field1: string
+  field2: number
+  // ... all insert fields
+}
+
+const insertData: DataInsert = { /* data */ }
+
+const { data, error } = await supabase
+  .from('table_name')
+  .insert(insertData as never)  // Use 'as never' NOT 'as any'
+  .select()
+  .single()
+
+return (data as { id: string }).id  // Type assertion for return
+```
+
+### Common Build Error Patterns to Avoid
+
+1. **Missing awaits in useEffect**:
+```typescript
+// ❌ WRONG
+useEffect(() => {
+  const data = getProjects()  // async function not awaited
+}, [])
+
+// ✅ CORRECT
+useEffect(() => {
+  const loadData = async () => {
+    const data = await getProjects()
+    setProjects(data)
+  }
+  loadData()
+}, [])
+```
+
+2. **Type mismatches in form submissions**:
+```typescript
+// ❌ WRONG - passing form data that doesn't match function signature
+await createProject(formData)  // has extra fields
+
+// ✅ CORRECT - extract only needed fields
+await createProject({
+  name: formData.name,
+  status: formData.status,
+  assignee: formData.assignee || undefined  // handle empty strings
+})
+```
+
+3. **Empty string vs undefined**:
+```typescript
+// ❌ WRONG - type error when function expects Developer | undefined
+assignee: assignee  // could be empty string ""
+
+// ✅ CORRECT
+assignee: assignee || undefined  // convert empty string to undefined
+```
+
+### Pre-Push Checklist
+
+Before pushing ANY code to main:
+- [ ] Run `npm run build` locally
+- [ ] Build completes with **zero errors** (warnings are OK)
+- [ ] Fix any TypeScript errors immediately
+- [ ] Fix any ESLint errors immediately
+- [ ] Test the feature works in the local build
+- [ ] Only then commit and push to main
+
 ## Timeline Component Development Patterns
 
 ### Adding New Interactive Actions (Buttons) to Timeline Stages
