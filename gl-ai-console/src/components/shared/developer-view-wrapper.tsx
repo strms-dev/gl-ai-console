@@ -11,7 +11,7 @@ import { ColumnConfig } from "@/components/shared/list-view"
 import { ProjectCard } from "@/components/project-management/project-card"
 import { TicketCard } from "@/components/maintenance/ticket-card"
 import { Badge } from "@/components/ui/badge"
-import { User, Clock, Calendar, AlertCircle } from "lucide-react"
+import { Clock, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // ============================================================================

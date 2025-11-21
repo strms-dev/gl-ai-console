@@ -2,7 +2,7 @@
 
 import { MaintenanceTicket, maintStageColors } from "@/lib/dummy-data"
 import { formatMinutes, formatDate } from "@/lib/services/time-tracking-service"
-import { User, Clock, Calendar, AlertCircle, Wrench } from "lucide-react"
+import { User, Clock, Calendar, AlertCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 

@@ -29,7 +29,6 @@ import {
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { AlertDialog } from "@/components/ui/alert-dialog"
 import { CustomerSelector } from "@/components/ui/customer-selector"
-import { ChevronDown } from "lucide-react"
 
 interface TicketDetailModalProps {
   ticketId?: string | null
@@ -203,7 +202,7 @@ export function TicketDetailModal({
         startDate,
         endDate,
         status,
-        assignee,
+        assignee: assignee || undefined,
         notes,
         errorMessage
       })
@@ -227,7 +226,7 @@ export function TicketDetailModal({
           startDate,
           endDate,
           status,
-          assignee,
+          assignee: assignee || undefined,
           notes,
           errorMessage
         })
@@ -299,21 +298,17 @@ export function TicketDetailModal({
       const newEntry = await createTimeEntry({
       projectId: ticket.id,
       projectType: "maintenance",
-      assignee: assignee,
+      assignee: assignee as Developer,
       duration: minutes,
       notes: timeEntryNotes.trim() || "",
       weekStartDate: getWeekStartDate(now)
     })
 
-    // Update local state and update ticket's total time
+    // Update local state
     const updatedEntries = [...timeEntries, newEntry]
     setTimeEntries(updatedEntries)
     setTimeIncrement("")
     setTimeEntryNotes("")
-
-    // Update ticket with new total time
-    const newTotalTime = updatedEntries.reduce((sum, entry) => sum + entry.duration, 0)
-    updateMaintTicket(ticket.id, { timeTracked: newTotalTime })
     } catch (error) {
       console.error("Error adding time entry:", error)
       showAlert("Error", "Failed to add time entry. Please try again.")
@@ -331,10 +326,6 @@ export function TicketDetailModal({
       const updatedEntries = timeEntries.filter(e => e.id !== entryToDelete)
       setTimeEntries(updatedEntries)
       setEntryToDelete(null)
-
-      // Update ticket with new total time
-      const newTotalTime = updatedEntries.reduce((sum, entry) => sum + entry.duration, 0)
-      updateMaintTicket(ticket.id, { timeTracked: newTotalTime })
     }
   }
 

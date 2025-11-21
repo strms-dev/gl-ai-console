@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { MaintenanceTicket, SprintLength, Developer, MaintenanceStatus, TicketType, TimeEntry } from "@/lib/dummy-data"
+import { MaintenanceTicket, Developer, MaintenanceStatus, TicketType, TimeEntry } from "@/lib/dummy-data"
 import { formatMinutes, getTimeEntriesForProject, createTimeEntry, deleteTimeEntry, getWeekStartDate } from "@/lib/services/time-tracking-service"
 import { Clock, Trash2 } from "lucide-react"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
@@ -30,7 +30,6 @@ export interface TicketFormData {
   numberOfErrors: number
   status: MaintenanceStatus
   assignee: Developer
-  sprintLength: SprintLength
   startDate: string
   endDate: string
   notes: string
@@ -54,7 +53,6 @@ export function TicketForm({
     numberOfErrors: 0,
     status: "errors-logged",
     assignee: initialData?.assignee || "Nick",
-    sprintLength: "" as SprintLength,
     startDate: "",
     endDate: "",
     notes: ""
@@ -68,12 +66,15 @@ export function TicketForm({
 
   // Load time entries when editing a ticket
   useEffect(() => {
-    if (initialData && open) {
-      const entries = getTimeEntriesForProject(initialData.id)
-      setTimeEntries(entries)
-    } else {
-      setTimeEntries([])
+    const loadEntries = async () => {
+      if (initialData && open) {
+        const entries = await getTimeEntriesForProject(initialData.id, "maintenance")
+        setTimeEntries(entries)
+      } else {
+        setTimeEntries([])
+      }
     }
+    loadEntries()
   }, [initialData, open])
 
   // Reset form when dialog opens/closes or initialData changes
@@ -86,7 +87,6 @@ export function TicketForm({
         numberOfErrors: initialData.numberOfErrors,
         status: initialData.status,
         assignee: initialData.assignee,
-        sprintLength: initialData.sprintLength,
         startDate: initialData.startDate,
         endDate: initialData.endDate,
         notes: initialData.notes
@@ -98,8 +98,7 @@ export function TicketForm({
         ticketType: "Maintenance",
         numberOfErrors: 0,
         status: "errors-logged",
-        assignee: initialData?.assignee || "Nick",
-        sprintLength: "" as SprintLength,
+        assignee: "Nick",
         startDate: "",
         endDate: "",
         notes: ""
@@ -133,7 +132,7 @@ export function TicketForm({
     return null
   }
 
-  const handleAddTime = () => {
+  const handleAddTime = async () => {
     if (!initialData) return // Can't add time to unsaved ticket
 
     const minutes = parseTimeIncrement(timeIncrement)
@@ -150,7 +149,7 @@ export function TicketForm({
 
     // Create a new time entry
     const now = new Date()
-    const newEntry = createTimeEntry({
+    const newEntry = await createTimeEntry({
       projectId: initialData.id,
       projectType: "maintenance",
       assignee: initialData.assignee,
@@ -192,7 +191,7 @@ export function TicketForm({
       timeTracked: totalTimeTracked
     }
 
-    onSubmit(submitData as any)
+    onSubmit(submitData as Partial<MaintenanceTicket>)
     onOpenChange(false)
   }
 
@@ -266,26 +265,8 @@ export function TicketForm({
             </div>
           </div>
 
-          {/* Sprint Length & Assignee Row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sprintLength" style={{fontFamily: 'var(--font-body)'}}>
-                Sprint Length
-              </Label>
-              <select
-                id="sprintLength"
-                value={formData.sprintLength}
-                onChange={(e) => handleChange("sprintLength", e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Select sprint length...</option>
-                <option value="0.5x">0.5x Sprint</option>
-                <option value="1x">1x Sprint</option>
-                <option value="1.5x">1.5x Sprint</option>
-                <option value="2x">2x Sprint</option>
-              </select>
-            </div>
-
+          {/* Assignee Row */}
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="assignee" style={{fontFamily: 'var(--font-body)'}}>
                 Assignee *

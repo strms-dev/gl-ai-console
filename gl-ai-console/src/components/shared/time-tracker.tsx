@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { TimeEntry, ProjectType, Developer } from "@/lib/types"
-import { createTimeEntry, getWeekStartDate, formatMinutes } from "@/lib/services/time-tracking-service"
+import { createTimeEntry, getWeekStartDate } from "@/lib/services/time-tracking-service"
 import { cn } from "@/lib/utils"
 
 // ============================================================================

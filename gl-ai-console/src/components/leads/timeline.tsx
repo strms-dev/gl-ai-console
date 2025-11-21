@@ -2551,7 +2551,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
           // Update sprint pricing data with ai_scope
           setSprintPricingData(prev => prev ? {
             ...prev,
-            aiScope: sprintPricing.ai_scope
+            aiScope: sprintPricing.ai_scope || undefined
           } : null)
 
           setAiScopeLoading(false)

@@ -122,7 +122,7 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
     }))
 
     // Combine and sort
-    let combined = [...devItems, ...maintItems]
+    const combined = [...devItems, ...maintItems]
 
     // Sort by completion date (most recent first) for completed view, or by priority for active view
     if (viewMode === "completed") {
@@ -258,7 +258,7 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
     }))
 
     // Combine and sort
-    let combined = [...devItems, ...maintItems]
+    const combined = [...devItems, ...maintItems]
 
     // Sort by completion date (most recent first) for completed view, or by priority for active view
     if (viewMode === "completed") {

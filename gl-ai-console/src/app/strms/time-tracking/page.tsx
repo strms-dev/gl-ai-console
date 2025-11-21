@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, Clock, User, Code, Wrench, ChevronDown } from "lucide-react"
-import { TimeEntry, Developer } from "@/lib/types"
-import { getTimeEntries, getWeekStartDate, formatMinutes, formatDate } from "@/lib/services/time-tracking-service"
+import { TimeEntry, DevelopmentProject, MaintenanceTicket } from "@/lib/types"
+import { getTimeEntries, getWeekStartDate, formatMinutes } from "@/lib/services/time-tracking-service"
 import { getDevProjects } from "@/lib/services/project-service"
 import { getMaintTickets } from "@/lib/services/maintenance-service"
 
@@ -119,8 +119,8 @@ export default function TimeTrackingPage() {
   }, [weekEntries])
 
   // Store projects and tickets for lookup
-  const [projects, setProjects] = useState<any[]>([])
-  const [tickets, setTickets] = useState<any[]>([])
+  const [projects, setProjects] = useState<DevelopmentProject[]>([])
+  const [tickets, setTickets] = useState<MaintenanceTicket[]>([])
 
   // Load projects and tickets when time entries are loaded
   useEffect(() => {
@@ -350,7 +350,7 @@ export default function TimeTrackingPage() {
         <Card className="bg-white border-none shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-              Nick's Hours
+              Nick&apos;s Hours
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -398,7 +398,7 @@ export default function TimeTrackingPage() {
         <Card className="bg-white border-none shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-              Gon's Hours
+              Gon&apos;s Hours
             </CardTitle>
           </CardHeader>
           <CardContent>

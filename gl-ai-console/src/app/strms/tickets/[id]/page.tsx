@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Edit, Trash2, User, Calendar, Clock, FileText, AlertCircle, Wrench } from "lucide-react"
-import { MaintenanceTicket, maintStageLabels, maintStageColors, sprintLengthLabels } from "@/lib/dummy-data"
+import { ArrowLeft, Edit, Trash2, User, Calendar, Clock, FileText, AlertCircle } from "lucide-react"
+import { MaintenanceTicket, maintStageLabels, maintStageColors } from "@/lib/dummy-data"
 import { getMaintTicketById, updateMaintTicket, deleteMaintTicket } from "@/lib/services/maintenance-service"
 import { formatMinutes } from "@/lib/services/time-tracking-service"
 import { TicketForm } from "@/components/maintenance/ticket-form"
@@ -27,8 +27,8 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
 
   // Load ticket on mount
   useEffect(() => {
-    const loadTicket = () => {
-      const fetchedTicket = getMaintTicketById(params.id)
+    const loadTicket = async () => {
+      const fetchedTicket = await getMaintTicketById(params.id)
       setTicket(fetchedTicket || null)
       setLoading(false)
     }
@@ -36,10 +36,10 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
   }, [params.id])
 
   // Handle ticket update
-  const handleUpdateTicket = (ticketData: any) => {
+  const handleUpdateTicket = async (ticketData: Partial<MaintenanceTicket>) => {
     if (ticket) {
-      updateMaintTicket(ticket.id, ticketData)
-      const updatedTicket = getMaintTicketById(ticket.id)
+      await updateMaintTicket(ticket.id, ticketData)
+      const updatedTicket = await getMaintTicketById(ticket.id)
       setTicket(updatedTicket || null)
       setShowEditForm(false)
     }
@@ -54,9 +54,9 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
   }
 
   // Handle time logged callback
-  const handleTimeLogged = () => {
+  const handleTimeLogged = async () => {
     // Refresh ticket to update time tracked
-    const updatedTicket = getMaintTicketById(params.id)
+    const updatedTicket = await getMaintTicketById(params.id)
     setTicket(updatedTicket || null)
   }
 
@@ -187,15 +187,6 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
                 </div>
               )}
 
-              {/* Sprint Length */}
-              <div className="flex items-center justify-between pb-4 border-b border-[#E5E5E5]">
-                <span className="text-sm font-medium text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                  Sprint Length
-                </span>
-                <Badge className="bg-[#95CBD7] text-[#463939] hover:bg-[#95CBD7]/90 border-none">
-                  {sprintLengthLabels[ticket.sprintLength]}
-                </Badge>
-              </div>
 
               {/* Assignee */}
               <div className="flex items-center justify-between pb-4 border-b border-[#E5E5E5]">

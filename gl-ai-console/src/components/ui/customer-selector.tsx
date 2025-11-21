@@ -174,7 +174,7 @@ export function CustomerSelector({ value, onChange, required = false, showLabel 
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm text-[#407B9D] font-medium" style={{ fontFamily: 'var(--font-body)' }}>
-                  + Add "{searchQuery.trim()}"
+                  + Add &quot;{searchQuery.trim()}&quot;
                 </span>
               </div>
             </div>
@@ -188,7 +188,7 @@ export function CustomerSelector({ value, onChange, required = false, showLabel 
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm text-[#407B9D] font-medium" style={{ fontFamily: 'var(--font-body)' }}>
-                  + Add "{searchQuery.trim()}" as new customer
+                  + Add &quot;{searchQuery.trim()}&quot; as new customer
                 </span>
               </div>
             </div>

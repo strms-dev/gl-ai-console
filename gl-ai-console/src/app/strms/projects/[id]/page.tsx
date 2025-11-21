@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Edit, Trash2, User, Calendar, Clock, FileText } from "lucide-react"
@@ -27,8 +27,8 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
 
   // Load project on mount
   useEffect(() => {
-    const loadProject = () => {
-      const fetchedProject = getDevProjectById(params.id)
+    const loadProject = async () => {
+      const fetchedProject = await getDevProjectById(params.id)
       setProject(fetchedProject || null)
       setLoading(false)
     }
@@ -36,10 +36,10 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   }, [params.id])
 
   // Handle project update
-  const handleUpdateProject = (projectData: any) => {
+  const handleUpdateProject = async (projectData: Partial<DevelopmentProject>) => {
     if (project) {
-      updateDevProject(project.id, projectData)
-      const updatedProject = getDevProjectById(project.id)
+      await updateDevProject(project.id, projectData)
+      const updatedProject = await getDevProjectById(project.id)
       setProject(updatedProject || null)
       setShowEditForm(false)
     }
@@ -54,9 +54,9 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   }
 
   // Handle time logged callback
-  const handleTimeLogged = () => {
+  const handleTimeLogged = async () => {
     // Refresh project to update time tracked
-    const updatedProject = getDevProjectById(params.id)
+    const updatedProject = await getDevProjectById(params.id)
     setProject(updatedProject || null)
   }
 

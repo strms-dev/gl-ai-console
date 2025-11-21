@@ -105,7 +105,6 @@ export interface MaintenanceTicket {
   numberOfErrors: number         // Count of duplicate error occurrences
   status: MaintenanceStatus
   assignee: Developer
-  sprintLength: SprintLength
   startDate: string
   endDate: string
   timeTracked: number            // Minutes tracked
@@ -126,11 +125,10 @@ export interface TimeEntry {
   projectId: string              // Reference to dev project or maintenance ticket
   projectType: ProjectType
   assignee: Developer
-  startTime: string              // ISO timestamp
-  endTime: string | null         // null if timer running
   duration: number               // Minutes
   notes: string
   weekStartDate: string          // ISO date for the week (Monday)
+  createdAt: string              // ISO timestamp of when entry was created
 }
 
 // Development Stage Labels & Colors

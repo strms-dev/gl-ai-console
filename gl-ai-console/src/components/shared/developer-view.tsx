@@ -168,7 +168,7 @@ export function DeveloperView({
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle style={{fontFamily: 'var(--font-heading)'}}>
-              {developer}'s {viewType === "active" ? "Active" : "Completed"} Work ({totalCount})
+              {developer}&apos;s {viewType === "active" ? "Active" : "Completed"} Work ({totalCount})
             </CardTitle>
             <ViewToggle currentView={viewMode} onChange={setViewMode} />
           </div>

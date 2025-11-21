@@ -184,7 +184,7 @@ export function ProjectForm({
       timeTracked: totalTimeTracked
     }
 
-    onSubmit(submitData as any)
+    onSubmit(submitData as Partial<DevelopmentProject>)
     onOpenChange(false)
   }
 
