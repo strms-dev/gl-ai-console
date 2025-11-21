@@ -21,7 +21,8 @@
       "Bash(npx playwright install:*)",
       "Bash(mkdir:*)",
       "Bash(mv:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(python:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

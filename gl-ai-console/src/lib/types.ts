@@ -1,68 +1,3 @@
-import { ProjectStatus } from './supabase/types'
-
-export interface Lead {
-  id: string
-  projectName: string
-  company: string
-  contact: string
-  email: string
-  stage: "new" | "demo" | "readiness" | "decision" | "scoping" | "scoping-prep" | "dev-overview" | "workflow-docs" | "sprint-pricing" | "proposal" | "proposal-decision" | "internal-client-docs" | "ea" | "setup" | "kickoff"
-  projectStatus?: ProjectStatus  // Status of the project (active, not-a-fit, proposal-declined, onboarding-complete)
-  lastActivity: string
-  readinessScore?: number
-  estimatedValue?: number
-  nextAction?: string
-  notes?: string
-}
-
-export const dummyLeads: Lead[] = [
-  {
-    id: "lead-1",
-    projectName: "Karbon > Notion Sync",
-    company: "Acme Corp",
-    contact: "John Smith",
-    email: "john@acmecorp.com",
-    stage: "demo",
-    lastActivity: "2 hours ago"
-  }
-]
-
-export const stageLabels = {
-  new: "New Lead",
-  demo: "Demo Call",
-  readiness: "Readiness Assessment",
-  decision: "Scoping Decision",
-  scoping: "Scoping Call",
-  "scoping-prep": "Scoping Prep",
-  "dev-overview": "Developer Overview",
-  "workflow-docs": "Workflow Documentation",
-  "sprint-pricing": "Sprint Pricing",
-  proposal: "Proposal Sent",
-  "proposal-decision": "Proposal Decision",
-  "internal-client-docs": "Internal & Client Docs",
-  ea: "Engagement Agreement",
-  setup: "Project Setup",
-  kickoff: "Project Kickoff"
-}
-
-export const stageColors = {
-  new: "bg-slate-100 text-slate-800",
-  demo: "bg-blue-100 text-blue-800",
-  readiness: "bg-yellow-100 text-yellow-800",
-  decision: "bg-amber-100 text-amber-800",
-  scoping: "bg-purple-100 text-purple-800",
-  "scoping-prep": "bg-indigo-100 text-indigo-800",
-  "dev-overview": "bg-cyan-100 text-cyan-800",
-  "workflow-docs": "bg-teal-100 text-teal-800",
-  "sprint-pricing": "bg-violet-100 text-violet-800",
-  proposal: "bg-orange-100 text-orange-800",
-  "proposal-decision": "bg-red-100 text-red-800",
-  "internal-client-docs": "bg-emerald-100 text-emerald-800",
-  ea: "bg-green-100 text-green-800",
-  setup: "bg-lime-100 text-lime-800",
-  kickoff: "bg-gray-100 text-gray-800"
-}
-
 // ============================================================================
 // PROJECT MANAGEMENT & MAINTENANCE TYPES
 // ============================================================================
@@ -82,10 +17,10 @@ export interface DevelopmentProject {
   endDate: string                // ISO date string
   status: DevelopmentStatus
   assignee: Developer
-  timeTracked: number            // Minutes tracked
+  timeTracked: number            // Minutes tracked (calculated from time_entries)
   priority: number               // Priority for developer view ordering (lower = higher priority)
   notes: string
-  lastActivity: string           // Relative time string
+  lastActivity: string           // Relative time string (calculated from updated_at)
   createdAt: string              // ISO timestamp
   updatedAt: string              // ISO timestamp
   completedDate?: string         // ISO timestamp when status changed to complete/cancelled
@@ -105,14 +40,13 @@ export interface MaintenanceTicket {
   numberOfErrors: number         // Count of duplicate error occurrences
   status: MaintenanceStatus
   assignee: Developer
-  sprintLength: SprintLength
   startDate: string
   endDate: string
-  timeTracked: number            // Minutes tracked
+  timeTracked: number            // Minutes tracked (calculated from time_entries)
   priority: number               // Priority for developer view ordering (lower = higher priority)
   notes: string
   errorMessage: string           // Detailed error message
-  lastActivity: string
+  lastActivity: string           // Relative time string (calculated from updated_at)
   createdAt: string
   updatedAt: string
   completedDate?: string         // ISO timestamp when status changed to closed
@@ -126,11 +60,57 @@ export interface TimeEntry {
   projectId: string              // Reference to dev project or maintenance ticket
   projectType: ProjectType
   assignee: Developer
-  startTime: string              // ISO timestamp
-  endTime: string | null         // null if timer running
   duration: number               // Minutes
   notes: string
   weekStartDate: string          // ISO date for the week (Monday)
+  createdAt: string              // ISO timestamp of when entry was created
+}
+
+// Database row types (from Supabase)
+export interface DevProjectRow {
+  id: string
+  project_name: string | null
+  customer: string | null
+  sprint_length: string | null
+  start_date: string | null
+  end_date: string | null
+  status: string | null
+  assignee: string | null
+  priority: number
+  notes: string | null
+  created_at: string
+  updated_at: string
+  completed_date: string | null
+}
+
+export interface MaintenanceTicketRow {
+  id: string
+  ticket_title: string | null
+  customer: string | null
+  ticket_type: string | null
+  platform: string | null
+  number_of_errors: number
+  status: string | null
+  assignee: string | null
+  start_date: string | null
+  end_date: string | null
+  priority: number
+  notes: string | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+  completed_date: string | null
+}
+
+export interface TimeEntryRow {
+  id: string
+  project_id: string | null
+  project_type: string | null
+  assignee: string | null
+  duration: number
+  notes: string | null
+  week_start_date: string | null
+  created_at: string
 }
 
 // Development Stage Labels & Colors
@@ -176,12 +156,3 @@ export const sprintLengthLabels: Record<SprintLength, string> = {
   "1.5x": "1.5x Sprint",
   "2x": "2x Sprint"
 }
-
-// Mock data for development projects
-export const dummyDevProjects: DevelopmentProject[] = []
-
-// Mock data for maintenance tickets
-export const dummyMaintTickets: MaintenanceTicket[] = []
-
-// Mock data for time entries
-export const dummyTimeEntries: TimeEntry[] = []

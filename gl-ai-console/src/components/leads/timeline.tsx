@@ -15,6 +15,7 @@ import { confirmSprintPricing, updateConfirmedPricing, getSprintPricing, deleteS
 import { updateProjectStatus } from "@/lib/supabase/project-status"
 import { getFileByType } from "@/lib/supabase/files"
 import { getProjectById } from "@/lib/supabase/projects"
+import { createDevProjectFromSTRMS } from "@/lib/supabase/dev-projects"
 import {
   CheckCircle2,
   XCircle,
@@ -194,6 +195,7 @@ const ActionZone = ({
   setupEmailSent,
   aiSprintEstimatesLoading,
   aiSprintEstimatesAvailable,
+  aiScopeLoading,
   leadId
 }: {
   event: TimelineEvent,
@@ -237,6 +239,7 @@ const ActionZone = ({
   setupEmailSent?: boolean,
   aiSprintEstimatesLoading?: boolean,
   aiSprintEstimatesAvailable?: boolean,
+  aiScopeLoading?: boolean,
   leadId: string
 }) => {
   const [emailCopied, setEmailCopied] = useState(false)
@@ -626,6 +629,21 @@ const ActionZone = ({
 
     // Show proposal email draft for pending/in-progress stage
     if (sprintPricingData) {
+      // If ai_scope is not yet available, show loading state
+      if (!sprintPricingData.aiScope && aiScopeLoading) {
+        return (
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <RotateCw className="w-5 h-5 text-[#407B9D] animate-spin" />
+              <h3 className="font-medium text-[#407B9D]" style={{fontFamily: 'var(--font-heading)'}}>Generating Proposal Email Draft...</h3>
+            </div>
+            <p className="text-sm text-gray-700">
+              Please wait while AI generates the detailed scope for your proposal email.
+            </p>
+          </div>
+        )
+      }
+
       const sprintOptions = {
         "0.5": { duration: "2.5 days", type: "1/2 sprint" },
         "1": { duration: "5 days", type: "1x sprint" },
@@ -1287,7 +1305,7 @@ Tim`
     )
   }
 
-  // Project Setup Actions - Create ClickUp Task and Airtable CRM & Inventory Record
+  // Project Setup Actions - Create Project Work Item and Airtable CRM & Inventory Record
   if (event.type === "setup") {
     // Extract developer from decisionMade (e.g., "proceed_nick" -> "nick")
     const getDeveloperName = () => {
@@ -1316,14 +1334,13 @@ Tim`
       <div className="mt-4 space-y-4">
         <div className="p-4 bg-[#95CBD7]/20 border border-[#95CBD7] rounded-xl">
           <div className="space-y-3">
-            {/* Create ClickUp Task */}
+            {/* Create Project Work Item */}
             <div className="p-3 bg-white border border-gray-200 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <ClipboardList className="w-6 h-6 text-gray-600" />
                   <div>
-                    <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create ClickUp Task</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">Manual for now - soon automating with GL AI Console project management</p>
+                    <h4 className="font-medium text-gray-800" style={{fontFamily: 'var(--font-heading)'}}>Create Project Work Item</h4>
                   </div>
                 </div>
                 <div className="flex items-center">
@@ -1338,7 +1355,7 @@ Tim`
                       size="sm"
                       className="bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                     >
-                      Confirm
+                      Create
                     </Button>
                   )}
                 </div>
@@ -1780,6 +1797,7 @@ const StageCard = ({
   setupEmailSent,
   aiSprintEstimatesLoading,
   aiSprintEstimatesAvailable,
+  aiScopeLoading,
   completionDate,
   leadId
 }: {
@@ -1828,6 +1846,7 @@ const StageCard = ({
   setupEmailSent?: boolean
   aiSprintEstimatesLoading?: boolean
   aiSprintEstimatesAvailable?: boolean
+  aiScopeLoading?: boolean
   completionDate?: string
   leadId: string
 }) => {
@@ -1997,6 +2016,7 @@ const StageCard = ({
                     setupEmailSent={event.id === "setup" ? setupEmailSent : false}
                     aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
                     aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
+                    aiScopeLoading={event.id === "proposal" ? aiScopeLoading : false}
                     leadId={leadId}
                   />
                 ) : null}
@@ -2331,6 +2351,8 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
   // AI Sprint Pricing state - for polling n8n workflow results
   const [aiSprintEstimatesLoading, setAiSprintEstimatesLoading] = useState(false)
   const [aiSprintEstimatesAvailable, setAiSprintEstimatesAvailable] = useState(false)
+  // AI Scope loading state - for proposal email stage
+  const [aiScopeLoading, setAiScopeLoading] = useState(false)
 
   // Load stage data from Supabase on mount
   useEffect(() => {
@@ -2389,7 +2411,7 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         }
 
         // Load Setup stage data
-        const clickupTask = await getStageData(leadId, 'setup', 'clickup_task_created')
+        const clickupTask = await getStageData(leadId, 'setup', 'project_work_item_created')
         if (clickupTask === true) {
           setClickupTaskCreated(true)
         }
@@ -2501,6 +2523,52 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
     return () => clearInterval(pollInterval)
   }, [leadId, completedStages, aiSprintEstimatesAvailable, sprintPricingData])
 
+  // Poll for ai_scope when on proposal email stage and ai_scope is not yet available
+  useEffect(() => {
+    // Only poll if:
+    // 1. We have sprint pricing data with ai_explanation
+    // 2. ai_scope is not yet available
+    // 3. The proposal stage is not completed
+    if (!sprintPricingData || sprintPricingData.aiScope || completedStages.has('proposal')) {
+      setAiScopeLoading(false)
+      return
+    }
+
+    // Only start polling if we have ai_explanation (meaning initial estimates are ready)
+    if (!sprintPricingData.aiExplanation) {
+      return
+    }
+
+    console.log('Starting polling for ai_scope...')
+    setAiScopeLoading(true)
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const sprintPricing = await getSprintPricing(leadId)
+        if (sprintPricing && sprintPricing.ai_scope) {
+          console.log('ai_scope detected:', sprintPricing.ai_scope)
+
+          // Update sprint pricing data with ai_scope
+          setSprintPricingData(prev => prev ? {
+            ...prev,
+            aiScope: sprintPricing.ai_scope
+          } : null)
+
+          setAiScopeLoading(false)
+          clearInterval(pollInterval)
+        }
+      } catch (error) {
+        console.error("Error polling for ai_scope:", error)
+      }
+    }, 3000) // Poll every 3 seconds
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      console.log('Stopping ai_scope polling')
+      clearInterval(pollInterval)
+    }
+  }, [leadId, sprintPricingData, completedStages])
+
   const completedCount = completedStages.size
   const totalCount = events.length
   const progressPercentage = (completedCount / totalCount) * 100
@@ -2587,6 +2655,9 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       setAnchorProposalCreated(false)
       setAnchorProposalLoading(false)
 
+      // Also reset Project Work Item since it's auto-created when EA is confirmed
+      setClickupTaskCreated(false)
+
       // Reset EA stage to pending
       setCompletedStages(prev => {
         const newSet = new Set(prev)
@@ -2604,6 +2675,11 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       // Delete all EA stage data from Supabase
       deleteAllStageData(leadId, 'ea').catch(error => {
         console.error("Failed to delete EA stage data from Supabase:", error)
+      })
+
+      // Also delete project work item data since it's auto-created when EA is confirmed
+      setStageData(leadId, 'setup', 'project_work_item_created', false).catch(error => {
+        console.error("Failed to reset project work item in Supabase:", error)
       })
 
       return
@@ -3674,6 +3750,38 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       // Mark the engagement agreement stage as completed
       setCompletedStages(prev => new Set(prev).add('ea'))
 
+      // Automatically mark Project Work Item as created
+      setClickupTaskCreated(true)
+
+      // Save to Supabase
+      setStageData(leadId, 'setup', 'project_work_item_created', true).catch(error => {
+        console.error("Failed to save project work item data to Supabase:", error)
+      })
+
+      // Create dev project in strms_dev_projects
+      const developer = decisionMade?.startsWith('proceed_')
+        ? decisionMade.replace('proceed_', '')
+        : null
+
+      if (developer) {
+        const assignee = developer === 'nick' ? 'Nick' : 'Gon'
+        console.log(`Creating dev project for ${assignee}`)
+
+        createDevProjectFromSTRMS(leadId, assignee)
+          .then((devProjectId) => {
+            console.log('Dev project created successfully:', devProjectId)
+            // Save the dev project ID to stage data for reference
+            setStageData(leadId, 'setup', 'dev_project_id', devProjectId).catch(error => {
+              console.error("Failed to save dev project ID to Supabase:", error)
+            })
+          })
+          .catch(error => {
+            console.error('Error creating dev project:', error)
+          })
+      } else {
+        console.error('Cannot create dev project: developer not found in decisionMade')
+      }
+
       // Automatically mark Airtable record as created
       setAirtableRecordCreated(true)
 
@@ -3743,12 +3851,36 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       })
     } else if (action === 'create_clickup_task') {
       setClickupTaskCreated(true)
-      console.log('ClickUp task created')
+      console.log('Project work item created')
 
       // Save to Supabase
-      setStageData(leadId, 'setup', 'clickup_task_created', true).catch(error => {
+      setStageData(leadId, 'setup', 'project_work_item_created', true).catch(error => {
         console.error("Failed to save Setup data to Supabase:", error)
       })
+
+      // Create dev project in strms_dev_projects (if not already created)
+      const developer = decisionMade?.startsWith('proceed_')
+        ? decisionMade.replace('proceed_', '')
+        : null
+
+      if (developer) {
+        const assignee = developer === 'nick' ? 'Nick' : 'Gon'
+        console.log(`Creating dev project for ${assignee}`)
+
+        createDevProjectFromSTRMS(leadId, assignee)
+          .then((devProjectId) => {
+            console.log('Dev project created successfully:', devProjectId)
+            // Save the dev project ID to stage data for reference
+            setStageData(leadId, 'setup', 'dev_project_id', devProjectId).catch(error => {
+              console.error("Failed to save dev project ID to Supabase:", error)
+            })
+          })
+          .catch(error => {
+            console.error('Error creating dev project:', error)
+          })
+      } else {
+        console.error('Cannot create dev project: developer not found in decisionMade')
+      }
     } else if (action === 'create_airtable_record') {
       // Immediately mark as created (no loading state)
       setAirtableRecordCreated(true)
@@ -4521,6 +4653,7 @@ Tim`
                 setupEmailSent={event.id === "setup" ? setupEmailSent : false}
                 aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
                 aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
+                aiScopeLoading={event.id === "proposal" ? aiScopeLoading : false}
                 completionDate={completionDates[event.id]}
                 leadId={leadId}
               />
@@ -4623,6 +4756,7 @@ Tim`
                 setupEmailSent={event.id === "setup" ? setupEmailSent : false}
                 aiSprintEstimatesLoading={event.id === "sprint-pricing" ? aiSprintEstimatesLoading : false}
                 aiSprintEstimatesAvailable={event.id === "sprint-pricing" ? aiSprintEstimatesAvailable : false}
+                aiScopeLoading={event.id === "proposal" ? aiScopeLoading : false}
                 completionDate={completionDates[event.id]}
                 leadId={leadId}
               />
