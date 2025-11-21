@@ -57,7 +57,7 @@ export default function HomePage() {
                   className="text-4xl font-bold text-[#407B9D]"
                   style={{fontFamily: 'var(--font-heading)'}}
                 >
-                  1
+                  2
                 </p>
               </div>
             </CardContent>

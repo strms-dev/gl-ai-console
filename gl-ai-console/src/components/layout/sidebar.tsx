@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Wrench, RotateCw, Home, Code, AlertCircle, Users, Clock, Folder, ChevronDown, ChevronRight, User, LucideIcon } from "lucide-react"
+import { Wrench, RotateCw, Home, Code, AlertCircle, Users, Clock, Folder, ChevronDown, ChevronRight, User, UserX, LucideIcon } from "lucide-react"
 import { useState, useEffect } from "react"
 
 const departments = [
@@ -22,6 +22,7 @@ interface NavigationItem {
 const departmentNavigation: Record<string, NavigationItem[]> = {
   strms: [
     { name: "Sales Pipeline", href: "/strms/sales-pipeline", icon: "rotate-cw" },
+    { name: "Offboarding", href: "/strms/offboarding", icon: "user-x" },
     {
       name: "Project Management",
       icon: "folder",
@@ -41,6 +42,7 @@ const getIconComponent = (iconName: string): LucideIcon => {
     'home': Home,
     'wrench': Wrench,
     'rotate-cw': RotateCw,
+    'user-x': UserX,
     'code': Code,
     'alert-circle': AlertCircle,
     'users': Users,
