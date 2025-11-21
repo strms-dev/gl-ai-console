@@ -2,6 +2,17 @@ import { supabase } from './client'
 import { getProjectById } from './projects'
 import { getSprintPricing } from './sprint-pricing'
 
+interface DevProjectInsert {
+  project_name: string
+  customer: string
+  sprint_length: string
+  start_date: string
+  status: string
+  assignee: string
+  priority: number
+  notes: string | null
+}
+
 /**
  * Create a development project from STRMS project data
  * Uses data from strms_projects and strms_sprint_pricing tables
@@ -33,18 +44,20 @@ export async function createDevProjectFromSTRMS(
 
   // Create dev project
   const now = new Date().toISOString()
+  const insertData: DevProjectInsert = {
+    project_name: project.project_name,
+    customer: project.company,
+    sprint_length: sprintLength,
+    start_date: now,
+    status: 'setup',
+    assignee: assignee,
+    priority: 0,
+    notes: pricing.ai_scope || null
+  }
+
   const { data, error } = await supabase
     .from('strms_dev_projects')
-    .insert({
-      project_name: project.project_name,
-      customer: project.company,
-      sprint_length: sprintLength,
-      start_date: now,
-      status: 'setup',
-      assignee: assignee,
-      priority: 0,
-      notes: pricing.ai_scope || null
-    } as any)
+    .insert(insertData as never)
     .select()
     .single()
 
@@ -53,7 +66,7 @@ export async function createDevProjectFromSTRMS(
     throw new Error(`Failed to create dev project: ${error.message}`)
   }
 
-  return data.id
+  return (data as { id: string }).id
 }
 
 /**
