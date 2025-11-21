@@ -64,12 +64,15 @@ export function ProjectForm({
 
   // Load time entries when editing a project
   useEffect(() => {
-    if (initialData && open) {
-      const entries = getTimeEntriesForProject(initialData.id)
-      setTimeEntries(entries)
-    } else {
-      setTimeEntries([])
+    const loadEntries = async () => {
+      if (initialData && open) {
+        const entries = await getTimeEntriesForProject(initialData.id, "development")
+        setTimeEntries(entries)
+      } else {
+        setTimeEntries([])
+      }
     }
+    loadEntries()
   }, [initialData, open])
 
   // Reset form when dialog opens/closes or initialData changes
@@ -93,7 +96,7 @@ export function ProjectForm({
         startDate: "",
         endDate: "",
         status: "setup",
-        assignee: initialData?.assignee || "Nick",
+        assignee: "Nick",
         notes: ""
       })
     }
@@ -125,7 +128,7 @@ export function ProjectForm({
     return null
   }
 
-  const handleAddTime = () => {
+  const handleAddTime = async () => {
     if (!initialData) return // Can't add time to unsaved project
 
     const minutes = parseTimeIncrement(timeIncrement)
@@ -142,7 +145,7 @@ export function ProjectForm({
 
     // Create a new time entry
     const now = new Date()
-    const newEntry = createTimeEntry({
+    const newEntry = await createTimeEntry({
       projectId: initialData.id,
       projectType: "development",
       assignee: initialData.assignee,
@@ -178,13 +181,8 @@ export function ProjectForm({
       return
     }
 
-    // Include calculated time tracked in submission
-    const submitData = {
-      ...formData,
-      timeTracked: totalTimeTracked
-    }
-
-    onSubmit(submitData as Partial<DevelopmentProject>)
+    // Submit form data (timeTracked is calculated from time_entries in the service)
+    onSubmit(formData)
     onOpenChange(false)
   }
 

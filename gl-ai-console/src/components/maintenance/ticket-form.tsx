@@ -185,13 +185,8 @@ export function TicketForm({
       return
     }
 
-    // Include calculated time tracked in submission
-    const submitData = {
-      ...formData,
-      timeTracked: totalTimeTracked
-    }
-
-    onSubmit(submitData as Partial<MaintenanceTicket>)
+    // Submit form data (timeTracked is calculated from time_entries in the service)
+    onSubmit(formData)
     onOpenChange(false)
   }
 

@@ -38,8 +38,11 @@ export function DeveloperViewWrapper({
 
   // Load data on mount
   useEffect(() => {
-    setDevProjects(getDevProjects())
-    setMaintTickets(getMaintTickets())
+    const loadData = async () => {
+      setDevProjects(await getDevProjects())
+      setMaintTickets(await getMaintTickets())
+    }
+    loadData()
   }, [])
 
   // Stage configurations
@@ -204,14 +207,14 @@ export function DeveloperViewWrapper({
   ]
 
   // Handle stage changes
-  const handleDevStageChange = (projectId: string, newStage: string) => {
-    updateDevProject(projectId, { status: newStage as DevelopmentProject["status"] })
-    setDevProjects(getDevProjects())
+  const handleDevStageChange = async (projectId: string, newStage: string) => {
+    await updateDevProject(projectId, { status: newStage as DevelopmentProject["status"] })
+    setDevProjects(await getDevProjects())
   }
 
-  const handleMaintStageChange = (ticketId: string, newStage: string) => {
-    updateMaintTicket(ticketId, { status: newStage as MaintenanceTicket["status"] })
-    setMaintTickets(getMaintTickets())
+  const handleMaintStageChange = async (ticketId: string, newStage: string) => {
+    await updateMaintTicket(ticketId, { status: newStage as MaintenanceTicket["status"] })
+    setMaintTickets(await getMaintTickets())
   }
 
   // Title and description based on view type

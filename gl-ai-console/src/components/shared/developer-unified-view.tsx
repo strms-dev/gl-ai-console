@@ -565,7 +565,6 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
                   {/* Type Badge */}
                   <div className="col-span-1">
                     <Badge
-                      variant="outline"
                       className={cn(
                         "font-medium",
                         item.type === "dev"
@@ -623,7 +622,7 @@ export function DeveloperUnifiedView({ developer, onDeveloperChange }: Developer
 
                   {/* Status */}
                   <div className="col-span-2">
-                    <Badge variant="secondary" className="font-medium">
+                    <Badge className="font-medium">
                       {item.statusLabel}
                     </Badge>
                   </div>

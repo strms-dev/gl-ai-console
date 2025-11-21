@@ -173,7 +173,7 @@ export function ProjectDetailModal({
           startDate,
           endDate,
           status,
-          assignee,
+          assignee: assignee || undefined,
           notes,
           priority: 0
         })
@@ -197,7 +197,7 @@ export function ProjectDetailModal({
           startDate,
           endDate,
           status,
-          assignee,
+          assignee: assignee || undefined,
           notes
         })
         console.log('Project updated')

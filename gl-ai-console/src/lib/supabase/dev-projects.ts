@@ -44,7 +44,7 @@ export async function createDevProjectFromSTRMS(
       assignee: assignee,
       priority: 0,
       notes: pricing.ai_scope || null
-    })
+    } as any)
     .select()
     .single()
 
