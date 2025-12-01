@@ -25,7 +25,7 @@ export default function OffboardingPage() {
     customers: false
   })
 
-  // Load customers from localStorage on mount
+  // Load customers from Supabase on mount
   useEffect(() => {
     const loadCustomers = async () => {
       const fetchedCustomers = await getCustomers()
@@ -51,11 +51,12 @@ export default function OffboardingPage() {
   // Handle creating a new customer
   const handleCreateCustomer = async (customerData: Omit<OffboardingCustomer, "id" | "stage" | "lastActivity" | "createdAt" | "updatedAt">) => {
     try {
-      const newCustomer = await addCustomer({
+      await addCustomer({
         ...customerData,
-        stage: "active", // Set to first stage (active)
+        stage: "terminate-automations", // Set to first stage (terminate-automations)
         lastActivity: "Just now"
       })
+      // Manually refetch to update the list immediately
       const updatedCustomers = await getCustomers()
       setCustomers(updatedCustomers)
     } catch (error) {
@@ -69,9 +70,10 @@ export default function OffboardingPage() {
     if (editingCustomer) {
       try {
         await updateCustomer(editingCustomer.id, customerData)
+        setEditingCustomer(null)
+        // Manually refetch to update the list immediately
         const updatedCustomers = await getCustomers()
         setCustomers(updatedCustomers)
-        setEditingCustomer(null)
       } catch (error) {
         console.error("Failed to update customer:", error)
         alert("Failed to update customer. Please try again.")
@@ -89,6 +91,7 @@ export default function OffboardingPage() {
   const handleDeleteCustomer = async (id: string) => {
     try {
       await deleteCustomer(id)
+      // Manually refetch to update the list immediately
       const updatedCustomers = await getCustomers()
       setCustomers(updatedCustomers)
     } catch (error) {

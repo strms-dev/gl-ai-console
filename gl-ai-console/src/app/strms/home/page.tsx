@@ -8,7 +8,8 @@ import { getLeads } from "@/lib/leads-store"
 import { getDevProjects } from "@/lib/services/project-service"
 import { getMaintTickets } from "@/lib/services/maintenance-service"
 import { getTimeEntries, getWeekStartDate } from "@/lib/services/time-tracking-service"
-import { RotateCw, ArrowRight, Code, AlertCircle, Clock, Users } from "lucide-react"
+import { getCustomers } from "@/lib/offboarding-store"
+import { RotateCw, ArrowRight, Code, AlertCircle, Clock, Users, UserX } from "lucide-react"
 import Link from "next/link"
 
 export default function STRMSHomePage() {
@@ -16,6 +17,7 @@ export default function STRMSHomePage() {
   const [totalDevProjects, setTotalDevProjects] = useState(0)
   const [totalMaintTickets, setTotalMaintTickets] = useState(0)
   const [weeklyHours, setWeeklyHours] = useState(0)
+  const [totalOffboardingCustomers, setTotalOffboardingCustomers] = useState(0)
 
   useEffect(() => {
     const loadStats = async () => {
@@ -41,6 +43,10 @@ export default function STRMSHomePage() {
         const totalMinutes = weekEntries.reduce((sum, entry) => sum + entry.duration, 0)
         const hours = Math.round((totalMinutes / 60) * 10) / 10 // Round to 1 decimal
         setWeeklyHours(hours)
+
+        // Offboarding customers stats
+        const offboardingCustomers = await getCustomers()
+        setTotalOffboardingCustomers(offboardingCustomers.length)
       } catch (error) {
         console.error("Error loading stats:", error)
       }
@@ -350,6 +356,62 @@ export default function STRMSHomePage() {
                     style={{fontFamily: 'var(--font-heading)'}}
                   >
                     View Dashboard
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+            {/* Offboarding - Active */}
+            <Card className="bg-white border-none shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
+            <CardHeader className="pb-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="w-14 h-14 rounded-lg bg-[#407B9D]/10 flex items-center justify-center flex-shrink-0">
+                    <UserX className="w-7 h-7 text-[#407B9D]" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CardTitle
+                        className="text-xl text-[#463939]"
+                        style={{fontFamily: 'var(--font-heading)'}}
+                      >
+                        Offboarding
+                      </CardTitle>
+                      <Badge className="bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/90 border-none">
+                        Active
+                      </Badge>
+                    </div>
+                    <CardDescription
+                      className="text-sm"
+                      style={{fontFamily: 'var(--font-body)'}}
+                    >
+                      Manage customer offboarding process from notification through final handoff
+                    </CardDescription>
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-[#407B9D]"></div>
+                    <span
+                      className="text-[#666666]"
+                      style={{fontFamily: 'var(--font-body)'}}
+                    >
+                      {totalOffboardingCustomers} Customers
+                    </span>
+                  </div>
+                </div>
+                <Link href="/strms/offboarding">
+                  <Button
+                    className="bg-[#407B9D] hover:bg-[#407B9D]/90 text-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 hover:scale-105"
+                    style={{fontFamily: 'var(--font-heading)'}}
+                  >
+                    View Offboarding
                     <ArrowRight className="ml-2 w-4 h-4" />
                   </Button>
                 </Link>

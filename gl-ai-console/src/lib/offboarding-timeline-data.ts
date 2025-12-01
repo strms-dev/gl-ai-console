@@ -8,16 +8,16 @@ export const offboardingTimelineEvents: OffboardingTimelineEvent[] = [
   {
     id: "terminate-automations",
     type: "terminate-automations",
-    title: "Step 1: Terminate Active Automations",
-    description: "Turn off or delete all active automations across platforms",
+    title: "Terminate Active Automations",
+    description: "Locate and disable all customer automations across platforms",
     status: "pending",
     icon: "power-off",
     automationLevel: "manual-intervention",
-    details: [
-      "Zapier: Locate all Zaps tagged/named with customer name and turn off or delete",
-      "Make.com: Find and disable or delete scenarios",
-      "Prismatic: Find and turn off or delete instances",
-      "n8n: Find and turn off or delete workflows"
+    checklistItems: [
+      { id: "zapier", label: "Zapier" },
+      { id: "make", label: "Make" },
+      { id: "prismatic", label: "Prismatic" },
+      { id: "n8n", label: "n8n" }
     ],
     owner: "Automation team",
     actions: {
@@ -27,7 +27,7 @@ export const offboardingTimelineEvents: OffboardingTimelineEvent[] = [
   {
     id: "terminate-billing",
     type: "terminate-billing",
-    title: "Step 2: Terminate Engagement Agreement & Billing",
+    title: "Terminate Engagement Agreement & Billing",
     description: "Cancel engagement agreement and verify billing has stopped",
     status: "pending",
     icon: "x-circle",
@@ -45,7 +45,7 @@ export const offboardingTimelineEvents: OffboardingTimelineEvent[] = [
   {
     id: "revoke-access",
     type: "revoke-access",
-    title: "Step 3: Revoke Application Access (Practice Protect)",
+    title: "Revoke Application Access (Practice Protect)",
     description: "Submit ticket to remove customer and associated applications",
     status: "pending",
     icon: "shield-off",
@@ -55,15 +55,15 @@ export const offboardingTimelineEvents: OffboardingTimelineEvent[] = [
       "Request removal of customer and any associated applications",
       "Note: If STRMS customer only. If customer has other GrowthLab services, specify applications to remove"
     ],
-    owner: "Automation team (submits ticket)",
+    owner: "Automation team",
     actions: {
-      manual: { label: "Create SlackBot Ticket" }
+      manual: { label: "Mark as Complete" }
     }
   },
   {
     id: "update-inventory",
     type: "update-inventory",
-    title: "Step 4: Update Automation Inventory",
+    title: "Update Automation Inventory",
     description: "Update Airtable project status to reflect termination",
     status: "pending",
     icon: "database",
@@ -74,25 +74,20 @@ export const offboardingTimelineEvents: OffboardingTimelineEvent[] = [
     ],
     owner: "Automation team",
     actions: {
-      manual: { label: "Update Airtable" }
+      manual: { label: "Mark as Complete" }
     }
   },
   {
     id: "send-email",
     type: "send-email",
-    title: "Step 5: Send Offboarding Email",
+    title: "Send Offboarding Email",
     description: "Send final confirmation email to customer",
     status: "pending",
     icon: "mail",
     automationLevel: "manual-intervention",
-    details: [
-      "From: Tim",
-      "Subject: Final Confirmation: STRMS Services Terminated",
-      "Include: Confirmation of automation deactivation, engagement closure, billing stopped, refund info (if applicable)"
-    ],
     owner: "Tim/CXR",
     actions: {
-      manual: { label: "Send Email" }
+      manual: { label: "Confirm Email Sent" }
     }
   }
 ]
@@ -105,14 +100,13 @@ export function getTimelineForCustomer(
   const timeline = offboardingTimelineEvents.map(event => ({ ...event }))
 
   if (!currentStage || currentStage === "active") {
-    // For active customers (not yet started offboarding), mark first stage as in_progress
-    if (timeline.length > 0) {
-      timeline[0].status = "in_progress"
-    }
+    // For active customers (not yet started offboarding), all stages are pending
     return timeline
   }
 
   // Update status based on current stage
+  // The customer's stage represents the stage they are CURRENTLY WORKING ON
+  // So stages before the current stage are completed, current stage is pending
   const stageOrder = [
     "terminate-automations",
     "terminate-billing",
@@ -124,14 +118,21 @@ export function getTimelineForCustomer(
   const currentIndex = stageOrder.indexOf(currentStage)
 
   timeline.forEach((event, index) => {
+    // Mark stages before the current stage as completed
+    // Current stage and stages after remain pending
     if (index < currentIndex) {
       event.status = "completed"
-    } else if (index === currentIndex) {
-      event.status = "in_progress"
     } else {
       event.status = "pending"
     }
   })
+
+  // Special case: if we're at "complete" stage, mark everything as completed
+  if (currentStage === "complete") {
+    timeline.forEach(event => {
+      event.status = "completed"
+    })
+  }
 
   return timeline
 }

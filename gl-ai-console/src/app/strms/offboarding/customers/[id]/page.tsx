@@ -37,23 +37,24 @@ export default function CustomerDetailPage({ params }: CustomerDetailPageProps) 
   const calculateTimelineProgress = () => {
     if (!customer) return { completed: 0, total: timeline.length }
 
-    // Define the stage order
-    const stageOrder = ['active', 'terminate-automations', 'terminate-billing', 'revoke-access', 'update-inventory', 'send-email', 'complete']
-    const currentStageIndex = stageOrder.indexOf(customer.stage)
+    // The customer.stage represents the stage they are CURRENTLY WORKING ON
+    // Timeline stages: terminate-automations, terminate-billing, revoke-access, update-inventory, send-email
+    // When at terminate-automations: 0 completed (working on first stage)
+    // When at terminate-billing: 1 completed (working on second stage), etc.
 
-    let completedCount = 0
-
-    // Count stages before current stage as completed
-    for (let i = 0; i < currentStageIndex && i < stageOrder.length; i++) {
-      if (i > 0) { // Don't count 'active' as a completed stage
-        completedCount++
-      }
+    // Map customer stage to number of completed timeline stages
+    // Note: customer.stage represents the stage they are CURRENTLY WORKING ON
+    const stageToCompletedMap: Record<string, number> = {
+      'active': 0,                 // Deprecated - no longer used
+      'terminate-automations': 0,  // Working on first stage (0 completed)
+      'terminate-billing': 1,      // Completed first stage, working on second
+      'revoke-access': 2,          // Completed first two stages, working on third
+      'update-inventory': 3,       // Completed first three stages, working on fourth
+      'send-email': 4,             // Completed first four stages, working on fifth
+      'complete': 5                // All stages completed
     }
 
-    // If we're at complete stage, count it as well
-    if (customer.stage === 'complete') {
-      completedCount = timeline.length
-    }
+    const completedCount = stageToCompletedMap[customer.stage] || 0
 
     return { completed: completedCount, total: timeline.length }
   }
@@ -66,47 +67,29 @@ export default function CustomerDetailPage({ params }: CustomerDetailPageProps) 
     timeline: false
   })
 
-  // Monitor for customer data changes
+  // Load customer data on mount
   useEffect(() => {
-    let isInitialLoad = true
+    const loadData = async () => {
+      setIsLoading(true)
+      const fetchedCustomer = await getCustomerById(id)
+      setCustomer(fetchedCustomer)
 
-    const checkForCustomerUpdates = async () => {
-      // Only show loading on initial load
-      if (isInitialLoad) {
-        setIsLoading(true)
-      }
-
-      const updatedCustomer = await getCustomerById(id)
-      setCustomer(updatedCustomer)
-
-      if (isInitialLoad) {
-        setIsLoading(false)
-        isInitialLoad = false
-      }
+      const dates = await getCompletionDates(id)
+      setCompletionDates(dates)
+      setIsLoading(false)
     }
 
-    // Check immediately
-    checkForCustomerUpdates()
-
-    // Set up an interval to check for updates (every 5 seconds)
-    const interval = setInterval(checkForCustomerUpdates, 5000)
-
-    return () => clearInterval(interval)
+    loadData()
   }, [id])
 
-  // Load completion dates on mount
-  useEffect(() => {
-    const loadCompletionDates = async () => {
-      try {
-        const dates = await getCompletionDates(id)
-        setCompletionDates(dates)
-      } catch (error) {
-        console.error("Failed to load completion dates:", error)
-      }
-    }
+  // Function to reload customer data (called when timeline updates customer)
+  const handleCustomerUpdate = async () => {
+    const updatedCustomer = await getCustomerById(id)
+    setCustomer(updatedCustomer)
 
-    loadCompletionDates()
-  }, [id])
+    const dates = await getCompletionDates(id)
+    setCompletionDates(dates)
+  }
 
   const toggleSection = (section: keyof typeof collapsedSections) => {
     setCollapsedSections(prev => ({
@@ -317,6 +300,7 @@ export default function CustomerDetailPage({ params }: CustomerDetailPageProps) 
               hideHeader={true}
               customerStage={customer?.stage}
               completionDates={completionDates}
+              onCustomerUpdate={handleCustomerUpdate}
             />
           )}
         </Card>

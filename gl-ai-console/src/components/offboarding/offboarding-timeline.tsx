@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { OffboardingTimelineEvent } from "@/lib/offboarding-data"
-import { updateCustomer, getCustomerById, updateCompletionDate } from "@/lib/offboarding-store"
+import { updateCustomer, getCustomerById, updateCompletionDate, getChecklistItems, updateChecklistItem } from "@/lib/offboarding-store"
 import { getNextStage } from "@/lib/offboarding-data"
+import { offboardingEmailTemplate } from "@/lib/offboarding-timeline-data"
 import { CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -20,7 +21,9 @@ import {
   Mail,
   LucideIcon,
   Calendar,
-  Zap
+  Zap,
+  Copy,
+  Send
 } from "lucide-react"
 
 // Icon mapping function for timeline stage icons
@@ -41,6 +44,20 @@ interface OffboardingTimelineProps {
   hideHeader?: boolean
   customerStage?: string
   completionDates?: Record<string, string>
+  onCustomerUpdate?: () => void
+}
+
+// Helper function to get first name from full name
+const getFirstName = (fullName: string): string => {
+  return fullName.split(' ')[0]
+}
+
+// Helper function to format date as M/D/YYYY
+const formatDate = (date: Date): string => {
+  const month = date.getMonth() + 1 // Months are 0-indexed
+  const day = date.getDate()
+  const year = date.getFullYear()
+  return `${month}/${day}/${year}`
 }
 
 const getStatusColor = (status: OffboardingTimelineEvent["status"]) => {
@@ -83,9 +100,6 @@ const getConnectorStyles = (currentStatus: OffboardingTimelineEvent["status"], n
   if (currentStatus === "completed") {
     return "bg-[#C8E4BB]"
   }
-  if (currentStatus === "in_progress") {
-    return "bg-[#407B9D]"
-  }
   return "bg-gray-300"
 }
 
@@ -94,20 +108,75 @@ export function OffboardingTimeline({
   customerId,
   hideHeader = false,
   customerStage,
-  completionDates = {}
+  completionDates = {},
+  onCustomerUpdate
 }: OffboardingTimelineProps) {
-  // Initialize with all stages collapsed except the first in_progress one
+  // Initialize with all stages collapsed except the first pending one (current stage)
   const [collapsedItems, setCollapsedItems] = useState<Set<string>>(() => {
     const collapsed = new Set<string>()
-    events.forEach((event) => {
-      // Collapse all stages except the first in_progress one
-      if (event.status !== 'in_progress') {
+    // Find the first pending stage (this is the current/active stage)
+    const firstPendingIndex = events.findIndex(e => e.status === 'pending')
+    events.forEach((event, index) => {
+      // Collapse all stages except the first pending one
+      if (index !== firstPendingIndex) {
         collapsed.add(event.id)
       }
     })
     return collapsed
   })
   const [completingStage, setCompletingStage] = useState<string | null>(null)
+  const [emailCopied, setEmailCopied] = useState(false)
+  const [customerContact, setCustomerContact] = useState<string>('')
+
+  // Fetch customer data to get contact name
+  useEffect(() => {
+    const loadCustomer = async () => {
+      const customer = await getCustomerById(customerId)
+      if (customer) {
+        setCustomerContact(customer.contact)
+      }
+    }
+    loadCustomer()
+  }, [customerId])
+
+  // State for checklist items - key: "stageId-checklistItemId", value: checked state
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({})
+
+  // Load checklist items from Supabase
+  useEffect(() => {
+    const loadChecklist = async () => {
+      try {
+        const items = await getChecklistItems(customerId)
+        setCheckedItems(items)
+      } catch (error) {
+        console.error('Error loading checklist:', error)
+      }
+    }
+    loadChecklist()
+  }, [customerId])
+
+  const toggleChecklistItem = async (stageId: string, itemId: string) => {
+    const key = `${stageId}-${itemId}`
+    const newCheckedState = !checkedItems[key]
+
+    // Optimistic update
+    setCheckedItems(prev => ({
+      ...prev,
+      [key]: newCheckedState
+    }))
+
+    // Save to Supabase
+    try {
+      await updateChecklistItem(customerId, stageId, itemId, newCheckedState)
+    } catch (error) {
+      console.error('Error updating checklist item:', error)
+      // Revert on error
+      setCheckedItems(prev => ({
+        ...prev,
+        [key]: !newCheckedState
+      }))
+    }
+  }
 
   const toggleCollapse = (stageId: string) => {
     setCollapsedItems(prev => {
@@ -119,6 +188,27 @@ export function OffboardingTimeline({
       }
       return newSet
     })
+  }
+
+  // Process email template with customer data
+  const getProcessedEmailTemplate = () => {
+    const firstName = customerContact ? getFirstName(customerContact) : '[Customer First Name]'
+    const currentDate = formatDate(new Date())
+
+    return offboardingEmailTemplate
+      .replace('[Customer First Name]', firstName)
+      .replace('[DATE]', currentDate)
+  }
+
+  const handleCopyEmail = async () => {
+    try {
+      const processedTemplate = getProcessedEmailTemplate()
+      await navigator.clipboard.writeText(processedTemplate)
+      setEmailCopied(true)
+      setTimeout(() => setEmailCopied(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy email:', error)
+    }
   }
 
   const handleMarkComplete = async (event: OffboardingTimelineEvent) => {
@@ -148,8 +238,27 @@ export function OffboardingTimeline({
       const completionDate = new Date().toISOString()
       await updateCompletionDate(customerId, event.id, completionDate)
 
-      // Reload page to get updated data from store
-      window.location.reload()
+      // Notify parent component that customer was updated
+      onCustomerUpdate?.()
+
+
+      // Collapse the current stage and expand the next stage
+      const currentIndex = events.findIndex(e => e.id === event.id)
+      const nextEvent = events[currentIndex + 1]
+
+      setCollapsedItems(prev => {
+        const newSet = new Set(prev)
+        // Collapse current stage
+        newSet.add(event.id)
+        // Expand next stage if it exists
+        if (nextEvent) {
+          newSet.delete(nextEvent.id)
+        }
+        return newSet
+      })
+
+      // Trigger a quick reload by causing parent component to re-poll immediately
+      // The parent's useEffect will pick up the changes and re-render
     } catch (error) {
       console.error("Failed to mark stage complete:", error)
       alert("Failed to mark stage as complete. Please try again.")
@@ -172,15 +281,15 @@ export function OffboardingTimeline({
           const nextEvent = updatedEvents[index + 1]
           const completionDate = completionDates[event.id]
           const StageIcon = getStageIcon(event.icon)
-          const isActive = event.status === "in_progress" || event.status === "action-required"
+          // Find the first pending stage - this is the current/active stage
+          const firstPendingIndex = updatedEvents.findIndex(e => e.status === 'pending')
+          const isCurrentStage = index === firstPendingIndex
+          const isActive = event.status === "action-required"
 
           return (
             <div
               key={event.id}
-              className={cn(
-                "relative transition-all duration-300",
-                isActive && "ring-2 ring-blue-200 ring-opacity-50 rounded-lg"
-              )}
+              className="relative transition-all duration-300"
             >
               {/* Connector Line */}
               {!isLast && (
@@ -198,11 +307,9 @@ export function OffboardingTimeline({
                 <div className={cn(
                   "flex items-center justify-center w-12 h-12 rounded-full border-2 bg-background relative z-10 transition-all duration-300",
                   event.status === "completed" ? "border-[#C8E4BB] bg-[#C8E4BB]/20" :
-                  event.status === "in_progress" ? "border-[#407B9D] bg-[#407B9D]/20" :
                   event.status === "action-required" ? "border-amber-500 bg-amber-50" :
                   event.status === "failed" ? "border-red-500 bg-red-50" :
-                  "border-gray-300 bg-gray-50",
-                  isActive && "animate-pulse"
+                  "border-gray-300 bg-gray-50"
                 )}>
                   <StageIcon className="w-6 h-6" />
                 </div>
@@ -212,7 +319,6 @@ export function OffboardingTimeline({
                   <div className={cn(
                     "p-4 border-2 rounded-lg bg-background transition-all duration-300",
                     event.status === "completed" && event.isCollapsed ? "border-border bg-[#C8E4BB]/20" :
-                    isActive ? "border-[#407B9D] bg-[#407B9D]/10" :
                     "border-border"
                   )}>
                     {/* Header */}
@@ -290,9 +396,6 @@ export function OffboardingTimeline({
                         {/* Details List */}
                         {event.details && event.details.length > 0 && (
                           <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
-                            <h4 className="text-sm font-medium text-foreground mb-2">
-                              Steps:
-                            </h4>
                             <ul className="space-y-1.5 text-sm text-muted-foreground">
                               {event.details.map((detail, idx) => (
                                 <li key={idx} className="flex items-start gap-2">
@@ -304,12 +407,96 @@ export function OffboardingTimeline({
                           </div>
                         )}
 
-                        {/* Action Button - Only show for stages that are not completed */}
-                        {event.actions?.manual && event.status !== "completed" && (
+                        {/* Checklist Items */}
+                        {event.checklistItems && event.checklistItems.length > 0 && (
+                          <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
+                            <div className="space-y-2">
+                              {event.checklistItems.map((item) => {
+                                const checkKey = `${event.id}-${item.id}`
+                                const isChecked = checkedItems[checkKey] || false
+                                return (
+                                  <label
+                                    key={item.id}
+                                    className="flex items-start gap-3 cursor-pointer hover:bg-muted/50 p-2 rounded transition-colors"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => toggleChecklistItem(event.id, item.id)}
+                                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#407B9D] focus:ring-[#407B9D] focus:ring-offset-0 cursor-pointer"
+                                      disabled={event.status === "completed"}
+                                    />
+                                    <span className={cn(
+                                      "flex-1 text-sm",
+                                      isChecked ? "line-through text-muted-foreground" : "text-foreground"
+                                    )}>
+                                      {item.label}
+                                    </span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Email Template Section - Only for send-email stage */}
+                        {event.id === "send-email" && event.status !== "completed" && (
+                          <div className="mb-4">
+                            <div className="bg-muted/50 rounded-lg border border-border p-4">
+                              <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono bg-background p-3 rounded border border-border overflow-x-auto mb-4">
+                                {getProcessedEmailTemplate()}
+                              </pre>
+
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={handleCopyEmail}
+                                  variant="outline"
+                                  className="flex-1 bg-white hover:bg-[#407B9D] hover:text-white text-gray-700 border border-gray-300 transition-all duration-200 hover:scale-105 rounded-lg shadow-sm"
+                                >
+                                  {emailCopied ? (
+                                    <>
+                                      <Copy className="w-4 h-4 mr-2" />
+                                      Email Copied!
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-4 h-4 mr-2" />
+                                      Copy Email
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  onClick={() => handleMarkComplete(event)}
+                                  disabled={!isCurrentStage || completingStage === event.id}
+                                  className="flex-1 bg-[#C8E4BB] hover:bg-[#b5d6a5] text-gray-800 border-0 transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
+                                >
+                                  {completingStage === event.id ? (
+                                    <>
+                                      <RotateCw className="w-4 h-4 mr-2 animate-spin" />
+                                      Sending...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Send className="w-4 h-4 mr-2" />
+                                      Email Sent
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+
+                              <p className="text-xs text-gray-500 text-center mt-3">
+                                Click &quot;Copy Email&quot; to copy the template, then &quot;Email Sent&quot; when you&apos;ve sent it to the customer
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Action Button - Only show for stages that are not completed and not send-email */}
+                        {event.actions?.manual && event.status !== "completed" && event.id !== "send-email" && (
                           <div className="pt-2">
                             <Button
                               onClick={() => handleMarkComplete(event)}
-                              disabled={event.status !== "in_progress" || completingStage === event.id}
+                              disabled={!isCurrentStage || completingStage === event.id}
                               className="w-full sm:w-auto bg-[#407B9D] hover:bg-[#356780] text-white transition-all duration-200 hover:scale-105 rounded-lg shadow-md"
                             >
                               {completingStage === event.id ? (
@@ -324,7 +511,7 @@ export function OffboardingTimeline({
                                 </>
                               )}
                             </Button>
-                            {event.status === "pending" && (
+                            {!isCurrentStage && event.status === "pending" && (
                               <p className="text-xs text-muted-foreground mt-2">
                                 Complete previous stages first
                               </p>

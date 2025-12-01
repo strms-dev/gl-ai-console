@@ -1,28 +1,16 @@
 /**
  * Data types and interfaces for STRMS Offboarding feature
+ * Re-exports types from offboarding-types.ts and provides helper functions
  */
 
-export type OffboardingStage =
-  | "active"
-  | "terminate-automations"
-  | "terminate-billing"
-  | "revoke-access"
-  | "update-inventory"
-  | "send-email"
-  | "complete"
+// Re-export types from the types file
+export type {
+  OffboardingStage,
+  OffboardingCustomer,
+  OffboardingCompletionDates,
+} from './offboarding-types'
 
-export interface OffboardingCustomer {
-  id: string
-  company: string
-  email: string
-  contact: string
-  stage: OffboardingStage
-  lastActivity: string
-  notes?: string
-  createdAt: string
-  updatedAt: string
-}
-
+// Timeline event interface (used for UI configuration)
 export interface OffboardingTimelineEvent {
   id: string
   type: string
@@ -44,12 +32,15 @@ export interface OffboardingTimelineEvent {
     }
   }
   details?: string[]
+  checklistItems?: Array<{
+    id: string
+    label: string
+  }>
   owner?: string
 }
 
-export interface OffboardingCompletionDates {
-  [stageId: string]: string
-}
+// Import the type for use in helper functions
+import type { OffboardingStage } from './offboarding-types'
 
 // Stage label and color mappings
 export const stageLabels: Record<OffboardingStage, string> = {
