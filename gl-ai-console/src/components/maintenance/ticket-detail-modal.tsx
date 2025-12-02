@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Clock, Trash2, X, XCircle } from "lucide-react"
+import { Clock, Trash2, X, XCircle, CalendarClock } from "lucide-react"
 import {
   MaintenanceTicket,
   Developer,
@@ -29,6 +29,7 @@ import {
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { AlertDialog } from "@/components/ui/alert-dialog"
 import { CustomerSelector } from "@/components/ui/customer-selector"
+import { DateTimePicker } from "@/components/ui/date-time-picker"
 
 interface TicketDetailModalProps {
   ticketId?: string | null
@@ -73,6 +74,11 @@ export function TicketDetailModal({
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [timeEntryNotes, setTimeEntryNotes] = useState("")
   const [timeEntriesExpanded, setTimeEntriesExpanded] = useState(false)
+
+  // Date/time picker for backdating time entries
+  const [showDateTimePicker, setShowDateTimePicker] = useState(false)
+  const [entryDate, setEntryDate] = useState("")  // YYYY-MM-DD format
+  const [entryTime, setEntryTime] = useState("")  // HH:mm format
 
   // Confirmation dialogs
   const [deleteTicketConfirmOpen, setDeleteTicketConfirmOpen] = useState(false)
@@ -293,22 +299,47 @@ export function TicketDetailModal({
     // Edit mode - ticket already exists
     if (!ticket) return
 
-    const now = new Date()
+    // Determine the date to use for weekStartDate and createdAt
+    let targetDate = new Date()
+    let createdAtString: string | undefined = undefined
+
+    if (entryDate) {
+      // Parse date parts to avoid timezone issues
+      const [year, month, day] = entryDate.split('-').map(Number)
+
+      if (entryTime) {
+        const [hours, mins] = entryTime.split(':').map(Number)
+        targetDate = new Date(year, month - 1, day, hours, mins)
+      } else {
+        // If only date is provided, use noon to avoid timezone edge cases
+        targetDate = new Date(year, month - 1, day, 12, 0)
+      }
+
+      // Create ISO string for database
+      createdAtString = targetDate.toISOString()
+    }
+
     try {
       const newEntry = await createTimeEntry({
-      projectId: ticket.id,
-      projectType: "maintenance",
-      assignee: assignee as Developer,
-      duration: minutes,
-      notes: timeEntryNotes.trim() || "",
-      weekStartDate: getWeekStartDate(now)
-    })
+        projectId: ticket.id,
+        projectType: "maintenance",
+        assignee: assignee as Developer,
+        duration: minutes,
+        notes: timeEntryNotes.trim() || "",
+        weekStartDate: getWeekStartDate(targetDate),
+        createdAt: createdAtString  // Only passed if backdating
+      })
 
-    // Update local state
-    const updatedEntries = [...timeEntries, newEntry]
-    setTimeEntries(updatedEntries)
-    setTimeIncrement("")
-    setTimeEntryNotes("")
+      // Update local state
+      const updatedEntries = [...timeEntries, newEntry]
+      setTimeEntries(updatedEntries)
+      setTimeIncrement("")
+      setTimeEntryNotes("")
+
+      // Reset date/time picker
+      setEntryDate("")
+      setEntryTime("")
+      setShowDateTimePicker(false)
     } catch (error) {
       console.error("Error adding time entry:", error)
       showAlert("Error", "Failed to add time entry. Please try again.")
@@ -764,7 +795,44 @@ export function TicketDetailModal({
                     )}
 
                     {/* Add Time Section */}
-                    <div className="space-y-2 pt-2">
+                    <div className="space-y-3 pt-2">
+                      {/* Backdate Toggle */}
+                      <div className="flex items-center">
+                        <button
+                          onClick={() => setShowDateTimePicker(!showDateTimePicker)}
+                          className={`flex items-center gap-1.5 text-xs transition-colors ${
+                            showDateTimePicker || entryDate
+                              ? "text-[#407B9D]"
+                              : "text-[#666666] hover:text-[#407B9D]"
+                          }`}
+                          title={showDateTimePicker ? "Hide date/time options" : "Set custom date/time"}
+                          type="button"
+                        >
+                          <CalendarClock className="w-4 h-4" />
+                          <span style={{ fontFamily: 'var(--font-body)' }}>
+                            {entryDate
+                              ? `Backdated: ${new Date(entryDate + 'T12:00').toLocaleDateString()}${entryTime ? ` at ${entryTime}` : ''}`
+                              : "Backdate entry"
+                            }
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Date/Time Picker (shown when toggle is active) */}
+                      {showDateTimePicker && (
+                        <DateTimePicker
+                          date={entryDate}
+                          time={entryTime}
+                          onDateChange={setEntryDate}
+                          onTimeChange={setEntryTime}
+                          onClear={() => {
+                            setEntryDate("")
+                            setEntryTime("")
+                          }}
+                        />
+                      )}
+
+                      {/* Time Duration and Notes Row */}
                       <div className="flex gap-2">
                         <Input
                           value={timeIncrement}

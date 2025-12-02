@@ -97,20 +97,29 @@ export async function getTimeEntriesForWeek(
 
 /**
  * Create a new time entry
+ * @param entry - Time entry data (createdAt is optional for backdating)
  */
 export async function createTimeEntry(
-  entry: Omit<TimeEntry, 'id' | 'createdAt'>
+  entry: Omit<TimeEntry, 'id' | 'createdAt'> & { createdAt?: string }
 ): Promise<TimeEntry> {
+  // Build insert data - only include created_at if explicitly provided (for backdating)
+  const insertData: Record<string, unknown> = {
+    project_id: entry.projectId || null,
+    project_type: entry.projectType || null,
+    assignee: entry.assignee || null,
+    duration: entry.duration,
+    notes: entry.notes || null,
+    week_start_date: entry.weekStartDate || null
+  }
+
+  // Only pass created_at when backdating - otherwise let Supabase auto-generate
+  if (entry.createdAt) {
+    insertData.created_at = entry.createdAt
+  }
+
   const { data, error } = await supabase
     .from('strms_time_entries')
-    .insert({
-      project_id: entry.projectId || null,
-      project_type: entry.projectType || null,
-      assignee: entry.assignee || null,
-      duration: entry.duration,
-      notes: entry.notes || null,
-      week_start_date: entry.weekStartDate || null
-    })
+    .insert(insertData as never)
     .select()
     .single()
 

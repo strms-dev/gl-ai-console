@@ -18,6 +18,24 @@ export default function TimeTrackingPage() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
+  // Store projects and tickets for lookup (must be declared before useMemo hooks that use them)
+  const [projects, setProjects] = useState<DevelopmentProject[]>([])
+  const [tickets, setTickets] = useState<MaintenanceTicket[]>([])
+
+  // Determine if a project/ticket is internal (GrowthLab or STRMS)
+  const isInternalProject = (entry: TimeEntry): boolean => {
+    let customer = ""
+    if (entry.projectType === "development") {
+      const project = projects.find(p => p.id === entry.projectId)
+      customer = project?.customer || ""
+    } else {
+      const ticket = tickets.find(t => t.id === entry.projectId)
+      customer = ticket?.customer || ""
+    }
+    const lowerCustomer = customer.toLowerCase()
+    return lowerCustomer.includes("growthlab") || lowerCustomer.includes("strms")
+  }
+
   // Load data on mount
   useEffect(() => {
     const loadTimeEntries = async () => {
@@ -93,34 +111,62 @@ export default function TimeTrackingPage() {
       .reduce((sum, entry) => sum + entry.duration, 0)
   }, [weekEntries])
 
-  // Calculate hours by developer AND project type
-  const nickDevMinutes = useMemo(() => {
+  // Calculate hours by developer, project type, AND customer type (internal vs customer)
+  // Nick - Customer Development
+  const nickCustomerDevMinutes = useMemo(() => {
     return weekEntries
-      .filter(e => e.assignee === "Nick" && e.projectType === "development")
+      .filter(e => e.assignee === "Nick" && e.projectType === "development" && !isInternalProject(e))
       .reduce((sum, entry) => sum + entry.duration, 0)
-  }, [weekEntries])
+  }, [weekEntries, projects, tickets])
 
-  const nickMaintMinutes = useMemo(() => {
+  // Nick - Internal Development
+  const nickInternalDevMinutes = useMemo(() => {
     return weekEntries
-      .filter(e => e.assignee === "Nick" && e.projectType === "maintenance")
+      .filter(e => e.assignee === "Nick" && e.projectType === "development" && isInternalProject(e))
       .reduce((sum, entry) => sum + entry.duration, 0)
-  }, [weekEntries])
+  }, [weekEntries, projects, tickets])
 
-  const gonDevMinutes = useMemo(() => {
+  // Nick - Customer Maintenance
+  const nickCustomerMaintMinutes = useMemo(() => {
     return weekEntries
-      .filter(e => e.assignee === "Gon" && e.projectType === "development")
+      .filter(e => e.assignee === "Nick" && e.projectType === "maintenance" && !isInternalProject(e))
       .reduce((sum, entry) => sum + entry.duration, 0)
-  }, [weekEntries])
+  }, [weekEntries, projects, tickets])
 
-  const gonMaintMinutes = useMemo(() => {
+  // Nick - Internal Maintenance
+  const nickInternalMaintMinutes = useMemo(() => {
     return weekEntries
-      .filter(e => e.assignee === "Gon" && e.projectType === "maintenance")
+      .filter(e => e.assignee === "Nick" && e.projectType === "maintenance" && isInternalProject(e))
       .reduce((sum, entry) => sum + entry.duration, 0)
-  }, [weekEntries])
+  }, [weekEntries, projects, tickets])
 
-  // Store projects and tickets for lookup
-  const [projects, setProjects] = useState<DevelopmentProject[]>([])
-  const [tickets, setTickets] = useState<MaintenanceTicket[]>([])
+  // Gon - Customer Development
+  const gonCustomerDevMinutes = useMemo(() => {
+    return weekEntries
+      .filter(e => e.assignee === "Gon" && e.projectType === "development" && !isInternalProject(e))
+      .reduce((sum, entry) => sum + entry.duration, 0)
+  }, [weekEntries, projects, tickets])
+
+  // Gon - Internal Development
+  const gonInternalDevMinutes = useMemo(() => {
+    return weekEntries
+      .filter(e => e.assignee === "Gon" && e.projectType === "development" && isInternalProject(e))
+      .reduce((sum, entry) => sum + entry.duration, 0)
+  }, [weekEntries, projects, tickets])
+
+  // Gon - Customer Maintenance
+  const gonCustomerMaintMinutes = useMemo(() => {
+    return weekEntries
+      .filter(e => e.assignee === "Gon" && e.projectType === "maintenance" && !isInternalProject(e))
+      .reduce((sum, entry) => sum + entry.duration, 0)
+  }, [weekEntries, projects, tickets])
+
+  // Gon - Internal Maintenance
+  const gonInternalMaintMinutes = useMemo(() => {
+    return weekEntries
+      .filter(e => e.assignee === "Gon" && e.projectType === "maintenance" && isInternalProject(e))
+      .reduce((sum, entry) => sum + entry.duration, 0)
+  }, [weekEntries, projects, tickets])
 
   // Load projects and tickets when time entries are loaded
   useEffect(() => {
@@ -372,22 +418,44 @@ export default function TimeTrackingPage() {
                 <div className="flex items-center gap-2">
                   <Code className="w-3 h-3 text-[#407B9D]" />
                   <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                    Development
+                    Customer Dev
                   </span>
                 </div>
                 <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
-                  {formatMinutes(nickDevMinutes)}
+                  {formatMinutes(nickCustomerDevMinutes)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Code className="w-3 h-3 text-[#95CBD7]" />
+                  <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                    Internal Dev
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                  {formatMinutes(nickInternalDevMinutes)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Wrench className="w-3 h-3 text-[#407B9D]" />
                   <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                    Maintenance
+                    Customer Maint
                   </span>
                 </div>
                 <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
-                  {formatMinutes(nickMaintMinutes)}
+                  {formatMinutes(nickCustomerMaintMinutes)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-3 h-3 text-[#95CBD7]" />
+                  <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                    Internal Maint
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                  {formatMinutes(nickInternalMaintMinutes)}
                 </span>
               </div>
             </div>
@@ -420,22 +488,44 @@ export default function TimeTrackingPage() {
                 <div className="flex items-center gap-2">
                   <Code className="w-3 h-3 text-[#407B9D]" />
                   <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                    Development
+                    Customer Dev
                   </span>
                 </div>
                 <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
-                  {formatMinutes(gonDevMinutes)}
+                  {formatMinutes(gonCustomerDevMinutes)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Code className="w-3 h-3 text-[#95CBD7]" />
+                  <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                    Internal Dev
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                  {formatMinutes(gonInternalDevMinutes)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Wrench className="w-3 h-3 text-[#407B9D]" />
                   <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
-                    Maintenance
+                    Customer Maint
                   </span>
                 </div>
                 <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
-                  {formatMinutes(gonMaintMinutes)}
+                  {formatMinutes(gonCustomerMaintMinutes)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-3 h-3 text-[#95CBD7]" />
+                  <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                    Internal Maint
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                  {formatMinutes(gonInternalMaintMinutes)}
                 </span>
               </div>
             </div>

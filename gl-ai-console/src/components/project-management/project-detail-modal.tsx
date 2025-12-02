@@ -4,13 +4,14 @@ import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Trash2, Clock, X, XCircle, ChevronDown } from "lucide-react"
+import { Trash2, Clock, X, XCircle, ChevronDown, CalendarClock } from "lucide-react"
 import { DevelopmentProject, SprintLength, Developer, DevelopmentStatus, TimeEntry } from "@/lib/types"
 import { getDevProjectById, updateDevProject, deleteDevProject, createDevProject } from "@/lib/services/project-service"
 import { formatMinutes, getWeekStartDate, getTimeEntriesForProject, createTimeEntry, deleteTimeEntry } from "@/lib/services/time-tracking-service"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { AlertDialog } from "@/components/ui/alert-dialog"
 import { CustomerSelector } from "@/components/ui/customer-selector"
+import { DateTimePicker } from "@/components/ui/date-time-picker"
 
 interface ProjectDetailModalProps {
   projectId?: string | null
@@ -56,6 +57,11 @@ export function ProjectDetailModal({
   const [deleteProjectConfirmOpen, setDeleteProjectConfirmOpen] = useState(false)
   const [timeEntriesExpanded, setTimeEntriesExpanded] = useState(false)
   const [timeEntriesListExpanded, setTimeEntriesListExpanded] = useState(false)
+
+  // Date/time picker for backdating time entries
+  const [showDateTimePicker, setShowDateTimePicker] = useState(false)
+  const [entryDate, setEntryDate] = useState("")  // YYYY-MM-DD format
+  const [entryTime, setEntryTime] = useState("")  // HH:mm format
 
   // Alert dialog state
   const [alertOpen, setAlertOpen] = useState(false)
@@ -265,7 +271,26 @@ export function ProjectDetailModal({
     // Edit mode - project already exists
     if (!project) return
 
-    const now = new Date()
+    // Determine the date to use for weekStartDate and createdAt
+    let targetDate = new Date()
+    let createdAtString: string | undefined = undefined
+
+    if (entryDate) {
+      // Parse date parts to avoid timezone issues
+      const [year, month, day] = entryDate.split('-').map(Number)
+
+      if (entryTime) {
+        const [hours, mins] = entryTime.split(':').map(Number)
+        targetDate = new Date(year, month - 1, day, hours, mins)
+      } else {
+        // If only date is provided, use noon to avoid timezone edge cases
+        targetDate = new Date(year, month - 1, day, 12, 0)
+      }
+
+      // Create ISO string for database
+      createdAtString = targetDate.toISOString()
+    }
+
     try {
       const newEntry = await createTimeEntry({
         projectId: project.id,
@@ -273,12 +298,19 @@ export function ProjectDetailModal({
         assignee: project.assignee,
         duration: minutes,
         notes: timeEntryNotes.trim() || "",
-        weekStartDate: getWeekStartDate(now)
+        weekStartDate: getWeekStartDate(targetDate),
+        createdAt: createdAtString  // Only passed if backdating
       })
 
       setTimeEntries([...timeEntries, newEntry])
       setTimeIncrement("")
       setTimeEntryNotes("")
+
+      // Reset date/time picker
+      setEntryDate("")
+      setEntryTime("")
+      setShowDateTimePicker(false)
+
       // Refresh project to get updated totals
       const updatedProject = await getDevProjectById(project.id)
       if (updatedProject) {
@@ -676,7 +708,44 @@ export function ProjectDetailModal({
                     )}
 
                     {/* Add Time Section */}
-                    <div className="space-y-2 pt-2">
+                    <div className="space-y-3 pt-2">
+                      {/* Backdate Toggle */}
+                      <div className="flex items-center">
+                        <button
+                          onClick={() => setShowDateTimePicker(!showDateTimePicker)}
+                          className={`flex items-center gap-1.5 text-xs transition-colors ${
+                            showDateTimePicker || entryDate
+                              ? "text-[#407B9D]"
+                              : "text-[#666666] hover:text-[#407B9D]"
+                          }`}
+                          title={showDateTimePicker ? "Hide date/time options" : "Set custom date/time"}
+                          type="button"
+                        >
+                          <CalendarClock className="w-4 h-4" />
+                          <span style={{ fontFamily: 'var(--font-body)' }}>
+                            {entryDate
+                              ? `Backdated: ${new Date(entryDate + 'T12:00').toLocaleDateString()}${entryTime ? ` at ${entryTime}` : ''}`
+                              : "Backdate entry"
+                            }
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Date/Time Picker (shown when toggle is active) */}
+                      {showDateTimePicker && (
+                        <DateTimePicker
+                          date={entryDate}
+                          time={entryTime}
+                          onDateChange={setEntryDate}
+                          onTimeChange={setEntryTime}
+                          onClear={() => {
+                            setEntryDate("")
+                            setEntryTime("")
+                          }}
+                        />
+                      )}
+
+                      {/* Time Duration and Notes Row */}
                       <div className="flex gap-2">
                         <Input
                           value={timeIncrement}
