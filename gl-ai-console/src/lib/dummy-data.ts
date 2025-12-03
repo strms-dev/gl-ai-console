@@ -37,9 +37,9 @@ export const stageLabels = {
   "dev-overview": "Developer Overview",
   "workflow-docs": "Workflow Documentation",
   "sprint-pricing": "Sprint Pricing",
-  proposal: "Proposal Sent",
+  proposal: "Send Proposal",
   "proposal-decision": "Proposal Decision",
-  "internal-client-docs": "Internal & Client Docs",
+  "internal-client-docs": "Scoping Document",
   ea: "Engagement Agreement",
   setup: "Project Setup",
   kickoff: "Project Kickoff"

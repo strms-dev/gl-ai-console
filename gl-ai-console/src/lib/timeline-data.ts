@@ -9,6 +9,7 @@ export interface TimelineEvent {
   status: "pending" | "in_progress" | "action-required" | "completed" | "failed" | "skipped"
   icon: string // Icon name string for mapping
   automationLevel: "fully-automated" | "manual-intervention"
+  owner?: string
   artifacts?: {
     name: string
     type: "pdf" | "audio" | "document" | "transcript" | "score"
@@ -70,6 +71,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "video",
       automationLevel: "fully-automated",
+      owner: "CXR",
       actions: {
         manual: { label: "Upload Demo Transcript" }
       }
@@ -83,6 +85,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "target",
       automationLevel: "fully-automated",
+      owner: "Developer",
       actions: {
         automated: { label: "Generate with AI" },
         manual: { label: "Upload Manually" }
@@ -97,6 +100,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "help-circle",
       automationLevel: "manual-intervention",
+      owner: "Developer / CXR / Manager",
       actions: {
         decision: {
           options: [
@@ -115,6 +119,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "file-text",
       automationLevel: "fully-automated",
+      owner: "Developer",
       actions: {
         automated: { label: "Generate with AI" },
         manual: { label: "Create Manually" }
@@ -129,6 +134,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "search",
       automationLevel: "fully-automated",
+      owner: "Developer / Manager",
       actions: {
         manual: { label: "Upload Scoping Transcript" }
       }
@@ -142,6 +148,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "file-text",
       automationLevel: "manual-intervention",
+      owner: "Developer",
       actions: {
         manual: { label: "Upload Developer Overview Document" }
       }
@@ -155,6 +162,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "book-open",
       automationLevel: "fully-automated",
+      owner: "Developer",
       actions: {
         automated: { label: "Generate with AI" },
         manual: { label: "Upload Manually" }
@@ -169,6 +177,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "dollar-sign",
       automationLevel: "manual-intervention",
+      owner: "Developer / CXR / Manager",
       actions: {
         automated: { label: "Generate with AI" },
         manual: { label: "Upload Manually" }
@@ -183,6 +192,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "mail",
       automationLevel: "manual-intervention",
+      owner: "Developer Reviews, Then Alerts CXR To Send",
       actions: {
         automated: { label: "Auto-generate Proposal" },
         manual: { label: "Create Manually" }
@@ -197,6 +207,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "scale",
       automationLevel: "manual-intervention",
+      owner: "Developer / CXR / Manager",
       actions: {
         decision: {
           options: [
@@ -216,6 +227,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "clipboard-list",
       automationLevel: "fully-automated",
+      owner: "Developer",
       actions: {
         automated: { label: "Generate with AI" },
         manual: { label: "Upload Manually" }
@@ -230,6 +242,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "file-signature",
       automationLevel: "manual-intervention",
+      owner: "Developer Reviews EA Wording, Then Alerts CXR To Complete & Send EA",
       actions: {
         automated: { label: "Auto-generate EA" },
         manual: { label: "Create Manually" }
@@ -244,6 +257,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "settings",
       automationLevel: "manual-intervention",
+      owner: "Developer Reviews, Then Alerts CXR To Send",
       actions: {
         automated: { label: "Create ClickUp Task" },
         manual: { label: "Create Airtable Inventory Record" }
@@ -258,6 +272,7 @@ export const getTimelineForLead = (leadId: string, leadStage?: string): Timeline
       status: "pending",
       icon: "rocket",
       automationLevel: "fully-automated",
+      owner: "Developer",
       actions: {
         automated: { label: "Generate with AI" },
         manual: { label: "Upload Manually" }

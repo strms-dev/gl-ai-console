@@ -19,7 +19,7 @@ export const offboardingTimelineEvents: OffboardingTimelineEvent[] = [
       { id: "prismatic", label: "Prismatic" },
       { id: "n8n", label: "n8n" }
     ],
-    owner: "Automation team",
+    owner: "Developer",
     actions: {
       manual: { label: "Mark as Complete" }
     }
@@ -37,7 +37,7 @@ export const offboardingTimelineEvents: OffboardingTimelineEvent[] = [
       "Confirm no active billing cycles remain",
       "If termination occurs within 5 days after the 1st of the month, refund the customer's payment manually"
     ],
-    owner: "Tim/CXR",
+    owner: "CXR",
     actions: {
       manual: { label: "Mark as Complete" }
     }
@@ -55,7 +55,7 @@ export const offboardingTimelineEvents: OffboardingTimelineEvent[] = [
       "Request removal of customer and any associated applications",
       "Note: If STRMS customer only. If customer has other GrowthLab services, specify applications to remove"
     ],
-    owner: "Automation team",
+    owner: "Developer",
     actions: {
       manual: { label: "Mark as Complete" }
     }
@@ -72,7 +72,7 @@ export const offboardingTimelineEvents: OffboardingTimelineEvent[] = [
       "Update Airtable automation inventory",
       "Change project status to 'Turned off'"
     ],
-    owner: "Automation team",
+    owner: "Developer",
     actions: {
       manual: { label: "Mark as Complete" }
     }
@@ -85,7 +85,7 @@ export const offboardingTimelineEvents: OffboardingTimelineEvent[] = [
     status: "pending",
     icon: "mail",
     automationLevel: "manual-intervention",
-    owner: "Tim/CXR",
+    owner: "CXR",
     actions: {
       manual: { label: "Confirm Email Sent" }
     }

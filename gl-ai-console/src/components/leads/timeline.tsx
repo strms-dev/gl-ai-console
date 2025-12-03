@@ -1960,6 +1960,16 @@ const StageCard = ({
                   {event.description}
                 </p>
 
+                {/* Owner Badge */}
+                {event.owner && (
+                  <div className="mb-3">
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <User className="w-3 h-3" />
+                      <span className="font-medium">Owner:</span> {event.owner}
+                    </span>
+                  </div>
+                )}
+
                 {/* Readiness Score Display */}
                 {event.readinessScore && (
                   <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
