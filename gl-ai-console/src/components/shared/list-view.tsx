@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowUpDown } from "lucide-react"
+import { ArrowUpDown, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // ============================================================================
@@ -24,6 +24,14 @@ export interface ListViewProps<T> {
   sortOrder?: "asc" | "desc"
   emptyMessage?: string
   className?: string
+  // Selection props
+  selectionMode?: boolean
+  selectedIds?: Set<string>
+  onSelectionChange?: (id: string, selected: boolean) => void
+  onSelectAll?: (selected: boolean) => void
+  getItemId?: (item: T) => string
+  // Delete props
+  onItemDelete?: (e: React.MouseEvent, item: T) => void
 }
 
 // ============================================================================
@@ -38,7 +46,13 @@ export function ListView<T>({
   sortField,
   sortOrder,
   emptyMessage = "No items to display",
-  className
+  className,
+  selectionMode,
+  selectedIds,
+  onSelectionChange,
+  onSelectAll,
+  getItemId,
+  onItemDelete
 }: ListViewProps<T>) {
   const handleSort = (columnKey: string) => {
     if (onSort) {
@@ -46,12 +60,37 @@ export function ListView<T>({
     }
   }
 
+  // Check if all items are selected
+  const allSelected = selectionMode && getItemId && selectedIds && items.length > 0 &&
+    items.every(item => selectedIds.has(getItemId(item)))
+
+  // Check if some items are selected (for indeterminate state)
+  const someSelected = selectionMode && getItemId && selectedIds && items.length > 0 &&
+    items.some(item => selectedIds.has(getItemId(item))) && !allSelected
+
+  // Calculate column count for empty state
+  const totalColumns = columns.length + (selectionMode ? 1 : 0) + (onItemDelete ? 1 : 0)
+
   return (
     <div className={cn("bg-white rounded-lg shadow-sm border border-[#E5E5E5]", className)}>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#E5E5E5] bg-[#FAF9F9]">
+              {/* Selection checkbox column */}
+              {selectionMode && onSelectAll && (
+                <th className="w-10 py-3 px-4">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected || false
+                    }}
+                    onChange={(e) => onSelectAll(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-[#407B9D] focus:ring-[#407B9D] cursor-pointer"
+                  />
+                </th>
+              )}
               {columns.map((column) => (
                 <th
                   key={column.key}
@@ -82,13 +121,17 @@ export function ListView<T>({
                   )}
                 </th>
               ))}
+              {/* Actions column for delete */}
+              {onItemDelete && (
+                <th className="w-12 py-3 px-4"></th>
+              )}
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={totalColumns}
                   className="text-center py-12 text-[#999999]"
                   style={{fontFamily: 'var(--font-body)'}}
                 >
@@ -96,30 +139,63 @@ export function ListView<T>({
                 </td>
               </tr>
             ) : (
-              items.map((item, index) => (
-                <tr
-                  key={index}
-                  onClick={() => onItemClick?.(item)}
-                  className={cn(
-                    "border-b border-[#E5E5E5] last:border-b-0 transition-colors duration-150",
-                    "hover:bg-[#95CBD7]/10",
-                    onItemClick && "cursor-pointer"
-                  )}
-                >
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className={cn(
-                        "py-3 px-4 text-sm text-[#666666]",
-                        column.width
-                      )}
-                      style={{fontFamily: 'var(--font-body)'}}
-                    >
-                      {column.render(item)}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              items.map((item, index) => {
+                const itemId = getItemId ? getItemId(item) : String(index)
+                const isSelected = selectedIds?.has(itemId)
+
+                return (
+                  <tr
+                    key={itemId}
+                    onClick={() => onItemClick?.(item)}
+                    className={cn(
+                      "border-b border-[#E5E5E5] last:border-b-0 transition-colors duration-150 group",
+                      "hover:bg-[#95CBD7]/10",
+                      onItemClick && "cursor-pointer",
+                      isSelected && "bg-[#407B9D]/5"
+                    )}
+                  >
+                    {/* Selection checkbox */}
+                    {selectionMode && onSelectionChange && (
+                      <td className="w-10 py-3 px-4">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            onSelectionChange(itemId, e.target.checked)
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 rounded border-gray-300 text-[#407B9D] focus:ring-[#407B9D] cursor-pointer"
+                        />
+                      </td>
+                    )}
+                    {columns.map((column) => (
+                      <td
+                        key={column.key}
+                        className={cn(
+                          "py-3 px-4 text-sm text-[#666666]",
+                          column.width
+                        )}
+                        style={{fontFamily: 'var(--font-body)'}}
+                      >
+                        {column.render(item)}
+                      </td>
+                    ))}
+                    {/* Delete button */}
+                    {onItemDelete && (
+                      <td className="w-12 py-3 px-4">
+                        <button
+                          onClick={(e) => onItemDelete(e, item)}
+                          className="text-[#999999] hover:text-red-600 transition-colors p-1 opacity-0 group-hover:opacity-100"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>

@@ -2,7 +2,7 @@
 
 import { MaintenanceTicket, maintStageColors } from "@/lib/dummy-data"
 import { formatMinutes, formatDate } from "@/lib/services/time-tracking-service"
-import { User, Clock, Calendar, AlertCircle } from "lucide-react"
+import { User, Clock, Calendar, AlertCircle, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
@@ -12,15 +12,51 @@ import { cn } from "@/lib/utils"
 
 export interface TicketCardProps {
   ticket: MaintenanceTicket
+  selected?: boolean
+  selectionMode?: boolean
+  onSelect?: (id: string, selected: boolean) => void
+  onDelete?: (e: React.MouseEvent, ticket: MaintenanceTicket) => void
 }
 
 // ============================================================================
 // TICKET CARD COMPONENT
 // ============================================================================
 
-export function TicketCard({ ticket }: TicketCardProps) {
+export function TicketCard({
+  ticket,
+  selected,
+  selectionMode,
+  onSelect,
+  onDelete
+}: TicketCardProps) {
   return (
-    <div className="p-4 space-y-3">
+    <div className="p-4 space-y-3 group relative">
+      {/* Selection checkbox (visible in selection mode) */}
+      {selectionMode && onSelect && (
+        <div className="absolute top-2 left-2 z-10">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => {
+              e.stopPropagation()
+              onSelect(ticket.id, e.target.checked)
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-4 h-4 rounded border-gray-300 text-[#407B9D] focus:ring-[#407B9D] cursor-pointer"
+          />
+        </div>
+      )}
+
+      {/* Hover delete button */}
+      {onDelete && (
+        <button
+          onClick={(e) => onDelete(e, ticket)}
+          className="absolute top-2 right-2 z-10 text-[#999999] hover:text-red-600 transition-colors p-1 opacity-0 group-hover:opacity-100"
+          title="Delete"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
       {/* Ticket Title */}
       <h4
         className="font-semibold text-[#463939] line-clamp-2"

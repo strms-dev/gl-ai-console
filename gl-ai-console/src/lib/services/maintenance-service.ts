@@ -260,6 +260,63 @@ export async function updateMaintTicketPriority(id: string, priority: number): P
 }
 
 /**
+ * Bulk delete maintenance tickets and their associated time entries
+ */
+export async function bulkDeleteMaintTickets(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+
+  // First delete associated time entries for all tickets
+  const { error: timeError } = await supabase
+    .from('strms_time_entries')
+    .delete()
+    .in('project_id', ids)
+    .eq('project_type', 'maintenance')
+
+  if (timeError) {
+    console.error('Error bulk deleting time entries:', timeError)
+    throw new Error('Failed to delete associated time entries')
+  }
+
+  // Then delete the tickets
+  const { error } = await supabase
+    .from('strms_maintenance_tickets')
+    .delete()
+    .in('id', ids)
+
+  if (error) {
+    console.error('Error bulk deleting maintenance tickets:', error)
+    throw new Error('Failed to delete maintenance tickets')
+  }
+}
+
+/**
+ * Bulk update status for maintenance tickets
+ */
+export async function bulkUpdateMaintTicketStatus(
+  ids: string[],
+  status: MaintenanceStatus
+): Promise<void> {
+  if (ids.length === 0) return
+
+  const now = new Date().toISOString()
+  const completedDate = status === "closed" ? now : null
+
+  const { error } = await supabase
+    .from('strms_maintenance_tickets')
+    .update({
+      status,
+      completed_date: completedDate,
+      updated_at: now
+    })
+    .in('id', ids)
+
+  if (error) {
+    console.error('Error bulk updating status:', error)
+    throw new Error('Failed to update ticket statuses')
+  }
+}
+
+/**
  * Get maintenance tickets by assignee with optional filter for completed
  */
 export async function getMaintTicketsByAssignee(

@@ -4,16 +4,17 @@ import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, User, Clock, AlertCircle } from "lucide-react"
-import { MaintenanceTicket, maintStageLabels, maintStageColors, Developer } from "@/lib/types"
-import { getMaintTickets, updateMaintTicket } from "@/lib/services/maintenance-service"
+import { Plus, User, Clock, AlertCircle, CheckSquare } from "lucide-react"
+import { MaintenanceTicket, MaintenanceStatus, maintStageLabels, maintStageColors, Developer } from "@/lib/types"
+import { getMaintTickets, updateMaintTicket, deleteMaintTicket, bulkDeleteMaintTickets, bulkUpdateMaintTicketStatus } from "@/lib/services/maintenance-service"
 import { formatMinutes } from "@/lib/services/time-tracking-service"
 import { KanbanBoard, StageConfig } from "@/components/shared/kanban-board"
 import { ListView, ColumnConfig } from "@/components/shared/list-view"
 import { ViewToggle, ViewMode } from "@/components/shared/view-toggle"
 import { TicketCard } from "@/components/maintenance/ticket-card"
-// import { TicketForm, TicketFormData } from "@/components/maintenance/ticket-form" // No longer needed
 import { TicketDetailModal } from "@/components/maintenance/ticket-detail-modal"
+import { BulkActionBar } from "@/components/shared/bulk-action-bar"
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
@@ -29,6 +30,15 @@ export default function MaintenancePage() {
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectionMode, setSelectionMode] = useState(false)
+
+  // Delete confirmation state
+  const [itemToDelete, setItemToDelete] = useState<MaintenanceTicket | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false)
 
   // Load tickets on mount
   useEffect(() => {
@@ -198,6 +208,86 @@ export default function MaintenancePage() {
     setDetailModalOpen(true)
   }
 
+  // Toggle selection mode
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode)
+    if (selectionMode) {
+      setSelectedIds(new Set())
+    }
+  }
+
+  // Handle individual selection change
+  const handleSelectionChange = (id: string, selected: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (selected) {
+        next.add(id)
+      } else {
+        next.delete(id)
+      }
+      return next
+    })
+  }
+
+  // Handle select all
+  const handleSelectAll = (selected: boolean) => {
+    if (selected) {
+      setSelectedIds(new Set(filteredAndSortedTickets.map(t => t.id)))
+    } else {
+      setSelectedIds(new Set())
+    }
+  }
+
+  // Handle individual hover-delete click
+  const handleDeleteClick = (e: React.MouseEvent, ticket: MaintenanceTicket) => {
+    e.stopPropagation()
+    setItemToDelete(ticket)
+    setDeleteConfirmOpen(true)
+  }
+
+  // Confirm single delete
+  const confirmDelete = async () => {
+    if (itemToDelete) {
+      try {
+        await deleteMaintTicket(itemToDelete.id)
+        setItemToDelete(null)
+        setDeleteConfirmOpen(false)
+        await handleTicketDeleted()
+      } catch (error) {
+        console.error("Error deleting ticket:", error)
+      }
+    }
+  }
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDeleteMaintTickets(Array.from(selectedIds))
+      setSelectedIds(new Set())
+      setBulkDeleteConfirmOpen(false)
+      await handleTicketDeleted()
+    } catch (error) {
+      console.error("Error bulk deleting tickets:", error)
+    }
+  }
+
+  // Handle bulk status change
+  const handleBulkStatusChange = async (status: MaintenanceStatus) => {
+    try {
+      await bulkUpdateMaintTicketStatus(Array.from(selectedIds), status)
+      setSelectedIds(new Set())
+      await handleTicketUpdated()
+    } catch (error) {
+      console.error("Error bulk updating status:", error)
+    }
+  }
+
+  // Status options for bulk action bar
+  const statusOptions = Object.entries(maintStageLabels).map(([value, label]) => ({
+    value: value as MaintenanceStatus,
+    label
+  }))
+
   // Filter tickets
   const filteredAndSortedTickets = useMemo(() => {
     let filtered = tickets
@@ -251,13 +341,26 @@ export default function MaintenancePage() {
             Track maintenance requests and customizations from error logging through resolution
           </p>
         </div>
-        <Button
-          onClick={() => setCreateModalOpen(true)}
-          className="bg-[#407B9D] hover:bg-[#407B9D]/90 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          New Ticket
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={toggleSelectionMode}
+            className={cn(
+              "flex items-center gap-2",
+              selectionMode && "bg-[#407B9D]/10 border-[#407B9D] text-[#407B9D]"
+            )}
+          >
+            <CheckSquare className="w-4 h-4" />
+            {selectionMode ? "Exit Selection" : "Select Items"}
+          </Button>
+          <Button
+            onClick={() => setCreateModalOpen(true)}
+            className="bg-[#407B9D] hover:bg-[#407B9D]/90 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New Ticket
+          </Button>
+        </div>
       </div>
 
       {/* View Controls */}
@@ -322,7 +425,15 @@ export default function MaintenancePage() {
               getItemId={(ticket) => ticket.id}
               onItemClick={handleTicketClick}
               onStageChange={handleStageChange}
-              renderCard={(ticket) => <TicketCard ticket={ticket} />}
+              renderCard={(ticket) => (
+                <TicketCard
+                  ticket={ticket}
+                  selected={selectedIds.has(ticket.id)}
+                  selectionMode={selectionMode}
+                  onSelect={handleSelectionChange}
+                  onDelete={handleDeleteClick}
+                />
+              )}
               emptyMessage="No tickets in this stage"
             />
           ) : (
@@ -331,6 +442,12 @@ export default function MaintenancePage() {
               columns={columns}
               onItemClick={handleTicketClick}
               emptyMessage="No tickets found"
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onSelectionChange={handleSelectionChange}
+              onSelectAll={handleSelectAll}
+              getItemId={(ticket) => ticket.id}
+              onItemDelete={handleDeleteClick}
             />
           )}
         </CardContent>
@@ -358,6 +475,37 @@ export default function MaintenancePage() {
           onTicketDeleted={handleTicketDeleted}
         />
       )}
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onClearSelection={() => setSelectedIds(new Set())}
+        onBulkDelete={() => setBulkDeleteConfirmOpen(true)}
+        onBulkStatusChange={handleBulkStatusChange}
+        statusOptions={statusOptions}
+      />
+
+      {/* Single Delete Confirmation */}
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={confirmDelete}
+        title="Delete Ticket"
+        description={`Are you sure you want to delete "${itemToDelete?.ticketTitle}"? This action cannot be undone and all associated time entries will be deleted.`}
+        confirmText="Delete"
+        variant="danger"
+      />
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmationDialog
+        open={bulkDeleteConfirmOpen}
+        onOpenChange={setBulkDeleteConfirmOpen}
+        onConfirm={handleBulkDelete}
+        title="Delete Multiple Tickets"
+        description={`Are you sure you want to delete ${selectedIds.size} tickets? This action cannot be undone and all associated time entries will be deleted.`}
+        confirmText="Delete All"
+        variant="danger"
+      />
     </div>
   )
 }

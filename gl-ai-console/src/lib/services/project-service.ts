@@ -250,6 +250,63 @@ export async function updateDevProjectPriority(id: string, priority: number): Pr
 }
 
 /**
+ * Bulk delete development projects and their associated time entries
+ */
+export async function bulkDeleteDevProjects(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+
+  // First delete associated time entries for all projects
+  const { error: timeError } = await supabase
+    .from('strms_time_entries')
+    .delete()
+    .in('project_id', ids)
+    .eq('project_type', 'development')
+
+  if (timeError) {
+    console.error('Error bulk deleting time entries:', timeError)
+    throw new Error('Failed to delete associated time entries')
+  }
+
+  // Then delete the projects
+  const { error } = await supabase
+    .from('strms_dev_projects')
+    .delete()
+    .in('id', ids)
+
+  if (error) {
+    console.error('Error bulk deleting dev projects:', error)
+    throw new Error('Failed to delete development projects')
+  }
+}
+
+/**
+ * Bulk update status for development projects
+ */
+export async function bulkUpdateDevProjectStatus(
+  ids: string[],
+  status: DevelopmentStatus
+): Promise<void> {
+  if (ids.length === 0) return
+
+  const now = new Date().toISOString()
+  const completedDate = (status === "complete" || status === "cancelled") ? now : null
+
+  const { error } = await supabase
+    .from('strms_dev_projects')
+    .update({
+      status,
+      completed_date: completedDate,
+      updated_at: now
+    })
+    .in('id', ids)
+
+  if (error) {
+    console.error('Error bulk updating status:', error)
+    throw new Error('Failed to update project statuses')
+  }
+}
+
+/**
  * Get development projects by assignee with optional filter for completed
  */
 export async function getDevProjectsByAssignee(

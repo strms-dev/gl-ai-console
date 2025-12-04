@@ -4,16 +4,17 @@ import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, User, Clock, Calendar } from "lucide-react"
-import { DevelopmentProject, devStageLabels, devStageColors, Developer, sprintLengthLabels } from "@/lib/types"
-import { getDevProjects, updateDevProject } from "@/lib/services/project-service"
+import { Plus, User, Clock, Calendar, CheckSquare } from "lucide-react"
+import { DevelopmentProject, DevelopmentStatus, devStageLabels, devStageColors, Developer, sprintLengthLabels } from "@/lib/types"
+import { getDevProjects, updateDevProject, deleteDevProject, bulkDeleteDevProjects, bulkUpdateDevProjectStatus } from "@/lib/services/project-service"
 import { formatMinutes, formatDate } from "@/lib/services/time-tracking-service"
 import { KanbanBoard, StageConfig } from "@/components/shared/kanban-board"
 import { ListView, ColumnConfig } from "@/components/shared/list-view"
 import { ViewToggle, ViewMode } from "@/components/shared/view-toggle"
 import { ProjectCard } from "@/components/project-management/project-card"
-// import { ProjectForm, ProjectFormData } from "@/components/project-management/project-form" // No longer needed
 import { ProjectDetailModal } from "@/components/project-management/project-detail-modal"
+import { BulkActionBar } from "@/components/shared/bulk-action-bar"
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
@@ -29,6 +30,15 @@ export default function ProjectManagementPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("kanban")
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectionMode, setSelectionMode] = useState(false)
+
+  // Delete confirmation state
+  const [itemToDelete, setItemToDelete] = useState<DevelopmentProject | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false)
 
   // Load projects on mount
   useEffect(() => {
@@ -200,6 +210,86 @@ export default function ProjectManagementPage() {
     setDetailModalOpen(true)
   }
 
+  // Toggle selection mode
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode)
+    if (selectionMode) {
+      setSelectedIds(new Set())
+    }
+  }
+
+  // Handle individual selection change
+  const handleSelectionChange = (id: string, selected: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (selected) {
+        next.add(id)
+      } else {
+        next.delete(id)
+      }
+      return next
+    })
+  }
+
+  // Handle select all
+  const handleSelectAll = (selected: boolean) => {
+    if (selected) {
+      setSelectedIds(new Set(filteredAndSortedProjects.map(p => p.id)))
+    } else {
+      setSelectedIds(new Set())
+    }
+  }
+
+  // Handle individual hover-delete click
+  const handleDeleteClick = (e: React.MouseEvent, project: DevelopmentProject) => {
+    e.stopPropagation()
+    setItemToDelete(project)
+    setDeleteConfirmOpen(true)
+  }
+
+  // Confirm single delete
+  const confirmDelete = async () => {
+    if (itemToDelete) {
+      try {
+        await deleteDevProject(itemToDelete.id)
+        setItemToDelete(null)
+        setDeleteConfirmOpen(false)
+        await handleProjectDeleted()
+      } catch (error) {
+        console.error("Error deleting project:", error)
+      }
+    }
+  }
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    try {
+      await bulkDeleteDevProjects(Array.from(selectedIds))
+      setSelectedIds(new Set())
+      setBulkDeleteConfirmOpen(false)
+      await handleProjectDeleted()
+    } catch (error) {
+      console.error("Error bulk deleting projects:", error)
+    }
+  }
+
+  // Handle bulk status change
+  const handleBulkStatusChange = async (status: DevelopmentStatus) => {
+    try {
+      await bulkUpdateDevProjectStatus(Array.from(selectedIds), status)
+      setSelectedIds(new Set())
+      await handleProjectUpdated()
+    } catch (error) {
+      console.error("Error bulk updating status:", error)
+    }
+  }
+
+  // Status options for bulk action bar
+  const statusOptions = Object.entries(devStageLabels).map(([value, label]) => ({
+    value: value as DevelopmentStatus,
+    label
+  }))
+
   // Filter projects
   const filteredAndSortedProjects = useMemo(() => {
     let filtered = projects
@@ -254,13 +344,26 @@ export default function ProjectManagementPage() {
             Track development projects from setup through completion
           </p>
         </div>
-        <Button
-          onClick={() => setCreateModalOpen(true)}
-          className="bg-[#407B9D] hover:bg-[#407B9D]/90 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          New Project
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={toggleSelectionMode}
+            className={cn(
+              "flex items-center gap-2",
+              selectionMode && "bg-[#407B9D]/10 border-[#407B9D] text-[#407B9D]"
+            )}
+          >
+            <CheckSquare className="w-4 h-4" />
+            {selectionMode ? "Exit Selection" : "Select Items"}
+          </Button>
+          <Button
+            onClick={() => setCreateModalOpen(true)}
+            className="bg-[#407B9D] hover:bg-[#407B9D]/90 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New Project
+          </Button>
+        </div>
       </div>
 
       {/* View Controls */}
@@ -325,7 +428,15 @@ export default function ProjectManagementPage() {
               getItemId={(project) => project.id}
               onItemClick={handleProjectClick}
               onStageChange={handleStageChange}
-              renderCard={(project) => <ProjectCard project={project} />}
+              renderCard={(project) => (
+                <ProjectCard
+                  project={project}
+                  selected={selectedIds.has(project.id)}
+                  selectionMode={selectionMode}
+                  onSelect={handleSelectionChange}
+                  onDelete={handleDeleteClick}
+                />
+              )}
               emptyMessage="No projects in this stage"
             />
           ) : (
@@ -334,6 +445,12 @@ export default function ProjectManagementPage() {
               columns={columns}
               onItemClick={handleProjectClick}
               emptyMessage="No projects found"
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onSelectionChange={handleSelectionChange}
+              onSelectAll={handleSelectAll}
+              getItemId={(project) => project.id}
+              onItemDelete={handleDeleteClick}
             />
           )}
         </CardContent>
@@ -360,6 +477,37 @@ export default function ProjectManagementPage() {
           onProjectDeleted={handleProjectDeleted}
         />
       )}
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onClearSelection={() => setSelectedIds(new Set())}
+        onBulkDelete={() => setBulkDeleteConfirmOpen(true)}
+        onBulkStatusChange={handleBulkStatusChange}
+        statusOptions={statusOptions}
+      />
+
+      {/* Single Delete Confirmation */}
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={confirmDelete}
+        title="Delete Project"
+        description={`Are you sure you want to delete "${itemToDelete?.projectName}"? This action cannot be undone and all associated time entries will be deleted.`}
+        confirmText="Delete"
+        variant="danger"
+      />
+
+      {/* Bulk Delete Confirmation */}
+      <ConfirmationDialog
+        open={bulkDeleteConfirmOpen}
+        onOpenChange={setBulkDeleteConfirmOpen}
+        onConfirm={handleBulkDelete}
+        title="Delete Multiple Projects"
+        description={`Are you sure you want to delete ${selectedIds.size} projects? This action cannot be undone and all associated time entries will be deleted.`}
+        confirmText="Delete All"
+        variant="danger"
+      />
     </div>
   )
 }
