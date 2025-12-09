@@ -161,6 +161,47 @@ export interface Database {
           updated_at?: string
         }
       }
+      revops_funnel_leads: {
+        Row: {
+          id: string
+          first_name: string
+          last_name: string
+          email: string
+          company_name: string
+          company_domain: string | null
+          notes: string | null
+          hs_contact_created: boolean
+          hs_sequence_enrolled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          first_name: string
+          last_name: string
+          email: string
+          company_name: string
+          company_domain?: string | null
+          notes?: string | null
+          hs_contact_created?: boolean
+          hs_sequence_enrolled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          first_name?: string
+          last_name?: string
+          email?: string
+          company_name?: string
+          company_domain?: string | null
+          notes?: string | null
+          hs_contact_created?: boolean
+          hs_sequence_enrolled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     Views: {}
@@ -187,6 +228,11 @@ export type StageDataUpdate = Database['public']['Tables']['strms_project_stage_
 export type SprintPricing = Database['public']['Tables']['strms_sprint_pricing']['Row']
 export type SprintPricingInsert = Database['public']['Tables']['strms_sprint_pricing']['Insert']
 export type SprintPricingUpdate = Database['public']['Tables']['strms_sprint_pricing']['Update']
+
+// RevOps Funnel Lead types
+export type RevOpsFunnelLead = Database['public']['Tables']['revops_funnel_leads']['Row']
+export type RevOpsFunnelLeadInsert = Database['public']['Tables']['revops_funnel_leads']['Insert']
+export type RevOpsFunnelLeadUpdate = Database['public']['Tables']['revops_funnel_leads']['Update']
 
 // Complete project data including related tables
 export interface ProjectWithDetails extends Project {
