@@ -14,19 +14,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Check, Pencil, Plus, Trash2, UserPlus, Mail, AlertTriangle, FileText } from "lucide-react"
+import { Check, Pencil, Plus, Trash2, UserPlus, AlertTriangle, FileText, X, Filter, ExternalLink, Loader2 } from "lucide-react"
 import {
   FunnelLead,
   getFunnelLeads,
   addFunnelLead,
   updateFunnelLead,
   deleteFunnelLead,
-  toggleHsContactCreated,
-  toggleHsSequenceEnrolled,
 } from "@/lib/revops-funnel-store"
 
-type SortField = "firstName" | "lastName" | "companyName" | "createdAt"
-type SortOrder = "asc" | "desc"
+type FilterOption = "all" | "yes" | "no"
 
 // Helper function to format date/time
 function formatDateTime(isoString: string): string {
@@ -44,14 +41,24 @@ function formatDateTime(isoString: string): string {
 export default function SalesFunnelPage() {
   const [leads, setLeads] = useState<FunnelLead[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [sortField, setSortField] = useState<SortField>("createdAt")
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
   const [showLeadForm, setShowLeadForm] = useState(false)
   const [editingLead, setEditingLead] = useState<FunnelLead | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [leadToDelete, setLeadToDelete] = useState<FunnelLead | null>(null)
   const [notesDialogOpen, setNotesDialogOpen] = useState(false)
   const [notesLead, setNotesLead] = useState<FunnelLead | null>(null)
+  const [hsContactFilter, setHsContactFilter] = useState<FilterOption>("all")
+  const [hsSequenceFilter, setHsSequenceFilter] = useState<FilterOption>("all")
+  const [showFilterMenu, setShowFilterMenu] = useState(false)
+
+  // Check if any filters are active
+  const hasActiveFilters = hsContactFilter !== "all" || hsSequenceFilter !== "all"
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setHsContactFilter("all")
+    setHsSequenceFilter("all")
+  }
 
   // Form state
   const [formData, setFormData] = useState({
@@ -66,6 +73,10 @@ export default function SalesFunnelPage() {
   // Loading state
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+
+  // HubSpot contact creation states (per lead)
+  const [hsCreatingLeadId, setHsCreatingLeadId] = useState<string | null>(null)
+  const [hsFailedLeadId, setHsFailedLeadId] = useState<string | null>(null)
 
   // Load leads from Supabase on mount
   useEffect(() => {
@@ -108,7 +119,7 @@ export default function SalesFunnelPage() {
     // Filter by search term
     if (searchTerm) {
       const search = searchTerm.toLowerCase()
-      filtered = leads.filter(
+      filtered = filtered.filter(
         (lead) =>
           lead.firstName.toLowerCase().includes(search) ||
           lead.lastName.toLowerCase().includes(search) ||
@@ -118,37 +129,23 @@ export default function SalesFunnelPage() {
       )
     }
 
-    // Sort leads
-    return filtered.sort((a, b) => {
-      let aValue: string
-      let bValue: string
+    // Filter by HS Contact status
+    if (hsContactFilter !== "all") {
+      filtered = filtered.filter((lead) =>
+        hsContactFilter === "yes" ? lead.hsContactCreated : !lead.hsContactCreated
+      )
+    }
 
-      switch (sortField) {
-        case "firstName":
-          aValue = a.firstName.toLowerCase()
-          bValue = b.firstName.toLowerCase()
-          break
-        case "lastName":
-          aValue = a.lastName.toLowerCase()
-          bValue = b.lastName.toLowerCase()
-          break
-        case "companyName":
-          aValue = a.companyName.toLowerCase()
-          bValue = b.companyName.toLowerCase()
-          break
-        case "createdAt":
-          aValue = a.createdAt
-          bValue = b.createdAt
-          break
-        default:
-          aValue = a.createdAt
-          bValue = b.createdAt
-      }
+    // Filter by HS Sequence status
+    if (hsSequenceFilter !== "all") {
+      filtered = filtered.filter((lead) =>
+        hsSequenceFilter === "yes" ? lead.hsSequenceEnrolled : !lead.hsSequenceEnrolled
+      )
+    }
 
-      const result = aValue.localeCompare(bValue)
-      return sortOrder === "asc" ? result : -result
-    })
-  }, [searchTerm, sortField, sortOrder, leads])
+    // Sort by most recently updated (descending)
+    return filtered.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  }, [searchTerm, leads, hsContactFilter, hsSequenceFilter])
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -199,21 +196,49 @@ export default function SalesFunnelPage() {
     setLeadToDelete(null)
   }
 
-  // Handle HubSpot contact creation toggle
-  const handleToggleHsContact = async (id: string) => {
-    const result = await toggleHsContactCreated(id)
-    if (result) {
-      const updatedLeads = await getFunnelLeads()
-      setLeads(updatedLeads)
-    }
-  }
+  // Handle HubSpot contact creation via n8n webhook
+  const handleCreateHsContact = async (lead: FunnelLead) => {
+    setHsFailedLeadId(null)
+    setHsCreatingLeadId(lead.id)
 
-  // Handle HubSpot sequence enrollment toggle
-  const handleToggleHsSequence = async (id: string) => {
-    const result = await toggleHsSequenceEnrolled(id)
-    if (result) {
-      const updatedLeads = await getFunnelLeads()
-      setLeads(updatedLeads)
+    try {
+      const response = await fetch(
+        "https://n8n.srv1055749.hstgr.cloud/webhook/revops-create-hubspot-contact",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: lead.id,
+            firstName: lead.firstName,
+            lastName: lead.lastName,
+            email: lead.email,
+            companyName: lead.companyName,
+            companyDomain: lead.companyDomain,
+            notes: lead.notes,
+          }),
+        }
+      )
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        const updatedLeads = await getFunnelLeads()
+        setLeads(updatedLeads)
+      } else {
+        setHsFailedLeadId(lead.id)
+        setTimeout(() => {
+          setHsFailedLeadId(null)
+        }, 2000)
+      }
+    } catch {
+      setHsFailedLeadId(lead.id)
+      setTimeout(() => {
+        setHsFailedLeadId(null)
+      }, 2000)
+    } finally {
+      setHsCreatingLeadId(null)
     }
   }
 
@@ -271,36 +296,115 @@ export default function SalesFunnelPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Search and Sort Controls */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              <div className="flex-1">
-                <Input
-                  placeholder="Search by name, email, company..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full"
-                />
+            {/* Search and Filter Controls */}
+            <div className="flex flex-col gap-4 mb-6">
+              {/* Search Row */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Search by name, email, company..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowFilterMenu(!showFilterMenu)}
+                    className={`flex items-center gap-2 ${hasActiveFilters ? "border-[#407B9D] text-[#407B9D]" : ""}`}
+                  >
+                    <Filter className="w-4 h-4" />
+                    Add Filter
+                    {hasActiveFilters && (
+                      <span className="ml-1 bg-[#407B9D] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {(hsContactFilter !== "all" ? 1 : 0) + (hsSequenceFilter !== "all" ? 1 : 0)}
+                      </span>
+                    )}
+                  </Button>
+
+                  {/* Filter Dropdown Menu */}
+                  {showFilterMenu && (
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-50">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-[#463939] mb-2">
+                            HS Contact
+                          </label>
+                          <select
+                            value={hsContactFilter}
+                            onChange={(e) => setHsContactFilter(e.target.value as FilterOption)}
+                            className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                          >
+                            <option value="all">All</option>
+                            <option value="yes">Created</option>
+                            <option value="no">Not Created</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-[#463939] mb-2">
+                            HS Sequence Status
+                          </label>
+                          <select
+                            value={hsSequenceFilter}
+                            onChange={(e) => setHsSequenceFilter(e.target.value as FilterOption)}
+                            className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                          >
+                            <option value="all">All</option>
+                            <option value="yes">Enrolled</option>
+                            <option value="no">Not Enrolled</option>
+                          </select>
+                        </div>
+                        <div className="flex justify-end pt-2 border-t">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowFilterMenu(false)}
+                            className="text-[#407B9D]"
+                          >
+                            Done
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-2">
-                <select
-                  value={sortField}
-                  onChange={(e) => setSortField(e.target.value as SortField)}
-                  className="h-9 w-[140px] rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="createdAt">Date Added</option>
-                  <option value="firstName">First Name</option>
-                  <option value="lastName">Last Name</option>
-                  <option value="companyName">Company</option>
-                </select>
-                <select
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-                  className="h-9 w-[100px] rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="desc">Newest</option>
-                  <option value="asc">Oldest</option>
-                </select>
-              </div>
+
+              {/* Active Filter Chips */}
+              {hasActiveFilters && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-muted-foreground">Active filters:</span>
+                  {hsContactFilter !== "all" && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/20">
+                      HS Contact: {hsContactFilter === "yes" ? "Created" : "Not Created"}
+                      <button
+                        onClick={() => setHsContactFilter("all")}
+                        className="ml-1 hover:bg-[#407B9D]/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {hsSequenceFilter !== "all" && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/20">
+                      HS Sequence: {hsSequenceFilter === "yes" ? "Enrolled" : "Not Enrolled"}
+                      <button
+                        onClick={() => setHsSequenceFilter("all")}
+                        className="ml-1 hover:bg-[#407B9D]/20 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  <button
+                    onClick={clearAllFilters}
+                    className="text-sm text-muted-foreground hover:text-[#407B9D] underline"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Leads Table */}
@@ -319,8 +423,8 @@ export default function SalesFunnelPage() {
                   className="text-[#666666]"
                   style={{ fontFamily: "var(--font-body)" }}
                 >
-                  {searchTerm
-                    ? "No leads found matching your search."
+                  {searchTerm || hsContactFilter !== "all" || hsSequenceFilter !== "all"
+                    ? "No leads found matching your filters."
                     : "No leads yet. Add your first lead to get started."}
                 </p>
               </div>
@@ -336,7 +440,7 @@ export default function SalesFunnelPage() {
                       <th className="text-left py-3 px-4 font-medium">Company Domain</th>
                       <th className="text-left py-3 px-4 font-medium">Notes</th>
                       <th className="text-center py-3 px-4 font-medium">HS Contact</th>
-                      <th className="text-center py-3 px-4 font-medium">HS Sequence</th>
+                      <th className="text-center py-3 px-4 font-medium">HS Sequence Status</th>
                       <th className="text-left py-3 px-4 font-medium">Created</th>
                       <th className="text-left py-3 px-4 font-medium">Updated</th>
                       <th className="text-left py-3 px-4 font-medium">Actions</th>
@@ -367,16 +471,39 @@ export default function SalesFunnelPage() {
                         </td>
                         <td className="py-3 px-4 text-center">
                           {lead.hsContactCreated ? (
-                            <div className="flex justify-center">
+                            <div className="flex items-center justify-center gap-1.5">
                               <div className="w-6 h-6 rounded-full bg-[#C8E4BB] flex items-center justify-center">
                                 <Check className="w-4 h-4 text-[#463939]" />
+                              </div>
+                              {lead.hsContactUrl && (
+                                <a
+                                  href={lead.hsContactUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#407B9D] hover:text-[#407B9D]/70 transition-colors"
+                                  title="Open in HubSpot"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              )}
+                            </div>
+                          ) : hsCreatingLeadId === lead.id ? (
+                            <div className="flex justify-center">
+                              <div className="w-6 h-6 rounded-full bg-[#407B9D]/10 flex items-center justify-center">
+                                <Loader2 className="w-4 h-4 text-[#407B9D] animate-spin" />
+                              </div>
+                            </div>
+                          ) : hsFailedLeadId === lead.id ? (
+                            <div className="flex justify-center">
+                              <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
+                                <X className="w-4 h-4 text-red-600" />
                               </div>
                             </div>
                           ) : (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleToggleHsContact(lead.id)}
+                              onClick={() => handleCreateHsContact(lead)}
                               className="h-7 text-xs"
                             >
                               <UserPlus className="w-3 h-3 mr-1" />
@@ -385,23 +512,15 @@ export default function SalesFunnelPage() {
                           )}
                         </td>
                         <td className="py-3 px-4 text-center">
-                          {lead.hsSequenceEnrolled ? (
-                            <div className="flex justify-center">
-                              <div className="w-6 h-6 rounded-full bg-[#C8E4BB] flex items-center justify-center">
-                                <Check className="w-4 h-4 text-[#463939]" />
-                              </div>
-                            </div>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleToggleHsSequence(lead.id)}
-                              className="h-7 text-xs"
-                            >
-                              <Mail className="w-3 h-3 mr-1" />
-                              Enroll
-                            </Button>
-                          )}
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              lead.hsSequenceEnrolled
+                                ? "bg-[#C8E4BB] text-[#463939]"
+                                : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {lead.hsSequenceEnrolled ? "Enrolled" : "Not Enrolled"}
+                          </span>
                         </td>
                         <td className="py-3 px-4 text-sm text-muted-foreground whitespace-nowrap">
                           {formatDateTime(lead.createdAt)}

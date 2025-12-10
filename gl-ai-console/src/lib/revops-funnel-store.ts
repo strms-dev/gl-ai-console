@@ -8,7 +8,6 @@ import {
   updateFunnelLeadSupabase,
   deleteFunnelLeadSupabase,
   toggleHsContactCreatedSupabase,
-  toggleHsSequenceEnrolledSupabase,
 } from "@/lib/supabase/revops-funnel"
 
 // Application-level interface (camelCase for UI layer)
@@ -21,6 +20,7 @@ export interface FunnelLead {
   companyDomain: string
   notes: string
   hsContactCreated: boolean
+  hsContactUrl: string | null
   hsSequenceEnrolled: boolean
   createdAt: string
   updatedAt: string
@@ -39,6 +39,7 @@ function dbToApp(dbLead: RevOpsFunnelLead): FunnelLead {
     companyDomain: dbLead.company_domain || "",
     notes: dbLead.notes || "",
     hsContactCreated: dbLead.hs_contact_created,
+    hsContactUrl: dbLead.hs_contact_url,
     hsSequenceEnrolled: dbLead.hs_sequence_enrolled,
     createdAt: dbLead.created_at,
     updatedAt: dbLead.updated_at,
@@ -57,6 +58,7 @@ function appToDbUpdate(appLead: Partial<Omit<FunnelLead, "id" | "createdAt" | "u
     company_domain?: string | null
     notes?: string | null
     hs_contact_created?: boolean
+    hs_contact_url?: string | null
     hs_sequence_enrolled?: boolean
   } = {}
 
@@ -72,6 +74,9 @@ function appToDbUpdate(appLead: Partial<Omit<FunnelLead, "id" | "createdAt" | "u
   }
   if (appLead.hsContactCreated !== undefined) {
     dbUpdate.hs_contact_created = appLead.hsContactCreated
+  }
+  if (appLead.hsContactUrl !== undefined) {
+    dbUpdate.hs_contact_url = appLead.hsContactUrl
   }
   if (appLead.hsSequenceEnrolled !== undefined) {
     dbUpdate.hs_sequence_enrolled = appLead.hsSequenceEnrolled
@@ -167,15 +172,3 @@ export async function toggleHsContactCreated(id: string): Promise<FunnelLead | n
   }
 }
 
-/**
- * Toggle HubSpot sequence enrolled status
- */
-export async function toggleHsSequenceEnrolled(id: string): Promise<FunnelLead | null> {
-  try {
-    const dbLead = await toggleHsSequenceEnrolledSupabase(id)
-    return dbToApp(dbLead)
-  } catch (error) {
-    console.error("Error toggling HubSpot sequence status:", error)
-    return null
-  }
-}

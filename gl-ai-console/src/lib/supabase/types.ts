@@ -171,6 +171,7 @@ export interface Database {
           company_domain: string | null
           notes: string | null
           hs_contact_created: boolean
+          hs_contact_url: string | null
           hs_sequence_enrolled: boolean
           created_at: string
           updated_at: string
@@ -184,6 +185,7 @@ export interface Database {
           company_domain?: string | null
           notes?: string | null
           hs_contact_created?: boolean
+          hs_contact_url?: string | null
           hs_sequence_enrolled?: boolean
           created_at?: string
           updated_at?: string
@@ -197,6 +199,7 @@ export interface Database {
           company_domain?: string | null
           notes?: string | null
           hs_contact_created?: boolean
+          hs_contact_url?: string | null
           hs_sequence_enrolled?: boolean
           created_at?: string
           updated_at?: string
