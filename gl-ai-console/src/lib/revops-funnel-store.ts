@@ -116,7 +116,7 @@ export async function getFunnelLeadById(id: string): Promise<FunnelLead | null> 
  * Add a new funnel lead to Supabase
  */
 export async function addFunnelLead(
-  lead: Omit<FunnelLead, "id" | "hsContactCreated" | "hsSequenceEnrolled" | "createdAt" | "updatedAt">
+  lead: Omit<FunnelLead, "id" | "hsContactCreated" | "hsContactUrl" | "hsSequenceEnrolled" | "createdAt" | "updatedAt">
 ): Promise<FunnelLead> {
   const dbLead = await createFunnelLead({
     first_name: lead.firstName,
