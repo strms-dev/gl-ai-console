@@ -1,0 +1,412 @@
+{
+  "name": "Sales Funnel - Check HubSpot Enrollment Status",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "cebd0a6d-aeae-4a38-8ee0-5e5f4f0c3944",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'hs_sequences_is_enrolled', operator: 'EQ', value: 'true' }, { propertyName: 'lastmodifieddate', operator: 'GTE', value: String(Date.now() - (20 * 60 * 1000)) }] }], properties: ['email', 'firstname', 'lastname', 'hs_sequences_is_enrolled', 'company'], limit: 100 }) }}",
+        "options": {}
+      },
+      "id": "050a3118-b045-48be-85b6-1cff1ec4e135",
+      "name": "Query HubSpot Enrolled Contacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "HubSpot Header Auth"
+        },
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "results",
+        "options": {}
+      },
+      "id": "77ddf14f-d67b-43bd-845f-0666512435bf",
+      "name": "Split Out Contacts",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-email",
+              "leftValue": "={{ $json.properties.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "73f24d80-5528-409c-be4e-b58f0c32c638",
+              "leftValue": "={{ $json.properties.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "3a831cf0-c4d7-4194-a3da-226836a6c266",
+      "name": "Filter Has Email",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "email",
+              "name": "email",
+              "value": "={{ $json.properties.email }}",
+              "type": "string"
+            },
+            {
+              "id": "firstname",
+              "name": "firstname",
+              "value": "={{ $json.properties.firstname }}",
+              "type": "string"
+            },
+            {
+              "id": "lastname",
+              "name": "lastname",
+              "value": "={{ $json.properties.lastname }}",
+              "type": "string"
+            },
+            {
+              "id": "company",
+              "name": "company",
+              "value": "={{ $json.properties.company }}",
+              "type": "string"
+            },
+            {
+              "id": "hubspot-id",
+              "name": "hubspot_contact_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "394b5853-fe96-4ebc-b4bf-d18d7d995a93",
+      "name": "Prepare Contact Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "revops_funnel_leads",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "condition": "eq",
+              "keyValue": "={{ $json.email }}"
+            }
+          ]
+        }
+      },
+      "id": "66a14323-84eb-4a9a-8042-fbc1e0e41de1",
+      "name": "Query Supabase Contact",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "supabase-id",
+              "name": "supabase_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "supabase-status",
+              "name": "hs_sequence_enrolled",
+              "value": "={{ $json.hs_sequence_enrolled }}",
+              "type": "boolean"
+            },
+            {
+              "id": "email",
+              "name": "email",
+              "value": "={{ $('Prepare Contact Data').item.json.email }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0d53e987-ee2f-4e55-8ca1-17485f80829b",
+      "name": "Merge Contact & Supabase Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1328,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-supabase-id",
+              "leftValue": "={{ $json.supabase_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "not-already-enrolled",
+              "leftValue": "={{ $json.hs_sequence_enrolled }}",
+              "rightValue": "sequence_enrolled",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "064b980b-db0c-4c12-ae31-8179f23449f4",
+      "name": "Filter Needs Update",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        1552,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "revops_funnel_leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.supabase_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "hs_sequence_enrolled",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "id": "abf261b5-b39e-4206-8ec7-24432c15c263",
+      "name": "Update Supabase Status",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Query HubSpot Enrolled Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query HubSpot Enrolled Contacts": {
+      "main": [
+        [
+          {
+            "node": "Split Out Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Contacts": {
+      "main": [
+        [
+          {
+            "node": "Filter Has Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Has Email": {
+      "main": [
+        [
+          {
+            "node": "Prepare Contact Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Contact Data": {
+      "main": [
+        [
+          {
+            "node": "Query Supabase Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Supabase Contact": {
+      "main": [
+        [
+          {
+            "node": "Merge Contact & Supabase Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Contact & Supabase Data": {
+      "main": [
+        [
+          {
+            "node": "Filter Needs Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Needs Update": {
+      "main": [
+        [
+          {
+            "node": "Update Supabase Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": -1,
+    "availableInMCP": false,
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
+  },
+  "versionId": "dca76d43-b30d-4431-8616-56c48c4dc5b6",
+  "meta": {
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "X6m1q0577BYMUzNX",
+  "tags": []
+}

@@ -109,18 +109,3 @@ export async function toggleHsContactCreatedSupabase(id: string): Promise<RevOps
   })
 }
 
-/**
- * Toggle HubSpot sequence enrolled status
- */
-export async function toggleHsSequenceEnrolledSupabase(id: string): Promise<RevOpsFunnelLead> {
-  // First fetch the current lead to get current value
-  const lead = await getFunnelLeadByIdSupabase(id)
-  if (!lead) {
-    throw new Error(`Lead not found: ${id}`)
-  }
-
-  // Toggle the value
-  return await updateFunnelLeadSupabase(id, {
-    hs_sequence_enrolled: !lead.hs_sequence_enrolled
-  })
-}

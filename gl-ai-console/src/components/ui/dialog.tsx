@@ -111,10 +111,25 @@ const DialogFooter = ({ className, ...props }: DialogFooterProps) => (
 )
 DialogFooter.displayName = "DialogFooter"
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface DialogDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement> {}
+
+const DialogDescription = React.forwardRef<HTMLParagraphElement, DialogDescriptionProps>(
+  ({ className, ...props }, ref) => (
+    <p
+      ref={ref}
+      className={cn("text-sm text-muted-foreground", className)}
+      {...props}
+    />
+  )
+)
+DialogDescription.displayName = "DialogDescription"
+
 export {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 }

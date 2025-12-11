@@ -1,0 +1,292 @@
+{
+  "name": "RevOps - Create HubSpot Contact",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "revops-create-hubspot-contact",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "6e0af06f-6dd9-49d2-b579-fad98b179387",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        272,
+        192
+      ],
+      "webhookId": "4a5dd64a-0b21-4e8e-af61-f835ae56dfbb",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "company",
+        "name": "={{ $json.body.companyName }}",
+        "additionalFields": {
+          "companyDomainName": "={{ $json.body.companyDomain }}",
+          "companyOwner": 664091983
+        }
+      },
+      "id": "0b82c794-f789-4452-944e-cfdcf11a392e",
+      "name": "Create HubSpot Company",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2,
+      "position": [
+        496,
+        128
+      ],
+      "alwaysOutputData": false,
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "email": "={{ $('Webhook').item.json.body.email }}",
+        "additionalFields": {
+          "associatedCompanyId": "={{ $json.companyId }}",
+          "companyName": "={{ $('Webhook').item.json.body.companyName }}",
+          "contactOwner": 664091983,
+          "firstName": "={{ $('Webhook').item.json.body.firstName }}",
+          "lastName": "={{ $('Webhook').item.json.body.lastName }}"
+        },
+        "options": {}
+      },
+      "id": "2f53b6b1-22c9-4219-8dea-1f9a7f648f64",
+      "name": "Create HubSpot Contact",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2,
+      "position": [
+        720,
+        48
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "revops_funnel_leads",
+        "filterType": "string",
+        "filterString": "=id=eq.{{ $('Webhook').item.json.body.id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "hs_contact_created",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "hs_contact_url",
+              "fieldValue": "=https://app.hubspot.com/contacts/4723689/record/0-1/{{ $json.vid }}"
+            }
+          ]
+        }
+      },
+      "id": "98c358dc-d11b-42f8-90f9-7f2ee5e51ac2",
+      "name": "Update Supabase Lead",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        944,
+        -32
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, contactId: $('Create HubSpot Contact').item.json.id, companyId: $('Create HubSpot Company').item.json.id }) }}",
+        "options": {}
+      },
+      "id": "f16f3c3c-c19e-470c-a853-ef81a1a47e2e",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        -96
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.message || 'Unknown error' }) }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "ad5d3000-0b94-4718-941d-ed4d4b5a3cc9",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        176
+      ]
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.srv1055749.hstgr.cloud",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+            "content-length": "194",
+            "accept": "*/*",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "en-US,en;q=0.9",
+            "content-type": "application/json",
+            "origin": "http://localhost:3000",
+            "priority": "u=1, i",
+            "referer": "http://localhost:3000/",
+            "sec-ch-ua": "\"Google Chrome\";v=\"143\", \"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "x-forwarded-for": "68.6.247.35",
+            "x-forwarded-host": "n8n.srv1055749.hstgr.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "658a1a16248d",
+            "x-real-ip": "68.6.247.35"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "id": "ddac49db-d060-4124-9ccf-e0c82ce8aae0",
+            "firstName": "Tony",
+            "lastName": "Stark",
+            "email": "tstark@jarvis.com",
+            "companyName": "Jarvis",
+            "companyDomain": "jarvis.com",
+            "notes": "Here are some notes!"
+          },
+          "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook/revops-create-hubspot-contact",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Create HubSpot Company",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create HubSpot Company": {
+      "main": [
+        [
+          {
+            "node": "Create HubSpot Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create HubSpot Contact": {
+      "main": [
+        [
+          {
+            "node": "Update Supabase Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Supabase Lead": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond Success": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
+  },
+  "versionId": "41721f4f-3b93-4b6c-9b2f-a4e8f3fc2d8c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "ghKvdFkuQhGFEcNZ",
+  "tags": []
+}

@@ -22,7 +22,8 @@
       "Bash(mkdir:*)",
       "Bash(mv:*)",
       "Bash(find:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(ls -la \"c:\\Users\\nseme\\OneDrive\\Desktop\\gl-ai-console-main\\gl-ai-console\\src\\lib\"\" 2>/dev/null || echo \"Directory not found \")"
     ]
   },
   "enableAllProjectMcpServers": true,

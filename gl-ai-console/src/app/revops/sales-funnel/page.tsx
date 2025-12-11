@@ -14,7 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Check, Pencil, Plus, Trash2, UserPlus, AlertTriangle, FileText, X, Filter, ExternalLink, Loader2 } from "lucide-react"
+import { Check, Pencil, Plus, Trash2, UserPlus, AlertTriangle, FileText, X, Filter, ExternalLink, Loader2, RefreshCw } from "lucide-react"
+import { useToast } from "@/components/ui/toast"
 import {
   FunnelLead,
   getFunnelLeads,
@@ -39,8 +40,10 @@ function formatDateTime(isoString: string): string {
 }
 
 export default function SalesFunnelPage() {
+  const { toast } = useToast()
   const [leads, setLeads] = useState<FunnelLead[]>([])
   const [searchTerm, setSearchTerm] = useState("")
+  const [isSyncing, setIsSyncing] = useState(false)
   const [showLeadForm, setShowLeadForm] = useState(false)
   const [editingLead, setEditingLead] = useState<FunnelLead | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -242,6 +245,43 @@ export default function SalesFunnelPage() {
     }
   }
 
+  // Handle sync enrollments
+  const handleSyncEnrollments = async () => {
+    setIsSyncing(true)
+    toast({
+      title: "Syncing enrollment status...",
+      description: "This may take a few seconds",
+      variant: "info",
+    })
+
+    try {
+      // Trigger the n8n webhook to check enrollment status
+      await fetch("https://n8n.srv1055749.hstgr.cloud/webhook/check-enrollment-status")
+
+      // Wait 5 seconds for n8n to process and update Supabase
+      await new Promise((resolve) => setTimeout(resolve, 5000))
+
+      // Refresh the leads data from Supabase
+      const updatedLeads = await getFunnelLeads()
+      setLeads(updatedLeads)
+
+      toast({
+        title: "Sync complete",
+        description: "Enrollment statuses have been updated",
+        variant: "success",
+      })
+    } catch (error) {
+      console.error("Sync failed:", error)
+      toast({
+        title: "Sync failed",
+        description: "Please try again",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   // Open edit form
   const handleEdit = (lead: FunnelLead) => {
     setEditingLead(lead)
@@ -283,16 +323,27 @@ export default function SalesFunnelPage() {
               >
                 Leads
               </CardTitle>
-              <Button
-                onClick={() => {
-                  setEditingLead(null)
-                  setShowLeadForm(true)
-                }}
-                className="bg-[#407B9D] hover:bg-[#407B9D]/90"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Lead
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleSyncEnrollments}
+                  disabled={isSyncing}
+                  className="border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D]/10"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
+                  {isSyncing ? "Syncing..." : "Sync Enrollments"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setEditingLead(null)
+                    setShowLeadForm(true)
+                  }}
+                  className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Lead
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
