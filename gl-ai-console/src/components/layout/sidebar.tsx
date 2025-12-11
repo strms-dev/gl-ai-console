@@ -37,6 +37,7 @@ const departmentNavigation: Record<string, NavigationItem[]> = {
   ],
   revops: [
     { name: "Sales Funnel", href: "/revops/sales-funnel", icon: "funnel" },
+    { name: "Sales Pipeline", href: "/revops/sales-pipeline", icon: "rotate-cw" },
   ],
 }
 
