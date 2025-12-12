@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Pencil, Plus, Trash2, AlertTriangle, Search } from "lucide-react"
+import { Pencil, Plus, Trash2, AlertTriangle, Search, ExternalLink } from "lucide-react"
 import {
   PipelineDeal,
   getPipelineDeals,
@@ -59,6 +60,7 @@ const hsStageOptions = [
 ]
 
 export default function SalesPipelinePage() {
+  const router = useRouter()
   const [deals, setDeals] = useState<PipelineDeal[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [showDealForm, setShowDealForm] = useState(false)
@@ -66,10 +68,16 @@ export default function SalesPipelinePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [dealToDelete, setDealToDelete] = useState<PipelineDeal | null>(null)
 
+  // Sort state: 'updated' = by last updated, 'hsStage' = by HS Stage order
+  const [sortBy, setSortBy] = useState<'updated' | 'hsStage'>('updated')
+
   // Form state
   const [formData, setFormData] = useState({
     dealName: "",
     companyName: "",
+    firstName: "",
+    lastName: "",
+    email: "",
     stage: "",
     hsStage: "",
   })
@@ -95,6 +103,9 @@ export default function SalesPipelinePage() {
       setFormData({
         dealName: editingDeal.dealName,
         companyName: editingDeal.companyName,
+        firstName: editingDeal.firstName || "",
+        lastName: editingDeal.lastName || "",
+        email: editingDeal.email || "",
         stage: editingDeal.stage,
         hsStage: editingDeal.hsStage || "",
       })
@@ -102,6 +113,9 @@ export default function SalesPipelinePage() {
       setFormData({
         dealName: "",
         companyName: "",
+        firstName: "",
+        lastName: "",
+        email: "",
         stage: "",
         hsStage: "",
       })
@@ -124,9 +138,19 @@ export default function SalesPipelinePage() {
       )
     }
 
-    // Sort by most recently updated (descending)
+    // Sort based on sortBy state
+    if (sortBy === 'hsStage') {
+      // Sort by HS Stage order (based on hsStageOptions array index)
+      return filtered.sort((a, b) => {
+        const aIndex = a.hsStage ? hsStageOptions.indexOf(a.hsStage) : hsStageOptions.length
+        const bIndex = b.hsStage ? hsStageOptions.indexOf(b.hsStage) : hsStageOptions.length
+        return aIndex - bIndex
+      })
+    }
+
+    // Default: Sort by most recently updated (descending)
     return filtered.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-  }, [searchTerm, deals])
+  }, [searchTerm, deals, sortBy])
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -139,6 +163,9 @@ export default function SalesPipelinePage() {
         await updatePipelineDeal(editingDeal.id, {
           dealName: formData.dealName,
           companyName: formData.companyName,
+          firstName: formData.firstName || null,
+          lastName: formData.lastName || null,
+          email: formData.email || null,
           stage: formData.stage,
           hsStage: formData.hsStage || null,
         })
@@ -147,6 +174,9 @@ export default function SalesPipelinePage() {
         await addPipelineDeal({
           dealName: formData.dealName,
           companyName: formData.companyName,
+          firstName: formData.firstName || null,
+          lastName: formData.lastName || null,
+          email: formData.email || null,
           stage: formData.stage,
           hsStage: formData.hsStage || null,
         })
@@ -235,9 +265,9 @@ export default function SalesPipelinePage() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Search */}
-            <div className="mb-6">
-              <div className="relative">
+            {/* Search and Sort */}
+            <div className="mb-6 flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by deal name, company, or stage..."
@@ -245,6 +275,17 @@ export default function SalesPipelinePage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'updated' | 'hsStage')}
+                  className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="updated">Last Updated</option>
+                  <option value="hsStage">HS Stage</option>
+                </select>
               </div>
             </div>
 
@@ -285,8 +326,31 @@ export default function SalesPipelinePage() {
                   </thead>
                   <tbody>
                     {filteredAndSortedDeals.map((deal) => (
-                      <tr key={deal.id} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-4 font-medium">{deal.dealName}</td>
+                      <tr
+                        key={deal.id}
+                        className="border-b hover:bg-muted/50 cursor-pointer"
+                        onClick={(e) => {
+                          // Prevent navigation when clicking on buttons or links
+                          if ((e.target as HTMLElement).closest('button, a')) {
+                            return
+                          }
+                          router.push(`/revops/sales-pipeline/deals/${deal.id}`)
+                        }}
+                      >
+                        <td className="py-3 px-4 font-medium">
+                          <div className="flex items-center gap-2">
+                            {deal.dealName}
+                            <a
+                              href="https://app.hubspot.com/contacts/4723689/objects/0-3/views/all/board"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#407B9D] hover:text-[#407B9D]/80 transition-colors"
+                              title="View in HubSpot"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </div>
+                        </td>
                         <td className="py-3 px-4">{deal.companyName}</td>
                         <td className="py-3 px-4">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#95CBD7]/30 text-[#407B9D]">
@@ -372,6 +436,39 @@ export default function SalesPipelinePage() {
                       setFormData({ ...formData, companyName: e.target.value })
                     }
                     required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      value={formData.firstName}
+                      onChange={(e) =>
+                        setFormData({ ...formData, firstName: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      value={formData.lastName}
+                      onChange={(e) =>
+                        setFormData({ ...formData, lastName: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                   />
                 </div>
                 <div className="space-y-2">

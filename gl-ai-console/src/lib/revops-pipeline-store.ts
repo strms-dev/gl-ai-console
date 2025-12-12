@@ -5,6 +5,9 @@ export interface PipelineDeal {
   id: string
   dealName: string
   companyName: string
+  firstName: string | null
+  lastName: string | null
+  email: string | null
   stage: string
   hsStage: string | null
   createdAt: string
@@ -70,6 +73,9 @@ export async function addPipelineDeal(
     id: generateId(),
     dealName: deal.dealName,
     companyName: deal.companyName,
+    firstName: deal.firstName,
+    lastName: deal.lastName,
+    email: deal.email,
     stage: deal.stage,
     hsStage: deal.hsStage,
     createdAt: now,
