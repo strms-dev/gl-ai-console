@@ -1,43 +1,181 @@
 {
-  "name": "RevOps - Create HubSpot Contact",
+  "name": "RevOps - Create HubSpot Contact (with Duplicate Handling)",
   "nodes": [
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "revops-create-hubspot-contact",
-        "responseMode": "responseNode",
+        "authentication": "oAuth2",
+        "resource": "company",
+        "operation": "searchByDomain",
+        "domain": "={{ $json.body.companyDomain }}",
         "options": {}
       },
-      "id": "6e0af06f-6dd9-49d2-b579-fad98b179387",
-      "name": "Webhook",
-      "type": "n8n-nodes-base.webhook",
+      "id": "860f4580-0ca7-4814-83ec-bddfb84e7509",
+      "name": "Search Company by Domain",
+      "type": "n8n-nodes-base.hubspot",
       "typeVersion": 2,
       "position": [
-        272,
-        192
+        -1376,
+        912
       ],
-      "webhookId": "4a5dd64a-0b21-4e8e-af61-f835ae56dfbb",
+      "alwaysOutputData": true,
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "company-exists-condition",
+              "leftValue": "={{ Object.keys($json).length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "24baf515-13fd-4c62-b56d-b9dbd485bc04",
+      "name": "IF Company Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1232,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize company data - both search and create return same structure\nconst item = $input.first();\nconst data = item.json;\n\nconst companyId = data.companyId;\nconst companyName = data.properties?.name?.value || null;\n\n// We can't easily distinguish new vs existing from the response alone\n// since both have the same structure. Default to false, \n// or check if there's any distinguishing field\nconst isNewCompany = false; // Will be overridden if we find a better indicator\n\n// Get original webhook data  \nconst webhookData = $('Webhook').first().json.body;\n\nreturn [{\n  json: {\n    companyId,\n    companyName,\n    isNewCompany,\n    webhookData\n  }\n}];"
+      },
+      "id": "c587bbdb-eaea-4817-b02e-3a142383563b",
+      "name": "Normalize Company Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -912,
+        688
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "search",
+        "filterGroupsUi": {
+          "filterGroupsValues": [
+            {
+              "filtersUi": {
+                "filterValues": [
+                  {
+                    "propertyName": "email",
+                    "type": "string",
+                    "value": "={{ $json.webhookData.email }}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "6671f0f1-b621-4fa7-8627-5b28b2030188",
+      "name": "Search Contact by Email",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        592
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "contact-exists-condition",
+              "leftValue": "={{ Object.keys($json).length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "62366ae8-326f-4dd6-900a-2486de4b8169",
+      "name": "IF Contact Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize contact data from either search or create response\nconst item = $input.first();\nconst data = item.json;\n\nlet contactId;\nlet contactEmail;\nlet isNewContact = false;\nlet hubspotContactUrl;\n\n// From CREATE - has 'vid' field and nested property values\nif (data.vid !== undefined) {\n  contactId = data.vid;\n  contactEmail = data.properties?.email?.value || null;\n  hubspotContactUrl = 'https://app.hubspot.com/contacts/4723689/record/0-1/' + contactId;\n  isNewContact = data.isNew === true; // Create response has isNew: true\n}\n// From SEARCH - has 'id' field (string) and flat property values\nelse if (data.id !== undefined) {\n  contactId = data.id;\n  contactEmail = data.properties?.email || null;\n  hubspotContactUrl = data.url; // Search provides URL directly\n  isNewContact = false;\n}\n\n// Get data from previous nodes\nconst companyData = $('Normalize Company Data').first().json;\nconst webhookData = companyData.webhookData;\n\n// Safety check\nif (!contactId) {\n  throw new Error('Could not extract contact ID. Keys: ' + Object.keys(data).join(', '));\n}\n\nreturn [{\n  json: {\n    contactId,\n    contactEmail,\n    isNewContact,\n    companyId: companyData.companyId,\n    isNewCompany: companyData.isNewCompany,\n    hubspotContactUrl,\n    webhookData\n  }\n}];"
+      },
+      "id": "d9f21bb7-d131-42c5-9f6e-e0563e4c29f4",
+      "name": "Normalize Contact Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        336
+      ],
       "onError": "continueErrorOutput"
     },
     {
       "parameters": {
         "authentication": "oAuth2",
         "resource": "company",
-        "name": "={{ $json.body.companyName }}",
+        "name": "={{ $('Webhook').item.json.body.companyName }}",
         "additionalFields": {
-          "companyDomainName": "={{ $json.body.companyDomain }}",
+          "companyDomainName": "={{ $('Webhook').item.json.body.companyDomain }}",
           "companyOwner": 664091983
         }
       },
-      "id": "0b82c794-f789-4452-944e-cfdcf11a392e",
+      "id": "832902a3-3f12-4499-96fd-f71979308525",
       "name": "Create HubSpot Company",
       "type": "n8n-nodes-base.hubspot",
       "typeVersion": 2,
       "position": [
-        496,
-        128
+        -1104,
+        848
       ],
-      "alwaysOutputData": false,
       "credentials": {
         "hubspotOAuth2Api": {
           "id": "1ao5IPqi22U8ZzU3",
@@ -49,23 +187,23 @@
     {
       "parameters": {
         "authentication": "oAuth2",
-        "email": "={{ $('Webhook').item.json.body.email }}",
+        "email": "={{ $('Normalize Company Data').item.json.webhookData.email }}",
         "additionalFields": {
-          "associatedCompanyId": "={{ $json.companyId }}",
-          "companyName": "={{ $('Webhook').item.json.body.companyName }}",
+          "associatedCompanyId": "={{ $('Normalize Company Data').item.json.companyId }}",
+          "companyName": "={{ $('Normalize Company Data').item.json.webhookData.companyName }}",
           "contactOwner": 664091983,
-          "firstName": "={{ $('Webhook').item.json.body.firstName }}",
-          "lastName": "={{ $('Webhook').item.json.body.lastName }}"
+          "firstName": "={{ $('Normalize Company Data').item.json.webhookData.firstName }}",
+          "lastName": "={{ $('Normalize Company Data').item.json.webhookData.lastName }}"
         },
         "options": {}
       },
-      "id": "2f53b6b1-22c9-4219-8dea-1f9a7f648f64",
+      "id": "0d4e162b-9453-443c-a352-28af72020985",
       "name": "Create HubSpot Contact",
       "type": "n8n-nodes-base.hubspot",
       "typeVersion": 2,
       "position": [
-        720,
-        48
+        -176,
+        576
       ],
       "credentials": {
         "hubspotOAuth2Api": {
@@ -77,10 +215,44 @@
     },
     {
       "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.message || 'Unknown error' }) }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "361ea0f2-7cfd-4edc-ae55-eec8288f5701",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        544,
+        976
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, contactId: $('Normalize Contact Data').item.json.contactId, companyId: $('Normalize Contact Data').item.json.companyId, isNewContact: $('Normalize Contact Data').item.json.isNewContact, isNewCompany: $('Normalize Contact Data').item.json.isNewCompany }) }}",
+        "options": {}
+      },
+      "id": "fd46e10e-b3c3-42c9-984b-7af0babee94e",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        208
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
         "operation": "update",
         "tableId": "revops_funnel_leads",
         "filterType": "string",
-        "filterString": "=id=eq.{{ $('Webhook').item.json.body.id }}",
+        "filterString": "=id=eq.{{ $json.webhookData.id }}",
         "fieldsUi": {
           "fieldValues": [
             {
@@ -89,18 +261,18 @@
             },
             {
               "fieldId": "hs_contact_url",
-              "fieldValue": "=https://app.hubspot.com/contacts/4723689/record/0-1/{{ $json.vid }}"
+              "fieldValue": "={{ $json.hubspotContactUrl }}"
             }
           ]
         }
       },
-      "id": "98c358dc-d11b-42f8-90f9-7f2ee5e51ac2",
+      "id": "30b9cbcc-235f-4f02-87a3-06732469d29c",
       "name": "Update Supabase Lead",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        944,
-        -32
+        288,
+        256
       ],
       "credentials": {
         "supabaseApi": {
@@ -112,36 +284,21 @@
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, contactId: $('Create HubSpot Contact').item.json.id, companyId: $('Create HubSpot Company').item.json.id }) }}",
+        "httpMethod": "POST",
+        "path": "revops-create-hubspot-contact",
+        "responseMode": "responseNode",
         "options": {}
       },
-      "id": "f16f3c3c-c19e-470c-a853-ef81a1a47e2e",
-      "name": "Respond Success",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
+      "id": "ff9a1084-edf4-43be-86ea-64c63191ca29",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
       "position": [
-        1168,
-        -96
+        -1632,
+        992
       ],
-      "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: false, error: $json.message || 'Unknown error' }) }}",
-        "options": {
-          "responseCode": 500
-        }
-      },
-      "id": "ad5d3000-0b94-4718-941d-ed4d4b5a3cc9",
-      "name": "Respond Error",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [
-        1392,
-        176
-      ]
+      "webhookId": "4a5dd64a-0b21-4e8e-af61-f835ae56dfbb",
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {
@@ -151,7 +308,7 @@
           "headers": {
             "host": "n8n.srv1055749.hstgr.cloud",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
-            "content-length": "194",
+            "content-length": "184",
             "accept": "*/*",
             "accept-encoding": "gzip, deflate, br, zstd",
             "accept-language": "en-US,en;q=0.9",
@@ -175,12 +332,12 @@
           "params": {},
           "query": {},
           "body": {
-            "id": "ddac49db-d060-4124-9ccf-e0c82ce8aae0",
-            "firstName": "Tony",
-            "lastName": "Stark",
-            "email": "tstark@jarvis.com",
-            "companyName": "Jarvis",
-            "companyDomain": "jarvis.com",
+            "id": "4e9720a9-682c-4c90-bb01-98f8c0a53577",
+            "firstName": "John",
+            "lastName": "Doe",
+            "email": "jdoe@acme.com",
+            "companyName": "Acme",
+            "companyDomain": "acme.com",
             "notes": "Here are some notes!"
           },
           "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook/revops-create-hubspot-contact",
@@ -190,11 +347,101 @@
     ]
   },
   "connections": {
-    "Webhook": {
+    "Search Company by Domain": {
       "main": [
         [
           {
+            "node": "IF Company Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Company Exists": {
+      "main": [
+        [
+          {
+            "node": "Normalize Company Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Create HubSpot Company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Company Data": {
+      "main": [
+        [
+          {
+            "node": "Search Contact by Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Contact by Email": {
+      "main": [
+        [
+          {
+            "node": "IF Contact Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Contact Exists": {
+      "main": [
+        [
+          {
+            "node": "Normalize Contact Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create HubSpot Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Contact Data": {
+      "main": [
+        [
+          {
+            "node": "Update Supabase Lead",
             "type": "main",
             "index": 0
           }
@@ -212,7 +459,7 @@
       "main": [
         [
           {
-            "node": "Create HubSpot Contact",
+            "node": "Normalize Company Data",
             "type": "main",
             "index": 0
           }
@@ -230,7 +477,7 @@
       "main": [
         [
           {
-            "node": "Update Supabase Lead",
+            "node": "Normalize Contact Data",
             "type": "main",
             "index": 0
           }
@@ -262,12 +509,11 @@
         ]
       ]
     },
-    "Respond Success": {
+    "Webhook": {
       "main": [
-        [],
         [
           {
-            "node": "Respond Error",
+            "node": "Search Company by Domain",
             "type": "main",
             "index": 0
           }
@@ -282,7 +528,7 @@
     "availableInMCP": false,
     "errorWorkflow": "DCoS5cl84RJM4RoS"
   },
-  "versionId": "41721f4f-3b93-4b6c-9b2f-a4e8f3fc2d8c",
+  "versionId": "d3466cda-b0d2-40bf-8542-8d055fc13df3",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"

@@ -1,14 +1,7 @@
 "use client"
 
 // Sales Pipeline Stage Types
-export type SalesPipelineStageId =
-  | "demo-call"
-  | "needs-info"
-  | "access-received"
-  | "create-quote"
-  | "proposal-sent"
-  | "negotiation"
-  | "closed"
+export type SalesPipelineStageId = "demo-call"
 
 export type SalesPipelineStageStatus =
   | "pending"
@@ -137,16 +130,10 @@ export interface SalesPipelineTimelineState {
   dealId: string
   currentStage: SalesPipelineStageId
   stages: {
-    [K in SalesPipelineStageId]: {
+    "demo-call": {
       status: SalesPipelineStageStatus
       completedAt: string | null
-      data: SalesPipelineStageData[K extends "demo-call" ? "demoCall"
-        : K extends "needs-info" ? "needsInfo"
-        : K extends "access-received" ? "accessReceived"
-        : K extends "create-quote" ? "createQuote"
-        : K extends "proposal-sent" ? "proposalSent"
-        : K extends "negotiation" ? "negotiation"
-        : "closed"]
+      data: SalesPipelineStageData["demoCall"]
     }
   }
   createdAt: string
@@ -165,6 +152,9 @@ export interface StageConfig {
       action: string
       requiresData?: boolean
     }
+    manual?: {
+      label: string
+    }
     secondary?: {
       label: string
       action: string
@@ -177,110 +167,12 @@ export const SALES_PIPELINE_STAGES: StageConfig[] = [
   {
     id: "demo-call",
     title: "Demo Call",
-    description: "Meeting scheduled and completed. Upload transcript and run intake analysis.",
+    description: "Demo call transcript is usually uploaded automatically via automation. When uploaded, it will automatically populate the project name (which can be edited afterwards). If not received automatically, manually upload to complete this stage.",
     icon: "video",
     actions: {
-      primary: {
-        label: "Run Sales Intake Analyzer",
-        action: "analyze-intake",
-        requiresData: true
+      manual: {
+        label: "Upload Demo Transcript"
       }
-    }
-  },
-  {
-    id: "needs-info",
-    title: "Needs Info",
-    description: "Send follow-up recap email and request system access.",
-    icon: "mail",
-    actions: {
-      primary: {
-        label: "Send Follow-Up Email",
-        action: "send-followup"
-      },
-      secondary: [
-        {
-          label: "Enroll in Reminder Sequence",
-          action: "enroll-reminder"
-        }
-      ]
-    }
-  },
-  {
-    id: "access-received",
-    title: "Access Received",
-    description: "Client has granted system access. Assign internal team for GL review.",
-    icon: "user-plus",
-    actions: {
-      primary: {
-        label: "Send Internal Assignment",
-        action: "send-assignment"
-      }
-    }
-  },
-  {
-    id: "create-quote",
-    title: "Create Quote",
-    description: "Build pricing using calculator and generate proposal.",
-    icon: "calculator",
-    actions: {
-      primary: {
-        label: "Generate Quote",
-        action: "generate-quote"
-      },
-      secondary: [
-        {
-          label: "Draft Proposal Email",
-          action: "draft-proposal"
-        }
-      ]
-    }
-  },
-  {
-    id: "proposal-sent",
-    title: "Proposal Sent",
-    description: "Quote has been sent to the client. Awaiting response.",
-    icon: "send",
-    actions: {
-      primary: {
-        label: "Mark as Viewed",
-        action: "mark-viewed"
-      }
-    }
-  },
-  {
-    id: "negotiation",
-    title: "Negotiation",
-    description: "Discussing terms and pricing with the client.",
-    icon: "trending-up",
-    actions: {
-      primary: {
-        label: "Add Negotiation Note",
-        action: "add-note"
-      },
-      secondary: [
-        {
-          label: "Adjust Terms",
-          action: "adjust-terms"
-        }
-      ]
-    }
-  },
-  {
-    id: "closed",
-    title: "Closed",
-    description: "Deal has been finalized.",
-    icon: "check-circle",
-    actions: {
-      primary: {
-        label: "Mark Won",
-        action: "close-won"
-      },
-      secondary: [
-        {
-          label: "Mark Lost",
-          action: "close-lost"
-        }
-      ]
     }
   }
 ]
@@ -410,65 +302,6 @@ export function createInitialTimelineState(dealId: string): SalesPipelineTimelin
           intakeAnalyzed: false,
           intakeData: null,
           intakeConfirmedAt: null
-        }
-      },
-      "needs-info": {
-        status: "pending",
-        completedAt: null,
-        data: {
-          emailTemplate: null,
-          emailSent: false,
-          reminderEnrolled: false,
-          accessRequestedAt: null
-        }
-      },
-      "access-received": {
-        status: "pending",
-        completedAt: null,
-        data: {
-          accessType: null,
-          accessReceivedAt: null,
-          internalAssignment: null,
-          reviewCompleted: false,
-          reviewCompletedAt: null
-        }
-      },
-      "create-quote": {
-        status: "pending",
-        completedAt: null,
-        data: {
-          reviewInProgress: false,
-          reviewCompletedAt: null,
-          quoteData: null,
-          proposalDrafted: false
-        }
-      },
-      "proposal-sent": {
-        status: "pending",
-        completedAt: null,
-        data: {
-          proposal: null,
-          sentAt: null,
-          viewedAt: null
-        }
-      },
-      "negotiation": {
-        status: "pending",
-        completedAt: null,
-        data: {
-          data: null,
-          inProgress: false
-        }
-      },
-      "closed": {
-        status: "pending",
-        completedAt: null,
-        data: {
-          outcome: null,
-          closedAt: null,
-          wonReason: null,
-          lostReason: null,
-          finalDealValue: null
         }
       }
     },

@@ -7,8 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
   ArrowLeft,
-  ChevronDown,
-  ChevronUp,
   FileText,
   FileSignature,
   ClipboardList,
@@ -61,7 +59,6 @@ export default function DealDetailsPage() {
 
   // Collapsible section states
   const [detailsExpanded, setDetailsExpanded] = useState(true)
-  const [timelineExpanded, setTimelineExpanded] = useState(true)
   const [documentsExpanded, setDocumentsExpanded] = useState(false)
 
   // Load deal data
@@ -171,17 +168,13 @@ export default function DealDetailsPage() {
             >
               <div className="flex items-center justify-between">
                 <CardTitle
-                  className="text-xl text-[#463939]"
+                  className="text-lg text-[#463939]"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   Deal Details
                 </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  {detailsExpanded ? (
-                    <ChevronUp className="h-5 w-5" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" />
-                  )}
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-lg font-medium">
+                  {detailsExpanded ? "−" : "+"}
                 </Button>
               </div>
             </CardHeader>
@@ -263,7 +256,7 @@ export default function DealDetailsPage() {
                       className="text-sm text-muted-foreground mb-1"
                       style={{ fontFamily: "var(--font-body)" }}
                     >
-                      Stage
+                      Automation Stage
                     </p>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#95CBD7]/30 text-[#407B9D]">
                       {deal.stage}
@@ -319,34 +312,12 @@ export default function DealDetailsPage() {
 
           {/* Timeline Section */}
           <Card className="rounded-xl border shadow-sm">
-            <CardHeader
-              className="cursor-pointer"
-              onClick={() => setTimelineExpanded(!timelineExpanded)}
-            >
-              <div className="flex items-center justify-between">
-                <CardTitle
-                  className="text-xl text-[#463939]"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  Sales Pipeline Timeline
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  {timelineExpanded ? (
-                    <ChevronUp className="h-5 w-5" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" />
-                  )}
-                </Button>
-              </div>
-            </CardHeader>
-            {timelineExpanded && (
-              <CardContent>
-                <SalesPipelineTimeline
-                  deal={deal}
-                  onDealUpdate={handleDealUpdate}
-                />
-              </CardContent>
-            )}
+            <CardContent className="pt-6">
+              <SalesPipelineTimeline
+                deal={deal}
+                onDealUpdate={handleDealUpdate}
+              />
+            </CardContent>
           </Card>
 
           {/* Documents Section */}
@@ -357,17 +328,13 @@ export default function DealDetailsPage() {
             >
               <div className="flex items-center justify-between">
                 <CardTitle
-                  className="text-xl text-[#463939]"
+                  className="text-lg text-[#463939]"
                   style={{ fontFamily: "var(--font-heading)" }}
                 >
                   Deal Documents
                 </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  {documentsExpanded ? (
-                    <ChevronUp className="h-5 w-5" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" />
-                  )}
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-lg font-medium">
+                  {documentsExpanded ? "−" : "+"}
                 </Button>
               </div>
             </CardHeader>

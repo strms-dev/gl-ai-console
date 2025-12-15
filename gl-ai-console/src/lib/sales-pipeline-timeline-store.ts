@@ -4,18 +4,125 @@ import {
   SalesPipelineTimelineState,
   SalesPipelineStageId,
   SalesPipelineStageStatus,
-  SalesIntakeData,
-  FollowUpEmailData,
-  InternalAssignmentData,
-  QuoteData,
-  ProposalData,
-  NegotiationData,
-  ClosedOutcome,
-  AccountingSystem,
   createInitialTimelineState
 } from "./sales-pipeline-timeline-types"
 
 const TIMELINE_STORAGE_KEY = "revops-pipeline-timelines"
+const FILES_STORAGE_KEY = "revops-pipeline-files"
+
+// File data stored as base64 for localStorage persistence
+interface StoredFileData {
+  fileName: string
+  fileSize: number
+  fileType: string
+  base64Data: string
+  uploadedAt: string
+}
+
+/**
+ * Get all stored files from localStorage
+ */
+function getAllFiles(): Record<string, StoredFileData> {
+  if (typeof window === "undefined") return {}
+
+  try {
+    const stored = localStorage.getItem(FILES_STORAGE_KEY)
+    if (!stored) return {}
+    return JSON.parse(stored)
+  } catch (error) {
+    console.error("Error reading files from localStorage:", error)
+    return {}
+  }
+}
+
+/**
+ * Save all files to localStorage
+ */
+function saveAllFiles(files: Record<string, StoredFileData>): void {
+  if (typeof window === "undefined") return
+
+  try {
+    localStorage.setItem(FILES_STORAGE_KEY, JSON.stringify(files))
+  } catch (error) {
+    console.error("Error saving files to localStorage:", error)
+  }
+}
+
+/**
+ * Convert File to base64 string
+ */
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = error => reject(error)
+  })
+}
+
+/**
+ * Convert base64 string back to Blob
+ */
+function base64ToBlob(base64: string, mimeType: string): Blob {
+  const byteString = atob(base64.split(',')[1])
+  const ab = new ArrayBuffer(byteString.length)
+  const ia = new Uint8Array(ab)
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i)
+  }
+  return new Blob([ab], { type: mimeType })
+}
+
+/**
+ * Save file to localStorage
+ */
+export async function saveFileToStorage(dealId: string, fileTypeId: string, file: File): Promise<void> {
+  const files = getAllFiles()
+  const key = `${dealId}-${fileTypeId}`
+
+  const base64Data = await fileToBase64(file)
+
+  files[key] = {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    base64Data,
+    uploadedAt: new Date().toISOString()
+  }
+
+  saveAllFiles(files)
+}
+
+/**
+ * Get file from localStorage
+ */
+export function getFileFromStorage(dealId: string, fileTypeId: string): { blob: Blob; fileName: string; fileSize: number; uploadedAt: string } | null {
+  const files = getAllFiles()
+  const key = `${dealId}-${fileTypeId}`
+  const storedFile = files[key]
+
+  if (!storedFile) return null
+
+  const blob = base64ToBlob(storedFile.base64Data, storedFile.fileType)
+
+  return {
+    blob,
+    fileName: storedFile.fileName,
+    fileSize: storedFile.fileSize,
+    uploadedAt: storedFile.uploadedAt
+  }
+}
+
+/**
+ * Delete file from localStorage
+ */
+export function deleteFileFromStorage(dealId: string, fileTypeId: string): void {
+  const files = getAllFiles()
+  const key = `${dealId}-${fileTypeId}`
+
+  delete files[key]
+  saveAllFiles(files)
+}
 
 /**
  * Get all timeline states from localStorage
@@ -121,47 +228,6 @@ export async function updateStageStatus(
   return existing
 }
 
-/**
- * Move to next stage
- */
-export async function advanceToNextStage(
-  dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const stageOrder: SalesPipelineStageId[] = [
-    "demo-call",
-    "needs-info",
-    "access-received",
-    "create-quote",
-    "proposal-sent",
-    "negotiation",
-    "closed"
-  ]
-
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const currentIndex = stageOrder.indexOf(existing.currentStage)
-  if (currentIndex === -1 || currentIndex >= stageOrder.length - 1) return existing
-
-  const now = new Date().toISOString()
-
-  // Complete current stage
-  existing.stages[existing.currentStage].status = "completed"
-  existing.stages[existing.currentStage].completedAt = now
-
-  // Move to next stage
-  const nextStage = stageOrder[currentIndex + 1]
-  existing.currentStage = nextStage
-  existing.stages[nextStage].status = "in_progress"
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-
-  return existing
-}
-
 // ============================================
 // Stage-Specific Update Functions
 // ============================================
@@ -171,12 +237,18 @@ export async function advanceToNextStage(
  */
 export async function uploadDemoTranscript(
   dealId: string,
-  fileName: string
+  fileName: string,
+  file?: File
 ): Promise<SalesPipelineTimelineState | null> {
   const timelines = getAllTimelines()
   const existing = timelines[dealId]
 
   if (!existing) return null
+
+  // Save the actual file to localStorage if provided
+  if (file) {
+    await saveFileToStorage(dealId, 'revops-demo-call-transcript', file)
+  }
 
   const now = new Date().toISOString()
   existing.stages["demo-call"].data.transcriptUploaded = true
@@ -189,52 +261,9 @@ export async function uploadDemoTranscript(
 }
 
 /**
- * Demo Call Stage: Save intake analysis data
+ * Demo Call Stage: Clear transcript
  */
-export async function saveIntakeAnalysis(
-  dealId: string,
-  intakeData: SalesIntakeData
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  existing.stages["demo-call"].data.intakeAnalyzed = true
-  existing.stages["demo-call"].data.intakeData = intakeData
-  existing.stages["demo-call"].data.intakeConfirmedAt = now
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Needs Info Stage: Save email template
- */
-export async function saveFollowUpEmail(
-  dealId: string,
-  emailData: FollowUpEmailData
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  existing.stages["needs-info"].data.emailTemplate = emailData
-  existing.stages["needs-info"].data.accessRequestedAt = now
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Needs Info Stage: Mark email as sent
- */
-export async function markFollowUpEmailSent(
+export async function clearDemoTranscript(
   dealId: string
 ): Promise<SalesPipelineTimelineState | null> {
   const timelines = getAllTimelines()
@@ -242,270 +271,13 @@ export async function markFollowUpEmailSent(
 
   if (!existing) return null
 
-  const now = new Date().toISOString()
-  existing.stages["needs-info"].data.emailSent = true
-  if (existing.stages["needs-info"].data.emailTemplate) {
-    existing.stages["needs-info"].data.emailTemplate.sentAt = now
-  }
-  existing.updatedAt = now
+  // Delete the file from localStorage
+  deleteFileFromStorage(dealId, 'revops-demo-call-transcript')
 
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Needs Info Stage: Enroll in reminder sequence
- */
-export async function enrollInReminderSequence(
-  dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  existing.stages["needs-info"].data.reminderEnrolled = true
-  if (existing.stages["needs-info"].data.emailTemplate) {
-    existing.stages["needs-info"].data.emailTemplate.reminderEnrolledAt = now
-  }
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Access Received Stage: Mark access received
- */
-export async function markAccessReceived(
-  dealId: string,
-  accessType: AccountingSystem
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  existing.stages["access-received"].data.accessType = accessType
-  existing.stages["access-received"].data.accessReceivedAt = now
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Access Received Stage: Save internal assignment
- */
-export async function saveInternalAssignment(
-  dealId: string,
-  assignment: InternalAssignmentData
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  existing.stages["access-received"].data.internalAssignment = assignment
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Access Received Stage: Mark review completed
- */
-export async function markReviewCompleted(
-  dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  existing.stages["access-received"].data.reviewCompleted = true
-  existing.stages["access-received"].data.reviewCompletedAt = now
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Create Quote Stage: Save quote data
- */
-export async function saveQuoteData(
-  dealId: string,
-  quoteData: QuoteData
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  existing.stages["create-quote"].data.quoteData = quoteData
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Create Quote Stage: Mark proposal drafted
- */
-export async function markProposalDrafted(
-  dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  existing.stages["create-quote"].data.proposalDrafted = true
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Proposal Sent Stage: Save proposal data
- */
-export async function saveProposalData(
-  dealId: string,
-  proposal: ProposalData
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  existing.stages["proposal-sent"].data.proposal = proposal
-  existing.stages["proposal-sent"].data.sentAt = now
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Proposal Sent Stage: Mark proposal viewed
- */
-export async function markProposalViewed(
-  dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  existing.stages["proposal-sent"].data.viewedAt = now
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Negotiation Stage: Add negotiation note
- */
-export async function addNegotiationNote(
-  dealId: string,
-  note: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-
-  if (!existing.stages["negotiation"].data.data) {
-    existing.stages["negotiation"].data.data = {
-      notes: [],
-      adjustedTerms: null,
-      finalPrice: null
-    }
-  }
-
-  existing.stages["negotiation"].data.data.notes.push(`[${now}] ${note}`)
-  existing.stages["negotiation"].data.inProgress = true
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Negotiation Stage: Update terms
- */
-export async function updateNegotiationTerms(
-  dealId: string,
-  terms: string,
-  finalPrice: number
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-
-  if (!existing.stages["negotiation"].data.data) {
-    existing.stages["negotiation"].data.data = {
-      notes: [],
-      adjustedTerms: null,
-      finalPrice: null
-    }
-  }
-
-  existing.stages["negotiation"].data.data.adjustedTerms = terms
-  existing.stages["negotiation"].data.data.finalPrice = finalPrice
-  existing.updatedAt = now
-
-  saveAllTimelines(timelines)
-  return existing
-}
-
-/**
- * Close Deal: Mark as won or lost
- */
-export async function closeDeal(
-  dealId: string,
-  outcome: ClosedOutcome,
-  reason: string,
-  finalValue?: number
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-
-  existing.stages["closed"].data.outcome = outcome
-  existing.stages["closed"].data.closedAt = now
-
-  if (outcome === "won") {
-    existing.stages["closed"].data.wonReason = reason
-    existing.stages["closed"].data.finalDealValue = finalValue || null
-  } else {
-    existing.stages["closed"].data.lostReason = reason
-  }
-
-  existing.stages["closed"].status = "completed"
-  existing.stages["closed"].completedAt = now
-  existing.currentStage = "closed"
-  existing.updatedAt = now
+  existing.stages["demo-call"].data.transcriptUploaded = false
+  existing.stages["demo-call"].data.transcriptFileName = null
+  existing.stages["demo-call"].data.transcriptUploadedAt = null
+  existing.updatedAt = new Date().toISOString()
 
   saveAllTimelines(timelines)
   return existing
@@ -523,31 +295,4 @@ export async function deleteTimelineState(dealId: string): Promise<boolean> {
   saveAllTimelines(timelines)
 
   return true
-}
-
-/**
- * Check if a 3-day reminder should be shown
- * Returns true if email was sent but access not received after 3 business days
- */
-export function shouldShowReminderPrompt(state: SalesPipelineTimelineState): boolean {
-  const needsInfoData = state.stages["needs-info"].data
-
-  if (!needsInfoData.emailSent || needsInfoData.reminderEnrolled) {
-    return false
-  }
-
-  const accessData = state.stages["access-received"].data
-  if (accessData.accessReceivedAt) {
-    return false // Access already received
-  }
-
-  const sentAt = needsInfoData.emailTemplate?.sentAt
-  if (!sentAt) return false
-
-  // Calculate 3 business days (roughly 5 calendar days to be safe)
-  const sentDate = new Date(sentAt)
-  const now = new Date()
-  const daysDiff = Math.floor((now.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24))
-
-  return daysDiff >= 3
 }

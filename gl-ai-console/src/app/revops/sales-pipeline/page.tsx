@@ -317,7 +317,7 @@ export default function SalesPipelinePage() {
                     <tr className="border-b">
                       <th className="text-left py-3 px-4 font-medium">Deal Name</th>
                       <th className="text-left py-3 px-4 font-medium">Company Name</th>
-                      <th className="text-left py-3 px-4 font-medium">Stage</th>
+                      <th className="text-left py-3 px-4 font-medium">Automation Stage</th>
                       <th className="text-left py-3 px-4 font-medium">HS Stage</th>
                       <th className="text-left py-3 px-4 font-medium">Created</th>
                       <th className="text-left py-3 px-4 font-medium">Updated</th>
@@ -472,7 +472,7 @@ export default function SalesPipelinePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="stage">Stage *</Label>
+                  <Label htmlFor="stage">Automation Stage *</Label>
                   <select
                     id="stage"
                     value={formData.stage}
@@ -482,7 +482,7 @@ export default function SalesPipelinePage() {
                     className="w-full h-9 rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                     required
                   >
-                    <option value="">Select Stage</option>
+                    <option value="">Select Automation Stage</option>
                     {stageOptions.map((stage) => (
                       <option key={stage} value={stage}>
                         {stage}
