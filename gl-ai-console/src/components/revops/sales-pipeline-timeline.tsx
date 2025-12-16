@@ -11,20 +11,45 @@ import {
   Video,
   Zap,
   User,
-  Calendar
+  Calendar,
+  ClipboardList,
+  Mail,
+  Repeat,
+  Users
 } from "lucide-react"
 import {
   SalesPipelineTimelineState,
   SalesPipelineStageId,
   SalesPipelineStageStatus,
+  SalesIntakeFormData,
   SALES_PIPELINE_STAGES
 } from "@/lib/sales-pipeline-timeline-types"
 import {
   getOrCreateTimelineState,
   uploadDemoTranscript,
   clearDemoTranscript,
-  getFileFromStorage
+  getFileFromStorage,
+  autoFillSalesIntake,
+  updateSalesIntakeForm,
+  confirmSalesIntake,
+  resetSalesIntake,
+  initializeFollowUpEmail,
+  updateFollowUpEmail,
+  markFollowUpEmailSent,
+  markHubspotDealMoved,
+  resetFollowUpEmail,
+  enrollInSequence,
+  unenrollFromSequence,
+  markContactResponded,
+  markAccessReceived,
+  initializeInternalReview,
+  updateInternalReviewEmail,
+  markInternalReviewSent
 } from "@/lib/sales-pipeline-timeline-store"
+import { SalesIntakeForm } from "@/components/revops/sales-intake-form"
+import { FollowUpEmail } from "@/components/revops/follow-up-email"
+import { ReminderSequence } from "@/components/revops/reminder-sequence"
+import { InternalReview } from "@/components/revops/internal-review"
 import { PipelineDeal } from "@/lib/revops-pipeline-store"
 import { FileUpload } from "@/components/leads/file-upload"
 import { getFileTypeById, UploadedFile } from "@/lib/file-types"
@@ -111,7 +136,11 @@ const getConnectorStyles = (currentStatus: SalesPipelineStageStatus, nextStatus?
 // Stage icon mapping
 const getStageIcon = (iconName: string) => {
   const iconMap: Record<string, React.ElementType> = {
-    "video": Video
+    "video": Video,
+    "repeat": Repeat,
+    "clipboard-list": ClipboardList,
+    "mail": Mail,
+    "users": Users
   }
   return iconMap[iconName] || Circle
 }
@@ -127,6 +156,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   const [collapsedItems, setCollapsedItems] = useState<Set<string>>(new Set())
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | undefined>(undefined)
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false)
+  const [isAutoFillLoading, setIsAutoFillLoading] = useState(false)
 
   // Load timeline state
   useEffect(() => {
@@ -134,6 +164,15 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       setIsLoading(true)
       const state = await getOrCreateTimelineState(deal.id)
       setTimelineState(state)
+
+      // Single-stage expansion: only expand the current stage, collapse all others
+      const collapsed = new Set<string>()
+      for (const stageConfig of SALES_PIPELINE_STAGES) {
+        if (stageConfig.id !== state.currentStage) {
+          collapsed.add(stageConfig.id)
+        }
+      }
+      setCollapsedItems(collapsed)
 
       // If transcript was already uploaded, restore from localStorage
       if (state.stages["demo-call"].data.transcriptUploaded && state.stages["demo-call"].data.transcriptFileName) {
@@ -172,18 +211,36 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   const refreshState = useCallback(async () => {
     const state = await getOrCreateTimelineState(deal.id)
     setTimelineState(state)
+
+    // Single-stage expansion: only expand the current stage, collapse all others
+    const collapsed = new Set<string>()
+    for (const stageConfig of SALES_PIPELINE_STAGES) {
+      if (stageConfig.id !== state.currentStage) {
+        collapsed.add(stageConfig.id)
+      }
+    }
+    setCollapsedItems(collapsed)
   }, [deal.id])
 
-  // Toggle collapse for a stage
+  // Toggle collapse for a stage - only one stage can be expanded at a time
   const toggleCollapse = (id: string) => {
     setCollapsedItems(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(id)) {
-        newSet.delete(id)
+      const isCurrentlyCollapsed = prev.has(id)
+      // If expanding this stage, collapse all others
+      if (isCurrentlyCollapsed) {
+        const newSet = new Set<string>()
+        for (const stageConfig of SALES_PIPELINE_STAGES) {
+          if (stageConfig.id !== id) {
+            newSet.add(stageConfig.id)
+          }
+        }
+        return newSet
       } else {
+        // If collapsing, add it to collapsed set
+        const newSet = new Set(prev)
         newSet.add(id)
+        return newSet
       }
-      return newSet
     })
   }
 
@@ -191,7 +248,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   const handleFileUploaded = async (file: UploadedFile) => {
     setUploadedFile(file)
     // Pass the actual file data to save to localStorage
-    await uploadDemoTranscript(deal.id, file.fileName, file.fileData)
+    // Cast to File since FileUpload always provides a File object
+    await uploadDemoTranscript(deal.id, file.fileName, file.fileData as File | undefined)
     await refreshState()
   }
 
@@ -201,6 +259,100 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     await clearDemoTranscript(deal.id)
     await refreshState()
   }
+
+  // Handle auto-fill for Sales Intake
+  const handleAutoFillIntake = async () => {
+    setIsAutoFillLoading(true)
+    // Simulate AI processing delay (will be replaced with real API call)
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    await autoFillSalesIntake(deal.id)
+    await refreshState()
+    setIsAutoFillLoading(false)
+  }
+
+  // Handle form data changes
+  const handleIntakeFormChange = async (formData: SalesIntakeFormData) => {
+    await updateSalesIntakeForm(deal.id, formData)
+    // Don't refresh state here to avoid losing focus while typing
+  }
+
+  // Handle intake form confirmation
+  const handleConfirmIntake = async () => {
+    await confirmSalesIntake(deal.id)
+    await refreshState()
+  }
+
+  // Handle intake form reset
+  const handleResetIntake = async () => {
+    await resetSalesIntake(deal.id)
+    await refreshState()
+  }
+
+  // Follow-Up Email Handlers - memoized to prevent infinite re-renders
+  const handleInitializeEmail = useCallback(async (templateType: "qbo" | "xero" | "other", subject: string, body: string) => {
+    console.log("handleInitializeEmail called with:", templateType)
+    await initializeFollowUpEmail(deal.id, templateType, subject, body)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleUpdateEmail = useCallback(async (subject: string, body: string) => {
+    await updateFollowUpEmail(deal.id, subject, body)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleSendEmail = useCallback(async () => {
+    // In production, this would integrate with HubSpot API to send the email
+    // For now, we just mark it as sent
+    await markFollowUpEmailSent(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleMoveHubspotDeal = useCallback(async () => {
+    // In production, this would integrate with HubSpot API to move the deal
+    // For now, we just mark it as moved
+    await markHubspotDealMoved(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // Reminder Sequence Handlers
+  const handleEnrollInSequence = useCallback(async () => {
+    await enrollInSequence(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleUnenrollFromSequence = useCallback(async () => {
+    await unenrollFromSequence(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleMarkContactResponded = useCallback(async () => {
+    await markContactResponded(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleMarkAccessReceived = useCallback(async (platform: "qbo" | "xero" | "other") => {
+    await markAccessReceived(deal.id, platform)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // Internal Review Handlers
+  const handleInitializeInternalReview = useCallback(async (recipients: { name: string; email: string }[], subject: string, body: string) => {
+    console.log("handleInitializeInternalReview called")
+    await initializeInternalReview(deal.id, recipients, subject, body)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleUpdateInternalReview = useCallback(async (recipients: { name: string; email: string }[], subject: string, body: string) => {
+    await updateInternalReviewEmail(deal.id, recipients, subject, body)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleSendInternalReview = useCallback(async () => {
+    // In production, this would integrate with HubSpot API to send the email
+    // For now, we just mark it as sent
+    await markInternalReviewSent(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
 
   if (isLoading || !timelineState) {
     return (
@@ -268,10 +420,9 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
             {/* Progress Bar */}
             <div className="w-full bg-gray-200 rounded-full h-2 mb-4 mt-3">
               <div
-                className="h-2 rounded-full transition-all duration-500"
+                className="h-2 rounded-full transition-all duration-500 bg-[#407B9D]"
                 style={{
-                  width: `${progressPercent}%`,
-                  background: "linear-gradient(to right, #C8E4BB, #407B9D)"
+                  width: `${progressPercent}%`
                 }}
               />
             </div>
@@ -317,7 +468,6 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
               <div className={cn(
                 "flex items-center justify-center w-12 h-12 rounded-full border-2 bg-background relative z-10 transition-all duration-300",
                 event.status === "completed" ? "border-[#C8E4BB] bg-[#C8E4BB]/20" :
-                event.status === "action-required" ? "border-amber-500 bg-amber-50" :
                 event.status === "skipped" ? "border-gray-300 bg-gray-50 opacity-50" :
                 "border-gray-300 bg-gray-50"
               )}>
@@ -403,6 +553,18 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
                       {/* Action Zone - Demo Call specific - use FileUpload component */}
                       {event.id === "demo-call" && renderDemoCallActions()}
+
+                      {/* Action Zone - Sales Intake specific - use SalesIntakeForm component */}
+                      {event.id === "sales-intake" && renderSalesIntakeActions()}
+
+                      {/* Action Zone - Follow-Up Email specific - use FollowUpEmail component */}
+                      {event.id === "follow-up-email" && renderFollowUpEmailActions()}
+
+                      {/* Action Zone - Reminder Sequence specific - use ReminderSequence component */}
+                      {event.id === "reminder-sequence" && renderReminderSequenceActions()}
+
+                      {/* Action Zone - Internal Review specific - use InternalReview component */}
+                      {event.id === "internal-review" && renderInternalReviewActions()}
                     </>
                   )}
                 </div>
@@ -431,6 +593,89 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
           variant="compact"
         />
       </div>
+    )
+  }
+
+  function renderSalesIntakeActions() {
+    const salesIntakeData = timelineState?.stages["sales-intake"].data
+    const isConfirmed = !!salesIntakeData?.confirmedAt
+
+    return (
+      <SalesIntakeForm
+        formData={salesIntakeData?.formData || null}
+        isAutoFilled={salesIntakeData?.isAutoFilled || false}
+        isConfirmed={isConfirmed}
+        fieldConfidence={salesIntakeData?.fieldConfidence || null}
+        onAutoFill={handleAutoFillIntake}
+        onFormChange={handleIntakeFormChange}
+        onConfirm={handleConfirmIntake}
+        onReset={handleResetIntake}
+        isLoading={isAutoFillLoading}
+      />
+    )
+  }
+
+  function renderFollowUpEmailActions() {
+    // Safety check for existing deals that don't have follow-up-email stage
+    const followUpStage = timelineState?.stages["follow-up-email"]
+    if (!followUpStage) return null
+
+    const followUpData = followUpStage.data
+    const salesIntakeData = timelineState?.stages["sales-intake"]?.data
+
+    if (!followUpData) return null
+
+    return (
+      <FollowUpEmail
+        emailData={followUpData}
+        salesIntakeData={salesIntakeData?.formData || null}
+        onInitialize={handleInitializeEmail}
+        onUpdate={handleUpdateEmail}
+        onSend={handleSendEmail}
+        onMoveHubspotDeal={handleMoveHubspotDeal}
+      />
+    )
+  }
+
+  function renderReminderSequenceActions() {
+    // Safety check for existing deals that don't have reminder-sequence stage
+    const reminderStage = timelineState?.stages["reminder-sequence"]
+    if (!reminderStage) return null
+
+    const reminderData = reminderStage.data
+    if (!reminderData) return null
+
+    return (
+      <ReminderSequence
+        sequenceData={reminderData}
+        onEnroll={handleEnrollInSequence}
+        onUnenroll={handleUnenrollFromSequence}
+        onMarkResponded={handleMarkContactResponded}
+        onMarkAccessReceived={handleMarkAccessReceived}
+      />
+    )
+  }
+
+  function renderInternalReviewActions() {
+    // Safety check for existing deals that don't have internal-review stage
+    const internalReviewStage = timelineState?.stages["internal-review"]
+    if (!internalReviewStage) return null
+
+    const reviewData = internalReviewStage.data
+    if (!reviewData) return null
+
+    const salesIntakeData = timelineState?.stages["sales-intake"]?.data?.formData || null
+    const accessPlatform = timelineState?.stages["reminder-sequence"]?.data?.accessPlatform || null
+
+    return (
+      <InternalReview
+        reviewData={reviewData}
+        salesIntakeData={salesIntakeData}
+        accessPlatform={accessPlatform}
+        onInitialize={handleInitializeInternalReview}
+        onUpdate={handleUpdateInternalReview}
+        onSend={handleSendInternalReview}
+      />
     )
   }
 }

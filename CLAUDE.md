@@ -18,6 +18,7 @@ This is the **GrowthLab AI Console** - a Next.js 15 application that provides AI
 - All commands should be run from the `gl-ai-console/` subdirectory
 - Development server automatically handles port conflicts and will use next available port
 - **IMPORTANT**: User always handles running the development server in their own terminal - NEVER start npm run dev or any development server commands
+- **IMPORTANT**: NEVER run `npm run build` as a background task - it hangs indefinitely and returns "running" status forever. Only run builds in foreground if explicitly requested by the user.
 - Only make code adjustments, do not run terminal commands unless specifically requested
 
 ### File Structure
@@ -51,6 +52,12 @@ The app uses Next.js App Router with a department-based structure:
 - **Lead Storage**: Browser localStorage via `src/lib/leads-store.ts`
 - **Dummy Data**: Static data for development in `src/lib/dummy-data.ts`
 - **No External Database**: Currently uses local storage for persistence
+
+### Data Storage Strategy
+- **ALWAYS use localStorage first** for any new feature requiring data persistence
+- User prefers to nail down functionality with localStorage before migrating to Supabase
+- Only migrate to Supabase when explicitly requested by the user
+- When user says "migrate to Supabase", then convert the localStorage implementation to use Supabase
 
 ### Styling & Design System
 - **Tailwind CSS v4**: Latest version with PostCSS

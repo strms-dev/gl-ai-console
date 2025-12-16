@@ -4,7 +4,10 @@ import {
   SalesPipelineTimelineState,
   SalesPipelineStageId,
   SalesPipelineStageStatus,
-  createInitialTimelineState
+  SalesIntakeFormData,
+  createInitialTimelineState,
+  createTestSalesIntakeFormData,
+  createTestFieldConfidence
 } from "./sales-pipeline-timeline-types"
 
 const TIMELINE_STORAGE_KEY = "revops-pipeline-timelines"
@@ -163,10 +166,81 @@ export async function getTimelineState(dealId: string): Promise<SalesPipelineTim
 
 /**
  * Get or create timeline state for a deal
+ * Also migrates existing deals to add any new stages that were added after their creation
  */
 export async function getOrCreateTimelineState(dealId: string): Promise<SalesPipelineTimelineState> {
   const existing = await getTimelineState(dealId)
-  if (existing) return existing
+
+  if (existing) {
+    let needsSave = false
+    const timelines = getAllTimelines()
+
+    // Migrate existing deals to add follow-up-email stage if missing
+    if (!existing.stages["follow-up-email"]) {
+      existing.stages["follow-up-email"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          templateType: null,
+          emailSubject: "",
+          emailBody: "",
+          isEdited: false,
+          sentAt: null,
+          hubspotDealMoved: false,
+          hubspotDealMovedAt: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing deals to add reminder-sequence stage if missing
+    if (!existing.stages["reminder-sequence"]) {
+      existing.stages["reminder-sequence"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          status: "not_enrolled",
+          sequenceType: null,
+          scheduledEnrollmentAt: null,
+          enrolledAt: null,
+          enrolledBy: null,
+          unenrolledAt: null,
+          unenrollmentReason: null,
+          accessReceivedAt: null,
+          accessPlatform: null,
+          contactRespondedAt: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing deals to add internal-review stage if missing
+    if (!existing.stages["internal-review"]) {
+      existing.stages["internal-review"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          recipients: [],
+          emailSubject: "",
+          emailBody: "",
+          isEdited: false,
+          sentAt: null,
+          reviewAssignedTo: null,
+          reviewCompletedAt: null,
+          reviewNotes: null
+        }
+      }
+      needsSave = true
+    }
+
+    if (needsSave) {
+      existing.updatedAt = new Date().toISOString()
+      timelines[dealId] = existing
+      saveAllTimelines(timelines)
+    }
+
+    return existing
+  }
 
   const newState = createInitialTimelineState(dealId)
   const timelines = getAllTimelines()
@@ -214,12 +288,38 @@ export async function updateStageStatus(
   if (!existing) return null
 
   const now = new Date().toISOString()
-  const stage = existing.stages[stageId]
 
-  existing.stages[stageId] = {
-    ...stage,
-    status,
-    completedAt: status === "completed" ? now : stage.completedAt
+  // Update stage status based on stage type
+  if (stageId === "demo-call") {
+    existing.stages["demo-call"] = {
+      ...existing.stages["demo-call"],
+      status,
+      completedAt: status === "completed" ? now : existing.stages["demo-call"].completedAt
+    }
+  } else if (stageId === "sales-intake") {
+    existing.stages["sales-intake"] = {
+      ...existing.stages["sales-intake"],
+      status,
+      completedAt: status === "completed" ? now : existing.stages["sales-intake"].completedAt
+    }
+  } else if (stageId === "follow-up-email") {
+    existing.stages["follow-up-email"] = {
+      ...existing.stages["follow-up-email"],
+      status,
+      completedAt: status === "completed" ? now : existing.stages["follow-up-email"].completedAt
+    }
+  } else if (stageId === "reminder-sequence") {
+    existing.stages["reminder-sequence"] = {
+      ...existing.stages["reminder-sequence"],
+      status,
+      completedAt: status === "completed" ? now : existing.stages["reminder-sequence"].completedAt
+    }
+  } else if (stageId === "internal-review") {
+    existing.stages["internal-review"] = {
+      ...existing.stages["internal-review"],
+      status,
+      completedAt: status === "completed" ? now : existing.stages["internal-review"].completedAt
+    }
   }
 
   existing.updatedAt = now
@@ -251,9 +351,16 @@ export async function uploadDemoTranscript(
   }
 
   const now = new Date().toISOString()
+  existing.stages["demo-call"].status = "completed"
+  existing.stages["demo-call"].completedAt = now
   existing.stages["demo-call"].data.transcriptUploaded = true
   existing.stages["demo-call"].data.transcriptFileName = fileName
   existing.stages["demo-call"].data.transcriptUploadedAt = now
+
+  // Move to sales-intake stage
+  existing.currentStage = "sales-intake"
+  existing.stages["sales-intake"].status = "in_progress"
+
   existing.updatedAt = now
 
   saveAllTimelines(timelines)
@@ -274,9 +381,16 @@ export async function clearDemoTranscript(
   // Delete the file from localStorage
   deleteFileFromStorage(dealId, 'revops-demo-call-transcript')
 
+  existing.stages["demo-call"].status = "in_progress"
+  existing.stages["demo-call"].completedAt = null
   existing.stages["demo-call"].data.transcriptUploaded = false
   existing.stages["demo-call"].data.transcriptFileName = null
   existing.stages["demo-call"].data.transcriptUploadedAt = null
+
+  // Revert sales-intake stage back to pending
+  existing.currentStage = "demo-call"
+  existing.stages["sales-intake"].status = "pending"
+
   existing.updatedAt = new Date().toISOString()
 
   saveAllTimelines(timelines)
@@ -295,4 +409,595 @@ export async function deleteTimelineState(dealId: string): Promise<boolean> {
   saveAllTimelines(timelines)
 
   return true
+}
+
+// ============================================
+// Sales Intake Stage Functions
+// ============================================
+
+/**
+ * Auto-fill sales intake form with test data
+ */
+export async function autoFillSalesIntake(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+  const testData = createTestSalesIntakeFormData()
+  const testConfidence = createTestFieldConfidence()
+
+  existing.stages["sales-intake"].data = {
+    formData: testData,
+    isAutoFilled: true,
+    autoFilledAt: now,
+    confirmedAt: null,
+    fieldConfidence: testConfidence
+  }
+  existing.stages["sales-intake"].status = "in_progress"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update sales intake form data (for user edits)
+ */
+export async function updateSalesIntakeForm(
+  dealId: string,
+  formData: SalesIntakeFormData
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["sales-intake"].data = {
+    ...existing.stages["sales-intake"].data,
+    formData
+  }
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Confirm sales intake form (complete the stage)
+ */
+export async function confirmSalesIntake(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["sales-intake"].data.confirmedAt = now
+  existing.stages["sales-intake"].status = "completed"
+  existing.stages["sales-intake"].completedAt = now
+
+  // Move to follow-up-email stage
+  existing.currentStage = "follow-up-email"
+  existing.stages["follow-up-email"].status = "in_progress"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Reset sales intake form (clear data and go back to action-required)
+ */
+export async function resetSalesIntake(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["sales-intake"].data = {
+    formData: null,
+    isAutoFilled: false,
+    autoFilledAt: null,
+    confirmedAt: null,
+    fieldConfidence: null
+  }
+  existing.stages["sales-intake"].status = "in_progress"
+  existing.stages["sales-intake"].completedAt = null
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// Follow-Up Email Stage Functions
+// ============================================
+
+/**
+ * Initialize follow-up email with template based on accounting platform
+ */
+export async function initializeFollowUpEmail(
+  dealId: string,
+  templateType: "qbo" | "xero" | "other",
+  subject: string,
+  body: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["follow-up-email"].data = {
+    templateType,
+    emailSubject: subject,
+    emailBody: body,
+    isEdited: false,
+    sentAt: null,
+    hubspotDealMoved: false,
+    hubspotDealMovedAt: null
+  }
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update follow-up email content (for user edits)
+ */
+export async function updateFollowUpEmail(
+  dealId: string,
+  subject: string,
+  body: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["follow-up-email"].data.emailSubject = subject
+  existing.stages["follow-up-email"].data.emailBody = body
+  existing.stages["follow-up-email"].data.isEdited = true
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Calculate date 3 business days from a given date
+ */
+function addBusinessDays(date: Date, days: number): Date {
+  const result = new Date(date)
+  let addedDays = 0
+
+  while (addedDays < days) {
+    result.setDate(result.getDate() + 1)
+    // Skip weekends (0 = Sunday, 6 = Saturday)
+    if (result.getDay() !== 0 && result.getDay() !== 6) {
+      addedDays++
+    }
+  }
+
+  return result
+}
+
+/**
+ * Mark follow-up email as sent
+ */
+export async function markFollowUpEmailSent(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date()
+  const nowISO = now.toISOString()
+
+  existing.stages["follow-up-email"].data.sentAt = nowISO
+  existing.stages["follow-up-email"].status = "completed"
+  existing.stages["follow-up-email"].completedAt = nowISO
+
+  // Move to reminder-sequence stage and schedule auto-enrollment
+  existing.currentStage = "reminder-sequence"
+  existing.stages["reminder-sequence"].status = "in_progress"
+
+  // Calculate scheduled enrollment date (3 business days from now)
+  const scheduledDate = addBusinessDays(now, 3)
+  existing.stages["reminder-sequence"].data.status = "scheduled"
+  existing.stages["reminder-sequence"].data.scheduledEnrollmentAt = scheduledDate.toISOString()
+
+  // Set sequence type based on accounting platform from sales intake
+  const accountingPlatform = existing.stages["sales-intake"].data.formData?.accountingPlatform
+  if (accountingPlatform === "qbo" || accountingPlatform === "xero") {
+    existing.stages["reminder-sequence"].data.sequenceType = accountingPlatform
+  } else {
+    existing.stages["reminder-sequence"].data.sequenceType = "other"
+  }
+
+  existing.updatedAt = nowISO
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark HubSpot deal as moved to Need Info
+ */
+export async function markHubspotDealMoved(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["follow-up-email"].data.hubspotDealMoved = true
+  existing.stages["follow-up-email"].data.hubspotDealMovedAt = now
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Reset follow-up email stage
+ */
+export async function resetFollowUpEmail(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["follow-up-email"].data = {
+    templateType: null,
+    emailSubject: "",
+    emailBody: "",
+    isEdited: false,
+    sentAt: null,
+    hubspotDealMoved: false,
+    hubspotDealMovedAt: null
+  }
+  existing.stages["follow-up-email"].status = "in_progress"
+  existing.stages["follow-up-email"].completedAt = null
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// Reminder Sequence Stage Functions
+// ============================================
+
+/**
+ * Manually enroll contact in HubSpot sequence
+ */
+export async function enrollInSequence(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["reminder-sequence"].data.status = "enrolled"
+  existing.stages["reminder-sequence"].data.enrolledAt = now
+  existing.stages["reminder-sequence"].data.enrolledBy = "manual"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark contact as auto-enrolled (called by automation)
+ */
+export async function markAutoEnrolled(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["reminder-sequence"].data.status = "enrolled"
+  existing.stages["reminder-sequence"].data.enrolledAt = now
+  existing.stages["reminder-sequence"].data.enrolledBy = "auto"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Manually unenroll contact from sequence
+ */
+export async function unenrollFromSequence(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["reminder-sequence"].data.status = "unenrolled_response"
+  existing.stages["reminder-sequence"].data.unenrolledAt = now
+  existing.stages["reminder-sequence"].data.unenrollmentReason = "manual"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark contact as responded (auto-unenrolls from sequence)
+ */
+export async function markContactResponded(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["reminder-sequence"].data.contactRespondedAt = now
+  existing.stages["reminder-sequence"].data.status = "unenrolled_response"
+  existing.stages["reminder-sequence"].data.unenrolledAt = now
+  existing.stages["reminder-sequence"].data.unenrollmentReason = "response"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark accounting access as received (auto-unenrolls and completes stage)
+ */
+export async function markAccessReceived(
+  dealId: string,
+  platform: "qbo" | "xero" | "other"
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["reminder-sequence"].data.accessReceivedAt = now
+  existing.stages["reminder-sequence"].data.accessPlatform = platform
+
+  // If enrolled, unenroll
+  if (existing.stages["reminder-sequence"].data.status === "enrolled") {
+    existing.stages["reminder-sequence"].data.status = "unenrolled_access"
+    existing.stages["reminder-sequence"].data.unenrolledAt = now
+    existing.stages["reminder-sequence"].data.unenrollmentReason = "access_received"
+  } else {
+    existing.stages["reminder-sequence"].data.status = "unenrolled_access"
+  }
+
+  // Complete the stage
+  existing.stages["reminder-sequence"].status = "completed"
+  existing.stages["reminder-sequence"].completedAt = now
+
+  // Move to internal-review stage
+  existing.currentStage = "internal-review"
+  existing.stages["internal-review"].status = "in_progress"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Reset reminder sequence stage
+ */
+export async function resetReminderSequence(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["reminder-sequence"].data = {
+    status: "not_enrolled",
+    sequenceType: null,
+    scheduledEnrollmentAt: null,
+    enrolledAt: null,
+    enrolledBy: null,
+    unenrolledAt: null,
+    unenrollmentReason: null,
+    accessReceivedAt: null,
+    accessPlatform: null,
+    contactRespondedAt: null
+  }
+  existing.stages["reminder-sequence"].status = "in_progress"
+  existing.stages["reminder-sequence"].completedAt = null
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// Internal Review Stage Functions
+// ============================================
+
+/**
+ * Initialize internal review email with template
+ */
+export async function initializeInternalReview(
+  dealId: string,
+  recipients: { name: string; email: string }[],
+  subject: string,
+  body: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["internal-review"].data = {
+    recipients,
+    emailSubject: subject,
+    emailBody: body,
+    isEdited: false,
+    sentAt: null,
+    reviewAssignedTo: null,
+    reviewCompletedAt: null,
+    reviewNotes: null
+  }
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update internal review email content (for user edits)
+ */
+export async function updateInternalReviewEmail(
+  dealId: string,
+  recipients: { name: string; email: string }[],
+  subject: string,
+  body: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["internal-review"].data.recipients = recipients
+  existing.stages["internal-review"].data.emailSubject = subject
+  existing.stages["internal-review"].data.emailBody = body
+  existing.stages["internal-review"].data.isEdited = true
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark internal review email as sent
+ */
+export async function markInternalReviewSent(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["internal-review"].data.sentAt = now
+  existing.stages["internal-review"].data.reviewAssignedTo =
+    existing.stages["internal-review"].data.recipients.map(r => r.email)
+  existing.stages["internal-review"].status = "completed"
+  existing.stages["internal-review"].completedAt = now
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark internal review as completed
+ */
+export async function markInternalReviewCompleted(
+  dealId: string,
+  notes?: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["internal-review"].data.reviewCompletedAt = now
+  if (notes) {
+    existing.stages["internal-review"].data.reviewNotes = notes
+  }
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Reset internal review stage
+ */
+export async function resetInternalReview(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["internal-review"].data = {
+    recipients: [],
+    emailSubject: "",
+    emailBody: "",
+    isEdited: false,
+    sentAt: null,
+    reviewAssignedTo: null,
+    reviewCompletedAt: null,
+    reviewNotes: null
+  }
+  existing.stages["internal-review"].status = "in_progress"
+  existing.stages["internal-review"].completedAt = null
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
 }

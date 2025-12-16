@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { fileTypes, FileType, UploadedFile } from "@/lib/file-types"
 import { Download, RotateCw, Trash2, Paperclip } from "lucide-react"
 import { getFileDownloadUrl } from "@/lib/supabase/files"
+import { AlertDialog } from "@/components/ui/alert-dialog"
 
 interface FileUploadProps {
   fileType: FileType
@@ -21,6 +22,8 @@ export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFi
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | undefined>(existingFile)
+  const [invalidFileAlert, setInvalidFileAlert] = useState(false)
+  const [invalidFileMessage, setInvalidFileMessage] = useState("")
 
   // Generate a unique ID for this component instance to avoid DOM conflicts
   // Use React's useId for SSR-safe unique IDs
@@ -79,18 +82,34 @@ export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFi
 
     const files = Array.from(e.dataTransfer.files)
     if (files.length > 0) {
-      handleFileUpload(files[0])
+      const file = files[0]
+      // Validate file extension
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+      if (!fileType.acceptedTypes.some(ext => ext.toLowerCase() === fileExtension)) {
+        setInvalidFileMessage(`Invalid file type. Please upload a file with one of these extensions: ${fileType.acceptedTypes.join(', ')}`)
+        setInvalidFileAlert(true)
+        return
+      }
+      handleFileUpload(file)
     }
-  }, [])
+  }, [fileType.acceptedTypes])
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      // Validate file extension
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+      if (!fileType.acceptedTypes.some(ext => ext.toLowerCase() === fileExtension)) {
+        setInvalidFileMessage(`Invalid file type. Please upload a file with one of these extensions: ${fileType.acceptedTypes.join(', ')}`)
+        setInvalidFileAlert(true)
+        e.target.value = ''
+        return
+      }
       handleFileUpload(file)
     }
     // Reset the input value so the same file can be selected again
     e.target.value = ''
-  }, [])
+  }, [fileType.acceptedTypes])
 
   const handleFileUpload = async (file: File) => {
     setIsUploading(true)
@@ -318,6 +337,7 @@ For more information about this document, please contact the GrowthLab team.`
               </div>
               <input
                 type="file"
+                accept={fileType.acceptedTypes.join(',')}
                 onChange={handleFileSelect}
                 className="hidden"
                 id={uniqueId}
@@ -371,6 +391,7 @@ For more information about this document, please contact the GrowthLab team.`
 
               <input
                 type="file"
+                accept={fileType.acceptedTypes.join(',')}
                 onChange={handleFileSelect}
                 className="hidden"
                 id={uniqueId}
@@ -383,6 +404,7 @@ For more information about this document, please contact the GrowthLab team.`
   }
 
   return (
+    <>
     <Card className={cn(
       "border-2 border-dashed transition-colors",
       isDragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25",
@@ -426,6 +448,7 @@ For more information about this document, please contact the GrowthLab team.`
               </div>
               <input
                 type="file"
+                accept={fileType.acceptedTypes.join(',')}
                 onChange={handleFileSelect}
                 className="hidden"
                 id={uniqueId}
@@ -435,5 +458,13 @@ For more information about this document, please contact the GrowthLab team.`
         </div>
       </CardContent>
     </Card>
+    <AlertDialog
+      open={invalidFileAlert}
+      onOpenChange={setInvalidFileAlert}
+      title="Invalid File Type"
+      description={invalidFileMessage}
+      variant="warning"
+    />
+    </>
   )
 }

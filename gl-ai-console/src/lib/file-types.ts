@@ -95,8 +95,8 @@ export const fileTypes: FileType[] = [
   {
     id: 'revops-demo-call-transcript',
     label: 'Demo Call Transcript',
-    description: 'Transcript from the initial demo call',
-    acceptedTypes: ['.pdf', '.doc', '.docx', '.txt'],
+    description: 'Transcript from the initial demo call (.txt only)',
+    acceptedTypes: ['.txt'],
     icon: '🎤',
     IconComponent: Mic,
     category: 'call'
