@@ -58,9 +58,10 @@ export function InternalReview({
   const hasInitialized = useRef(false)
 
   // Initialize email template when component mounts
+  // Check emailBody instead of recipients since we now start with no recipients selected
   useEffect(() => {
-    // Only initialize once when we have salesIntakeData and no recipients yet
-    if (reviewData.recipients.length === 0 && salesIntakeData && !hasInitialized.current) {
+    // Only initialize once when we have salesIntakeData and no email body yet
+    if (!reviewData.emailBody && salesIntakeData && !hasInitialized.current) {
       hasInitialized.current = true
 
       console.log("Initializing internal review email")
@@ -86,14 +87,15 @@ export function InternalReview({
         .replace(/\{\{accountingSystem\}\}/g, platformNames[accessPlatform || "other"])
         .replace(/\{\{servicesNeeded\}\}/g, servicesNeeded.join(", "))
 
-      onInitialize(DEFAULT_INTERNAL_RECIPIENTS, template.subject, body)
+      // Initialize with empty recipients - user will select team members
+      onInitialize([], template.subject, body)
     }
 
-    // Reset the flag if recipients is cleared (for re-initialization)
-    if (reviewData.recipients.length === 0) {
+    // Reset the flag if email body is cleared (for re-initialization)
+    if (!reviewData.emailBody) {
       hasInitialized.current = false
     }
-  }, [reviewData.recipients.length, salesIntakeData, accessPlatform, onInitialize])
+  }, [reviewData.emailBody, salesIntakeData, accessPlatform, onInitialize])
 
   const handleStartEdit = () => {
     setEditSubject(reviewData.emailSubject)
@@ -215,8 +217,8 @@ export function InternalReview({
     )
   }
 
-  // If no recipients yet (loading state)
-  if (reviewData.recipients.length === 0) {
+  // If email template not yet initialized (loading state)
+  if (!reviewData.emailBody) {
     return (
       <div className="mt-4 p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
         <div className="text-center">
@@ -258,8 +260,10 @@ export function InternalReview({
 
       <p className="text-sm text-muted-foreground mb-4" style={{ fontFamily: "var(--font-body)" }}>
         {isEditing
-          ? "Edit the email content and recipients below, then save your changes."
-          : "Review the email template and select recipients before sending to the internal team for GL review."}
+          ? "Edit the email content and select recipients below, then save your changes."
+          : reviewData.recipients.length === 0
+            ? "Click Edit Email to select a team member to assign this client to."
+            : "Review the email template before sending to the assigned team member."}
       </p>
 
       {isEditing ? (
@@ -386,14 +390,20 @@ export function InternalReview({
           <div className="p-3 bg-gray-50 rounded-lg border">
             <Label className="text-muted-foreground text-xs">Recipients</Label>
             <div className="mt-1 flex flex-wrap gap-2">
-              {reviewData.recipients.map((recipient) => (
-                <span
-                  key={recipient.email}
-                  className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30"
-                >
-                  {recipient.name}
+              {reviewData.recipients.length === 0 ? (
+                <span className="text-sm text-amber-600 italic">
+                  No recipient selected - click Edit Email to assign a team member
                 </span>
-              ))}
+              ) : (
+                reviewData.recipients.map((recipient) => (
+                  <span
+                    key={recipient.email}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30"
+                  >
+                    {recipient.name}
+                  </span>
+                ))
+              )}
             </div>
           </div>
 
@@ -402,7 +412,9 @@ export function InternalReview({
             <div className="bg-gray-50 px-4 py-2 border-b">
               <p className="text-sm">
                 <span className="text-muted-foreground">To:</span>{" "}
-                <span className="font-medium">{reviewData.recipients.map(r => r.email).join(", ")}</span>
+                <span className={reviewData.recipients.length === 0 ? "text-amber-600 italic" : "font-medium"}>
+                  {reviewData.recipients.length === 0 ? "No recipient selected" : reviewData.recipients.map(r => r.email).join(", ")}
+                </span>
               </p>
               <p className="text-sm">
                 <span className="text-muted-foreground">Subject:</span>{" "}
@@ -428,10 +440,11 @@ export function InternalReview({
             </Button>
             <Button
               onClick={onSend}
+              disabled={reviewData.recipients.length === 0}
               className="bg-[#407B9D] hover:bg-[#366a88] text-white"
             >
               <Send className="w-4 h-4 mr-2" />
-              Send via HubSpot
+              Send
             </Button>
           </div>
         </div>

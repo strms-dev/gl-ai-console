@@ -5,9 +5,15 @@ import {
   SalesPipelineStageId,
   SalesPipelineStageStatus,
   SalesIntakeFormData,
+  GLReviewFormData,
+  GLReviewComparisonSelections,
+  GLReviewCustomValues,
   createInitialTimelineState,
   createTestSalesIntakeFormData,
-  createTestFieldConfidence
+  createTestFieldConfidence,
+  createTestGLReviewFormData,
+  createTestGLReviewFieldConfidence,
+  createTestTeamGLReviewFormData
 } from "./sales-pipeline-timeline-types"
 
 const TIMELINE_STORAGE_KEY = "revops-pipeline-timelines"
@@ -233,6 +239,48 @@ export async function getOrCreateTimelineState(dealId: string): Promise<SalesPip
       needsSave = true
     }
 
+    // Migrate existing deals to add gl-review stage if missing
+    if (!existing.stages["gl-review"]) {
+      existing.stages["gl-review"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          formData: null,
+          isAutoFilled: false,
+          autoFilledAt: null,
+          confirmedAt: null,
+          fieldConfidence: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing deals to add gl-review-comparison stage if missing
+    if (!existing.stages["gl-review-comparison"]) {
+      existing.stages["gl-review-comparison"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          teamReviewData: null,
+          teamReviewSubmittedAt: null,
+          teamReviewSubmittedBy: null,
+          aiReviewData: null,
+          finalReviewData: null,
+          fieldSelections: null,
+          customValues: null,
+          comparisonCompletedAt: null,
+          movedToCreateQuoteAt: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing comparison stage to add customValues if missing
+    if (existing.stages["gl-review-comparison"] && existing.stages["gl-review-comparison"].data.customValues === undefined) {
+      existing.stages["gl-review-comparison"].data.customValues = null
+      needsSave = true
+    }
+
     if (needsSave) {
       existing.updatedAt = new Date().toISOString()
       timelines[dealId] = existing
@@ -319,6 +367,18 @@ export async function updateStageStatus(
       ...existing.stages["internal-review"],
       status,
       completedAt: status === "completed" ? now : existing.stages["internal-review"].completedAt
+    }
+  } else if (stageId === "gl-review") {
+    existing.stages["gl-review"] = {
+      ...existing.stages["gl-review"],
+      status,
+      completedAt: status === "completed" ? now : existing.stages["gl-review"].completedAt
+    }
+  } else if (stageId === "gl-review-comparison") {
+    existing.stages["gl-review-comparison"] = {
+      ...existing.stages["gl-review-comparison"],
+      status,
+      completedAt: status === "completed" ? now : existing.stages["gl-review-comparison"].completedAt
     }
   }
 
@@ -941,6 +1001,10 @@ export async function markInternalReviewSent(
   existing.stages["internal-review"].status = "completed"
   existing.stages["internal-review"].completedAt = now
 
+  // Move to gl-review stage
+  existing.currentStage = "gl-review"
+  existing.stages["gl-review"].status = "in_progress"
+
   existing.updatedAt = now
   saveAllTimelines(timelines)
 
@@ -997,6 +1061,304 @@ export async function resetInternalReview(
   existing.stages["internal-review"].completedAt = null
 
   existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// GL Review Stage Functions
+// ============================================
+
+/**
+ * Auto-fill GL Review form with test data
+ */
+export async function autoFillGLReview(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+  const testData = createTestGLReviewFormData()
+  const testConfidence = createTestGLReviewFieldConfidence()
+
+  // Pre-fill email, company name, and lead name from sales intake if available
+  const salesIntakeData = existing.stages["sales-intake"].data.formData
+  if (salesIntakeData) {
+    testData.email = salesIntakeData.emailAddress || testData.email
+    testData.companyName = salesIntakeData.companyName || testData.companyName
+    testData.leadName = salesIntakeData.contactName || testData.leadName
+  }
+
+  existing.stages["gl-review"].data = {
+    formData: testData,
+    isAutoFilled: true,
+    autoFilledAt: now,
+    confirmedAt: null,
+    fieldConfidence: testConfidence
+  }
+  existing.stages["gl-review"].status = "in_progress"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update GL Review form data (for user edits)
+ */
+export async function updateGLReviewForm(
+  dealId: string,
+  formData: GLReviewFormData
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["gl-review"].data = {
+    ...existing.stages["gl-review"].data,
+    formData
+  }
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Confirm GL Review form (complete the stage)
+ */
+export async function confirmGLReview(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["gl-review"].data.confirmedAt = now
+  existing.stages["gl-review"].status = "completed"
+  existing.stages["gl-review"].completedAt = now
+
+  // Move to GL Review Comparison stage
+  existing.currentStage = "gl-review-comparison"
+  existing.stages["gl-review-comparison"].status = "in_progress"
+
+  // Copy the AI review data to the comparison stage for reference
+  existing.stages["gl-review-comparison"].data.aiReviewData =
+    existing.stages["gl-review"].data.formData
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Reset GL Review form (clear data and go back to in_progress)
+ */
+export async function resetGLReview(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["gl-review"].data = {
+    formData: null,
+    isAutoFilled: false,
+    autoFilledAt: null,
+    confirmedAt: null,
+    fieldConfidence: null
+  }
+  existing.stages["gl-review"].status = "in_progress"
+  existing.stages["gl-review"].completedAt = null
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// GL Review Comparison Stage Functions
+// ============================================
+
+/**
+ * Simulate team member submitting their GL review (for testing)
+ * In production, this would be called when the team member submits their review
+ */
+export async function submitTeamGLReview(
+  dealId: string,
+  submittedBy?: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  // Use test data for simulation - in production this would come from team's actual input
+  const teamReviewData = createTestTeamGLReviewFormData()
+
+  // If we have AI data, pre-fill some fields from it (email, company, lead name)
+  const aiData = existing.stages["gl-review-comparison"].data.aiReviewData
+  if (aiData) {
+    teamReviewData.email = aiData.email
+    teamReviewData.companyName = aiData.companyName
+    teamReviewData.leadName = aiData.leadName
+  }
+
+  existing.stages["gl-review-comparison"].data.teamReviewData = teamReviewData
+  existing.stages["gl-review-comparison"].data.teamReviewSubmittedAt = now
+  existing.stages["gl-review-comparison"].data.teamReviewSubmittedBy = submittedBy || "Team Member"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update field selections in the comparison
+ */
+export async function updateComparisonSelections(
+  dealId: string,
+  selections: GLReviewComparisonSelections
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["gl-review-comparison"].data.fieldSelections = selections
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update the final review data based on selections
+ */
+export async function updateFinalReviewData(
+  dealId: string,
+  finalData: GLReviewFormData
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["gl-review-comparison"].data.finalReviewData = finalData
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update custom values for fields that were manually edited
+ */
+export async function updateCustomValues(
+  dealId: string,
+  customValues: GLReviewCustomValues
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["gl-review-comparison"].data.customValues = customValues
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Complete the comparison and move to Create Quote stage
+ */
+export async function submitComparisonAndMoveToQuote(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  // Complete the comparison stage
+  existing.stages["gl-review-comparison"].data.comparisonCompletedAt = now
+  existing.stages["gl-review-comparison"].data.movedToCreateQuoteAt = now
+  existing.stages["gl-review-comparison"].status = "completed"
+  existing.stages["gl-review-comparison"].completedAt = now
+
+  // In the future, move to Create Quote stage
+  // existing.currentStage = "create-quote"
+  // existing.stages["create-quote"].status = "in_progress"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Reset the comparison stage (go back to waiting for team review)
+ */
+export async function resetGLReviewComparison(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  // Keep the AI review data but reset everything else
+  const aiReviewData = existing.stages["gl-review-comparison"].data.aiReviewData
+
+  existing.stages["gl-review-comparison"].data = {
+    teamReviewData: null,
+    teamReviewSubmittedAt: null,
+    teamReviewSubmittedBy: null,
+    aiReviewData: aiReviewData,
+    finalReviewData: null,
+    fieldSelections: null,
+    customValues: null,
+    comparisonCompletedAt: null,
+    movedToCreateQuoteAt: null
+  }
+  existing.stages["gl-review-comparison"].status = "in_progress"
+  existing.stages["gl-review-comparison"].completedAt = null
+
+  existing.updatedAt = now
   saveAllTimelines(timelines)
 
   return existing

@@ -15,13 +15,18 @@ import {
   ClipboardList,
   Mail,
   Repeat,
-  Users
+  Users,
+  FileSpreadsheet,
+  GitCompare
 } from "lucide-react"
 import {
   SalesPipelineTimelineState,
   SalesPipelineStageId,
   SalesPipelineStageStatus,
   SalesIntakeFormData,
+  GLReviewFormData,
+  GLReviewComparisonSelections,
+  GLReviewCustomValues,
   SALES_PIPELINE_STAGES
 } from "@/lib/sales-pipeline-timeline-types"
 import {
@@ -37,19 +42,29 @@ import {
   updateFollowUpEmail,
   markFollowUpEmailSent,
   markHubspotDealMoved,
-  resetFollowUpEmail,
   enrollInSequence,
   unenrollFromSequence,
-  markContactResponded,
   markAccessReceived,
   initializeInternalReview,
   updateInternalReviewEmail,
-  markInternalReviewSent
+  markInternalReviewSent,
+  autoFillGLReview,
+  updateGLReviewForm,
+  confirmGLReview,
+  resetGLReview,
+  submitTeamGLReview,
+  updateComparisonSelections,
+  updateFinalReviewData,
+  updateCustomValues,
+  submitComparisonAndMoveToQuote,
+  resetGLReviewComparison
 } from "@/lib/sales-pipeline-timeline-store"
 import { SalesIntakeForm } from "@/components/revops/sales-intake-form"
 import { FollowUpEmail } from "@/components/revops/follow-up-email"
 import { ReminderSequence } from "@/components/revops/reminder-sequence"
 import { InternalReview } from "@/components/revops/internal-review"
+import { GLReviewForm } from "@/components/revops/gl-review-form"
+import { GLReviewComparison } from "@/components/revops/gl-review-comparison"
 import { PipelineDeal } from "@/lib/revops-pipeline-store"
 import { FileUpload } from "@/components/leads/file-upload"
 import { getFileTypeById, UploadedFile } from "@/lib/file-types"
@@ -140,7 +155,9 @@ const getStageIcon = (iconName: string) => {
     "repeat": Repeat,
     "clipboard-list": ClipboardList,
     "mail": Mail,
-    "users": Users
+    "users": Users,
+    "file-spreadsheet": FileSpreadsheet,
+    "git-compare": GitCompare
   }
   return iconMap[iconName] || Circle
 }
@@ -157,6 +174,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | undefined>(undefined)
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false)
   const [isAutoFillLoading, setIsAutoFillLoading] = useState(false)
+  const [isGLReviewAutoFillLoading, setIsGLReviewAutoFillLoading] = useState(false)
+  const [isComparisonLoading, setIsComparisonLoading] = useState(false)
 
   // Load timeline state
   useEffect(() => {
@@ -325,10 +344,6 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     await refreshState()
   }, [deal.id, refreshState])
 
-  const handleMarkContactResponded = useCallback(async () => {
-    await markContactResponded(deal.id)
-    await refreshState()
-  }, [deal.id, refreshState])
 
   const handleMarkAccessReceived = useCallback(async (platform: "qbo" | "xero" | "other") => {
     await markAccessReceived(deal.id, platform)
@@ -351,6 +366,66 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     // In production, this would integrate with HubSpot API to send the email
     // For now, we just mark it as sent
     await markInternalReviewSent(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // GL Review Handlers
+  const handleAutoFillGLReview = useCallback(async () => {
+    setIsGLReviewAutoFillLoading(true)
+    // Simulate AI processing delay (will be replaced with real API call)
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    await autoFillGLReview(deal.id)
+    await refreshState()
+    setIsGLReviewAutoFillLoading(false)
+  }, [deal.id, refreshState])
+
+  const handleGLReviewFormChange = useCallback(async (formData: GLReviewFormData) => {
+    await updateGLReviewForm(deal.id, formData)
+    // Don't refresh state here to avoid losing focus while typing
+  }, [deal.id])
+
+  const handleConfirmGLReview = useCallback(async () => {
+    await confirmGLReview(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleResetGLReview = useCallback(async () => {
+    await resetGLReview(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // GL Review Comparison Handlers
+  const handleSimulateTeamSubmit = useCallback(async () => {
+    setIsComparisonLoading(true)
+    // Simulate delay for team submitting their review
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    await submitTeamGLReview(deal.id, "Lori Chambless")
+    await refreshState()
+    setIsComparisonLoading(false)
+  }, [deal.id, refreshState])
+
+  const handleUpdateComparisonSelections = useCallback(async (selections: GLReviewComparisonSelections) => {
+    await updateComparisonSelections(deal.id, selections)
+    // Don't refresh state to avoid UI flicker while selecting
+  }, [deal.id])
+
+  const handleUpdateFinalReviewData = useCallback(async (finalData: GLReviewFormData) => {
+    await updateFinalReviewData(deal.id, finalData)
+    // Don't refresh state to avoid UI flicker
+  }, [deal.id])
+
+  const handleUpdateCustomValues = useCallback(async (customValues: GLReviewCustomValues) => {
+    await updateCustomValues(deal.id, customValues)
+    // Don't refresh state to avoid UI flicker while editing
+  }, [deal.id])
+
+  const handleSubmitComparisonAndMoveToQuote = useCallback(async () => {
+    await submitComparisonAndMoveToQuote(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleResetGLReviewComparison = useCallback(async () => {
+    await resetGLReviewComparison(deal.id)
     await refreshState()
   }, [deal.id, refreshState])
 
@@ -565,6 +640,12 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
                       {/* Action Zone - Internal Review specific - use InternalReview component */}
                       {event.id === "internal-review" && renderInternalReviewActions()}
+
+                      {/* Action Zone - GL Review specific - use GLReviewForm component */}
+                      {event.id === "gl-review" && renderGLReviewActions()}
+
+                      {/* Action Zone - GL Review Comparison specific - use GLReviewComparison component */}
+                      {event.id === "gl-review-comparison" && renderGLReviewComparisonActions()}
                     </>
                   )}
                 </div>
@@ -645,12 +726,14 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     const reminderData = reminderStage.data
     if (!reminderData) return null
 
+    const salesIntakeData = timelineState?.stages["sales-intake"]?.data?.formData || null
+
     return (
       <ReminderSequence
         sequenceData={reminderData}
+        salesIntakeData={salesIntakeData}
         onEnroll={handleEnrollInSequence}
         onUnenroll={handleUnenrollFromSequence}
-        onMarkResponded={handleMarkContactResponded}
         onMarkAccessReceived={handleMarkAccessReceived}
       />
     )
@@ -675,6 +758,53 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         onInitialize={handleInitializeInternalReview}
         onUpdate={handleUpdateInternalReview}
         onSend={handleSendInternalReview}
+      />
+    )
+  }
+
+  function renderGLReviewActions() {
+    // Safety check for existing deals that don't have gl-review stage
+    const glReviewStage = timelineState?.stages["gl-review"]
+    if (!glReviewStage) return null
+
+    const glReviewData = glReviewStage.data
+    if (!glReviewData) return null
+
+    const isConfirmed = !!glReviewData.confirmedAt
+
+    return (
+      <GLReviewForm
+        formData={glReviewData.formData || null}
+        isAutoFilled={glReviewData.isAutoFilled || false}
+        isConfirmed={isConfirmed}
+        fieldConfidence={glReviewData.fieldConfidence || null}
+        onAutoFill={handleAutoFillGLReview}
+        onFormChange={handleGLReviewFormChange}
+        onConfirm={handleConfirmGLReview}
+        onReset={handleResetGLReview}
+        isLoading={isGLReviewAutoFillLoading}
+      />
+    )
+  }
+
+  function renderGLReviewComparisonActions() {
+    // Safety check for existing deals that don't have gl-review-comparison stage
+    const comparisonStage = timelineState?.stages["gl-review-comparison"]
+    if (!comparisonStage) return null
+
+    const comparisonData = comparisonStage.data
+    if (!comparisonData) return null
+
+    return (
+      <GLReviewComparison
+        comparisonData={comparisonData}
+        onSimulateTeamSubmit={handleSimulateTeamSubmit}
+        onUpdateSelections={handleUpdateComparisonSelections}
+        onUpdateFinalData={handleUpdateFinalReviewData}
+        onUpdateCustomValues={handleUpdateCustomValues}
+        onSubmitAndMoveToQuote={handleSubmitComparisonAndMoveToQuote}
+        onReset={handleResetGLReviewComparison}
+        isLoading={isComparisonLoading}
       />
     )
   }

@@ -1,7 +1,7 @@
 "use client"
 
 // Sales Pipeline Stage Types
-export type SalesPipelineStageId = "demo-call" | "sales-intake" | "follow-up-email" | "reminder-sequence" | "internal-review"
+export type SalesPipelineStageId = "demo-call" | "sales-intake" | "follow-up-email" | "reminder-sequence" | "internal-review" | "gl-review" | "gl-review-comparison"
 
 export type SalesPipelineStageStatus =
   | "pending"
@@ -245,6 +245,110 @@ export interface InternalReviewStageData {
   reviewNotes: string | null
 }
 
+// Transaction count options for financial accounts
+export type TransactionCount = "<20" | "20-100" | ">100" | ""
+
+// eCommerce platform account counts
+export type ECommerceAccountCount = "" | "1" | "2" | "3" | "4" | "5"
+
+// eCommerce platforms
+export interface ECommerceData {
+  amazon: ECommerceAccountCount
+  shopify: ECommerceAccountCount
+  square: ECommerceAccountCount
+  etsy: ECommerceAccountCount
+  ebay: ECommerceAccountCount
+  woocommerce: ECommerceAccountCount
+  other: ECommerceAccountCount
+}
+
+// Financial account entry (name + transaction count)
+export interface FinancialAccount {
+  name: string  // Name of Institution & Type of Account
+  transactionCount: TransactionCount
+}
+
+// GL Review Form Data - comprehensive form for general ledger review
+export interface GLReviewFormData {
+  // Basic Info (required)
+  email: string
+  companyName: string
+  leadName: string
+
+  // Financial Accounts (up to 20)
+  accounts: FinancialAccount[]
+
+  // eCommerce
+  ecommerce: ECommerceData
+
+  // Revenue COA Allocations (required)
+  revenueCoaAllocations: "1-2" | "3-5" | ">5" | ""
+
+  // List of COA Revenue Categories (required)
+  coaRevenueCategories: string
+
+  // Active Classes (required)
+  activeClasses: "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | ""
+
+  // Catchup Bookkeeping (required)
+  catchupRequired: "yes" | "no" | ""
+  catchupDateRange: string
+
+  // Additional Notes
+  additionalNotes: string
+}
+
+// Field confidence for GL Review form
+export type GLReviewFieldConfidence = {
+  [K in keyof GLReviewFormData]?: ConfidenceLevel
+}
+
+// GL Review Stage Data
+export interface GLReviewStageData {
+  formData: GLReviewFormData | null
+  isAutoFilled: boolean
+  autoFilledAt: string | null
+  confirmedAt: string | null
+  fieldConfidence: GLReviewFieldConfidence | null
+}
+
+// Selection source for each field in the comparison
+export type ComparisonFieldSource = "ai" | "team" | "custom" | null
+
+// Field selections for the comparison - which source was chosen for each field
+export type GLReviewComparisonSelections = {
+  [K in keyof GLReviewFormData]?: ComparisonFieldSource
+}
+
+// Custom values for fields that were manually edited
+export type GLReviewCustomValues = {
+  [K in keyof GLReviewFormData]?: GLReviewFormData[K]
+}
+
+// GL Review Comparison Stage Data - comparing AI review vs team member review
+export interface GLReviewComparisonStageData {
+  // Team member's review data (submitted separately)
+  teamReviewData: GLReviewFormData | null
+  teamReviewSubmittedAt: string | null
+  teamReviewSubmittedBy: string | null
+
+  // AI review data (copied from gl-review stage for reference)
+  aiReviewData: GLReviewFormData | null
+
+  // Final merged data based on user selections
+  finalReviewData: GLReviewFormData | null
+
+  // Track which source was selected for each field
+  fieldSelections: GLReviewComparisonSelections | null
+
+  // Custom edited values for fields where user chose to modify
+  customValues: GLReviewCustomValues | null
+
+  // Completion tracking
+  comparisonCompletedAt: string | null
+  movedToCreateQuoteAt: string | null
+}
+
 // Full Timeline State for a Deal
 export interface SalesPipelineTimelineState {
   dealId: string
@@ -274,6 +378,16 @@ export interface SalesPipelineTimelineState {
       status: SalesPipelineStageStatus
       completedAt: string | null
       data: InternalReviewStageData
+    }
+    "gl-review": {
+      status: SalesPipelineStageStatus
+      completedAt: string | null
+      data: GLReviewStageData
+    }
+    "gl-review-comparison": {
+      status: SalesPipelineStageStatus
+      completedAt: string | null
+      data: GLReviewComparisonStageData
     }
   }
   createdAt: string
@@ -341,6 +455,20 @@ export const SALES_PIPELINE_STAGES: StageConfig[] = [
     title: "Internal Team Assignment",
     description: "Now that access has been received, send an email to the internal team to assign them the general ledger review. Select recipients and customize the email before sending.",
     icon: "users",
+    actions: {}
+  },
+  {
+    id: "gl-review",
+    title: "General Ledger Review",
+    description: "AI analyzes the client's general ledger to auto-fill the GL Review form. Review the populated answers, make any adjustments, and confirm to complete this stage.",
+    icon: "file-spreadsheet",
+    actions: {}
+  },
+  {
+    id: "gl-review-comparison",
+    title: "GL Review Comparison",
+    description: "Compare the AI-generated GL Review with the team member's review. Review any differences, select the correct value for each field, and submit to move the deal to Create Quote.",
+    icon: "git-compare",
     actions: {}
   }
 ]
@@ -629,9 +757,147 @@ export function createInitialTimelineState(dealId: string): SalesPipelineTimelin
           reviewCompletedAt: null,
           reviewNotes: null
         }
+      },
+      "gl-review": {
+        status: "pending",
+        completedAt: null,
+        data: {
+          formData: null,
+          isAutoFilled: false,
+          autoFilledAt: null,
+          confirmedAt: null,
+          fieldConfidence: null
+        }
+      },
+      "gl-review-comparison": {
+        status: "pending",
+        completedAt: null,
+        data: {
+          teamReviewData: null,
+          teamReviewSubmittedAt: null,
+          teamReviewSubmittedBy: null,
+          aiReviewData: null,
+          finalReviewData: null,
+          fieldSelections: null,
+          customValues: null,
+          comparisonCompletedAt: null,
+          movedToCreateQuoteAt: null
+        }
       }
     },
     createdAt: now,
     updatedAt: now
+  }
+}
+
+// Empty GL Review form data for initialization
+export function createEmptyGLReviewFormData(): GLReviewFormData {
+  return {
+    email: "",
+    companyName: "",
+    leadName: "",
+    accounts: Array(20).fill(null).map(() => ({ name: "", transactionCount: "" as TransactionCount })),
+    ecommerce: {
+      amazon: "",
+      shopify: "",
+      square: "",
+      etsy: "",
+      ebay: "",
+      woocommerce: "",
+      other: ""
+    },
+    revenueCoaAllocations: "",
+    coaRevenueCategories: "",
+    activeClasses: "",
+    catchupRequired: "",
+    catchupDateRange: "",
+    additionalNotes: ""
+  }
+}
+
+// Test data for GL Review auto-fill simulation
+export function createTestGLReviewFormData(): GLReviewFormData {
+  return {
+    email: "john.smith@acmetech.com",
+    companyName: "Acme Technologies Inc.",
+    leadName: "John Smith",
+    accounts: [
+      { name: "Chase Business Checking", transactionCount: "20-100" },
+      { name: "Chase Business Savings", transactionCount: "<20" },
+      { name: "American Express Business", transactionCount: ">100" },
+      { name: "Capital One Spark Card", transactionCount: "20-100" },
+      { name: "Mercury Checking", transactionCount: "<20" },
+      ...Array(15).fill(null).map(() => ({ name: "", transactionCount: "" as TransactionCount }))
+    ],
+    ecommerce: {
+      amazon: "",
+      shopify: "2",
+      square: "1",
+      etsy: "",
+      ebay: "",
+      woocommerce: "",
+      other: ""
+    },
+    revenueCoaAllocations: "3-5",
+    coaRevenueCategories: "Product Sales, Service Revenue, Subscription Revenue, Consulting Fees",
+    activeClasses: "4",
+    catchupRequired: "yes",
+    catchupDateRange: "January 2024 - Present",
+    additionalNotes: "Client has multiple Shopify stores for different product lines. Square is used for in-person events. Need to review bank feed rules for categorization accuracy."
+  }
+}
+
+// Test confidence data for GL Review - simulates AI confidence from GL analysis
+export function createTestGLReviewFieldConfidence(): GLReviewFieldConfidence {
+  return {
+    // High confidence - from accounting system data
+    email: "high",
+    companyName: "high",
+    leadName: "high",
+    accounts: "high",
+    ecommerce: "medium",
+
+    // Medium confidence - inferred from GL patterns
+    revenueCoaAllocations: "medium",
+    coaRevenueCategories: "medium",
+    activeClasses: "high",
+
+    // Lower confidence - requires human verification
+    catchupRequired: "medium",
+    catchupDateRange: "low",
+    additionalNotes: "low"
+  }
+}
+
+// Test data for team member's GL Review - intentionally different from AI review for comparison testing
+export function createTestTeamGLReviewFormData(): GLReviewFormData {
+  return {
+    email: "john.smith@acmetech.com",
+    companyName: "Acme Technologies Inc.",
+    leadName: "John Smith",
+    accounts: [
+      { name: "Chase Business Checking", transactionCount: ">100" },  // Different from AI (<20)
+      { name: "Chase Business Savings", transactionCount: "<20" },
+      { name: "American Express Business", transactionCount: ">100" },
+      { name: "Capital One Spark Card", transactionCount: "20-100" },
+      { name: "Mercury Checking", transactionCount: "<20" },
+      { name: "Wells Fargo Line of Credit", transactionCount: "<20" },  // Additional account team found
+      ...Array(14).fill(null).map(() => ({ name: "", transactionCount: "" as TransactionCount }))
+    ],
+    ecommerce: {
+      amazon: "1",  // Different - team found Amazon account
+      shopify: "2",
+      square: "",  // Different - team didn't find Square
+      etsy: "",
+      ebay: "",
+      woocommerce: "",
+      other: ""
+    },
+    revenueCoaAllocations: ">5",  // Different from AI (3-5) - triggers custom pricing
+    coaRevenueCategories: "Product Sales, Service Revenue, Subscription Revenue, Consulting Fees, Software Licensing",  // Added one more
+    activeClasses: "5",  // Different from AI (4)
+    catchupRequired: "yes",
+    catchupDateRange: "October 2023 - Present",  // Different date range
+    additionalNotes: "Client has 2 Shopify stores (US and Canada). Amazon FBA account discovered with ~50 orders/month. Wells Fargo LOC was used for equipment financing in 2023. Need to set up proper class tracking for the 5 departments."
   }
 }

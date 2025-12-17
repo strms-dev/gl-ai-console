@@ -1,43 +1,48 @@
 "use client"
 
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
   ReminderSequenceStageData,
-  ReminderSequenceStatus
+  ReminderSequenceStatus,
+  SalesIntakeFormData
 } from "@/lib/sales-pipeline-timeline-types"
 import {
   CheckCircle2,
   Clock,
   Play,
   Pause,
-  Mail,
   KeyRound,
   Calendar,
-  UserCheck,
-  AlertCircle
+  AlertCircle,
+  Mail,
+  UserCheck
 } from "lucide-react"
-import { Select } from "@/components/ui/select"
 
 interface ReminderSequenceProps {
   sequenceData: ReminderSequenceStageData
+  salesIntakeData: SalesIntakeFormData | null
   onEnroll: () => void
   onUnenroll: () => void
-  onMarkResponded: () => void
   onMarkAccessReceived: (platform: "qbo" | "xero" | "other") => void
 }
 
 export function ReminderSequence({
   sequenceData,
+  salesIntakeData,
   onEnroll,
   onUnenroll,
-  onMarkResponded,
   onMarkAccessReceived,
 }: ReminderSequenceProps) {
-  const [selectedPlatform, setSelectedPlatform] = useState<"qbo" | "xero" | "other">(
-    sequenceData.sequenceType || "qbo"
-  )
+  // Get platform from sales intake form data
+  const getPlatformFromIntake = (): "qbo" | "xero" | "other" => {
+    if (salesIntakeData?.accountingPlatform === "qbo") return "qbo"
+    if (salesIntakeData?.accountingPlatform === "xero") return "xero"
+    if (salesIntakeData?.accountingPlatform === "other") return "other"
+    return "qbo" // default fallback
+  }
+
+  const selectedPlatform = getPlatformFromIntake()
 
   // Calculate days until auto-enrollment
   const getDaysUntilEnrollment = (): number | null => {
@@ -191,15 +196,9 @@ export function ReminderSequence({
         <div className="pt-4 border-t">
           <p className="text-sm font-medium mb-3">Mark when access is received to complete this stage:</p>
           <div className="flex items-center gap-3">
-            <Select
-              value={selectedPlatform}
-              onValueChange={(v) => setSelectedPlatform(v as "qbo" | "xero" | "other")}
-              className="w-[200px]"
-            >
-              <option value="qbo">QuickBooks Online</option>
-              <option value="xero">Xero</option>
-              <option value="other">Other</option>
-            </Select>
+            <span className="text-sm text-muted-foreground">
+              Platform: <strong>{selectedPlatform === "qbo" ? "QuickBooks Online" : selectedPlatform === "xero" ? "Xero" : "Other"}</strong>
+            </span>
             <Button
               onClick={() => onMarkAccessReceived(selectedPlatform)}
               className="bg-[#5A8A4A] hover:bg-[#4a7a3a] text-white"
@@ -258,24 +257,10 @@ export function ReminderSequence({
             <Pause className="w-4 h-4 mr-2" />
             Unenroll
           </Button>
-          <Button
-            variant="outline"
-            onClick={onMarkResponded}
-            className="text-[#407B9D] border-[#407B9D] hover:bg-[#407B9D]/10"
-          >
-            <Mail className="w-4 h-4 mr-2" />
-            Mark Responded
-          </Button>
           <div className="flex items-center gap-2">
-            <Select
-              value={selectedPlatform}
-              onValueChange={(v) => setSelectedPlatform(v as "qbo" | "xero" | "other")}
-              className="w-[180px]"
-            >
-              <option value="qbo">QuickBooks Online</option>
-              <option value="xero">Xero</option>
-              <option value="other">Other</option>
-            </Select>
+            <span className="text-sm text-muted-foreground">
+              Platform: <strong>{selectedPlatform === "qbo" ? "QuickBooks Online" : selectedPlatform === "xero" ? "Xero" : "Other"}</strong>
+            </span>
             <Button
               onClick={() => onMarkAccessReceived(selectedPlatform)}
               className="bg-[#5A8A4A] hover:bg-[#4a7a3a] text-white"
@@ -332,24 +317,10 @@ export function ReminderSequence({
             <Play className="w-4 h-4 mr-2" />
             Enroll Now
           </Button>
-          <Button
-            variant="outline"
-            onClick={onMarkResponded}
-            className="text-[#407B9D] border-[#407B9D] hover:bg-[#407B9D]/10"
-          >
-            <Mail className="w-4 h-4 mr-2" />
-            Mark Responded
-          </Button>
           <div className="flex items-center gap-2">
-            <Select
-              value={selectedPlatform}
-              onValueChange={(v) => setSelectedPlatform(v as "qbo" | "xero" | "other")}
-              className="w-[180px]"
-            >
-              <option value="qbo">QuickBooks Online</option>
-              <option value="xero">Xero</option>
-              <option value="other">Other</option>
-            </Select>
+            <span className="text-sm text-muted-foreground">
+              Platform: <strong>{selectedPlatform === "qbo" ? "QuickBooks Online" : selectedPlatform === "xero" ? "Xero" : "Other"}</strong>
+            </span>
             <Button
               onClick={() => onMarkAccessReceived(selectedPlatform)}
               className="bg-[#5A8A4A] hover:bg-[#4a7a3a] text-white"
@@ -395,15 +366,9 @@ export function ReminderSequence({
           Enroll Now
         </Button>
         <div className="flex items-center gap-2">
-          <Select
-            value={selectedPlatform}
-            onValueChange={(v) => setSelectedPlatform(v as "qbo" | "xero" | "other")}
-            className="w-[180px]"
-          >
-            <option value="qbo">QuickBooks Online</option>
-            <option value="xero">Xero</option>
-            <option value="other">Other</option>
-          </Select>
+          <span className="text-sm text-muted-foreground">
+            Platform: <strong>{selectedPlatform === "qbo" ? "QuickBooks Online" : selectedPlatform === "xero" ? "Xero" : "Other"}</strong>
+          </span>
           <Button
             onClick={() => onMarkAccessReceived(selectedPlatform)}
             className="bg-[#5A8A4A] hover:bg-[#4a7a3a] text-white"
