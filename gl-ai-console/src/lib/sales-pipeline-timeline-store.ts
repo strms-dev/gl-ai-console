@@ -8,6 +8,8 @@ import {
   GLReviewFormData,
   GLReviewComparisonSelections,
   GLReviewCustomValues,
+  QuoteLineItem,
+  LostReason,
   createInitialTimelineState,
   createTestSalesIntakeFormData,
   createTestFieldConfidence,
@@ -278,6 +280,190 @@ export async function getOrCreateTimelineState(dealId: string): Promise<SalesPip
     // Migrate existing comparison stage to add customValues if missing
     if (existing.stages["gl-review-comparison"] && existing.stages["gl-review-comparison"].data.customValues === undefined) {
       existing.stages["gl-review-comparison"].data.customValues = null
+      needsSave = true
+    }
+
+    // Migrate existing deals to add create-quote stage if missing
+    if (!existing.stages["create-quote"]) {
+      existing.stages["create-quote"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          accountingMonthlyPrice: null,
+          accountingPriceCalculatedAt: null,
+          accountingPriceBreakdown: null,
+          lineItems: [],
+          isEdited: false,
+          hubspotSynced: false,
+          hubspotSyncedAt: null,
+          hubspotQuoteLink: null,
+          hubspotQuotePdfUrl: null,
+          quoteConfirmedAt: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing create-quote stage to add new HubSpot fields if missing
+    if (existing.stages["create-quote"] && existing.stages["create-quote"].data.hubspotQuoteLink === undefined) {
+      existing.stages["create-quote"].data.hubspotQuoteLink = null
+      existing.stages["create-quote"].data.hubspotQuotePdfUrl = null
+      needsSave = true
+    }
+
+    // Migrate existing deals to add quote-sent stage if missing
+    if (!existing.stages["quote-sent"]) {
+      existing.stages["quote-sent"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          emailSubject: "",
+          emailBody: "",
+          isEdited: false,
+          sentAt: null,
+          sentTo: "",
+          followUpSequenceStarted: false,
+          followUpSequenceStartedAt: null,
+          nextFollowUpAt: null,
+          followUpCount: 0,
+          prospectRespondedAt: null,
+          responseType: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing deals to add quote-approved stage if missing
+    if (!existing.stages["quote-approved"]) {
+      existing.stages["quote-approved"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          approvedAt: null,
+          approvedBy: null,
+          approvalNotes: "",
+          acknowledgmentSentAt: null,
+          movedToEngagementAt: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing deals to add prepare-engagement stage if missing
+    if (!existing.stages["prepare-engagement"]) {
+      existing.stages["prepare-engagement"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          walkthroughText: "",
+          walkthroughGeneratedAt: null,
+          isGenerating: false,
+          isEdited: false,
+          walkthroughConfirmedAt: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing prepare-engagement stage to new walkthrough format
+    if (existing.stages["prepare-engagement"] && (existing.stages["prepare-engagement"].data as unknown as Record<string, unknown>).ignitionDraftStarted !== undefined) {
+      existing.stages["prepare-engagement"].data = {
+        walkthroughText: "",
+        walkthroughGeneratedAt: null,
+        isGenerating: false,
+        isEdited: false,
+        walkthroughConfirmedAt: null
+      }
+      needsSave = true
+    }
+
+    // Migrate existing deals to add internal-engagement-review stage if missing
+    if (!existing.stages["internal-engagement-review"]) {
+      existing.stages["internal-engagement-review"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          recipients: [],
+          emailSubject: "",
+          emailBody: "",
+          isEdited: false,
+          sentAt: null,
+          readyToSendAt: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing internal-engagement-review stage to new email format
+    if (existing.stages["internal-engagement-review"] && (existing.stages["internal-engagement-review"].data as unknown as Record<string, unknown>).reviewInProgress !== undefined) {
+      existing.stages["internal-engagement-review"].data = {
+        recipients: [],
+        emailSubject: "",
+        emailBody: "",
+        isEdited: false,
+        sentAt: null,
+        readyToSendAt: null
+      }
+      needsSave = true
+    }
+
+    // Migrate existing deals to add send-engagement stage if missing
+    if (!existing.stages["send-engagement"]) {
+      existing.stages["send-engagement"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          customerEmailSubject: "",
+          customerEmailBody: "",
+          isEdited: false,
+          sentViaHubspotAt: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing send-engagement stage to new simplified format
+    if (existing.stages["send-engagement"] && (existing.stages["send-engagement"].data as unknown as Record<string, unknown>).ignitionSentAt !== undefined) {
+      existing.stages["send-engagement"].data = {
+        customerEmailSubject: (existing.stages["send-engagement"].data as unknown as Record<string, unknown>).customerEmailSubject as string || "",
+        customerEmailBody: (existing.stages["send-engagement"].data as unknown as Record<string, unknown>).customerEmailBody as string || "",
+        isEdited: false,
+        sentViaHubspotAt: null
+      }
+      needsSave = true
+    }
+
+    // Migrate existing deals to add closed-won stage if missing
+    if (!existing.stages["closed-won"]) {
+      existing.stages["closed-won"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          closedAt: null,
+          finalDealValue: null,
+          servicesIncluded: [],
+          closingNotes: "",
+          hubspotSynced: false,
+          hubspotSyncedAt: null
+        }
+      }
+      needsSave = true
+    }
+
+    // Migrate existing deals to add closed-lost stage if missing
+    if (!existing.stages["closed-lost"]) {
+      existing.stages["closed-lost"] = {
+        status: "pending",
+        completedAt: null,
+        data: {
+          closedAt: null,
+          lostReason: null,
+          lostReasonDetails: "",
+          lostFromStage: null,
+          hubspotSynced: false,
+          hubspotSyncedAt: null
+        }
+      }
       needsSave = true
     }
 
@@ -1318,9 +1504,9 @@ export async function submitComparisonAndMoveToQuote(
   existing.stages["gl-review-comparison"].status = "completed"
   existing.stages["gl-review-comparison"].completedAt = now
 
-  // In the future, move to Create Quote stage
-  // existing.currentStage = "create-quote"
-  // existing.stages["create-quote"].status = "in_progress"
+  // Move to Create Quote stage
+  existing.currentStage = "create-quote"
+  existing.stages["create-quote"].status = "in_progress"
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
@@ -1357,6 +1543,1049 @@ export async function resetGLReviewComparison(
   }
   existing.stages["gl-review-comparison"].status = "in_progress"
   existing.stages["gl-review-comparison"].completedAt = null
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// Create Quote Stage Functions
+// ============================================
+
+/**
+ * Placeholder pricing calculator - returns a mock price based on GL Review data
+ * In production, this would be replaced with actual pricing logic
+ */
+function calculatePlaceholderPrice(finalReviewData: GLReviewFormData | null): {
+  price: number
+  breakdown: string
+} {
+  if (!finalReviewData) {
+    return { price: 0, breakdown: "No review data available" }
+  }
+
+  // Count filled accounts
+  const accountCount = finalReviewData.accounts.filter(a => a.name.trim() !== "").length
+
+  // Count eCommerce platforms
+  const ecommerceCount = Object.values(finalReviewData.ecommerce).filter(v => v && v !== "").length
+
+  // Base price calculation (placeholder logic)
+  let basePrice = 500
+  basePrice += accountCount * 50  // $50 per account
+  basePrice += ecommerceCount * 100  // $100 per eCommerce platform
+
+  // Adjust for catchup bookkeeping
+  if (finalReviewData.catchupRequired === "yes") {
+    basePrice += 200
+  }
+
+  // Adjust for revenue allocations
+  if (finalReviewData.revenueCoaAllocations === ">5") {
+    basePrice += 150
+  } else if (finalReviewData.revenueCoaAllocations === "3-5") {
+    basePrice += 75
+  }
+
+  const breakdown = `Base: $500 + Accounts (${accountCount} × $50) + eCommerce (${ecommerceCount} × $100)` +
+    (finalReviewData.catchupRequired === "yes" ? " + Catchup: $200" : "") +
+    (finalReviewData.revenueCoaAllocations === ">5" ? " + Custom COA: $150" :
+     finalReviewData.revenueCoaAllocations === "3-5" ? " + COA Allocations: $75" : "")
+
+  return { price: basePrice, breakdown }
+}
+
+/**
+ * Initialize create quote stage with calculated pricing
+ */
+export async function initializeCreateQuote(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  // Get the final review data from comparison stage
+  const finalReviewData = existing.stages["gl-review-comparison"].data.finalReviewData
+
+  // Calculate placeholder price
+  const { price, breakdown } = calculatePlaceholderPrice(finalReviewData)
+
+  // Create initial line item for accounting services
+  const accountingLineItem: QuoteLineItem = {
+    id: `line-${Date.now()}`,
+    service: "Monthly Accounting Services",
+    description: "Full-service bookkeeping and accounting",
+    monthlyPrice: price,
+    isCustom: false
+  }
+
+  existing.stages["create-quote"].data = {
+    accountingMonthlyPrice: price,
+    accountingPriceCalculatedAt: now,
+    accountingPriceBreakdown: breakdown,
+    lineItems: [accountingLineItem],
+    isEdited: false,
+    hubspotSynced: false,
+    hubspotSyncedAt: null,
+    quoteConfirmedAt: null
+  }
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Add a line item to the quote
+ */
+export async function addQuoteLineItem(
+  dealId: string,
+  service: string,
+  description: string,
+  monthlyPrice: number
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  const newLineItem: QuoteLineItem = {
+    id: `line-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    service,
+    description,
+    monthlyPrice,
+    isCustom: true
+  }
+
+  existing.stages["create-quote"].data.lineItems.push(newLineItem)
+  existing.stages["create-quote"].data.isEdited = true
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update a line item in the quote
+ */
+export async function updateQuoteLineItem(
+  dealId: string,
+  lineItemId: string,
+  updates: Partial<QuoteLineItem>
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  const index = existing.stages["create-quote"].data.lineItems.findIndex(item => item.id === lineItemId)
+  if (index === -1) return null
+
+  existing.stages["create-quote"].data.lineItems[index] = {
+    ...existing.stages["create-quote"].data.lineItems[index],
+    ...updates
+  }
+  existing.stages["create-quote"].data.isEdited = true
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Remove a line item from the quote
+ */
+export async function removeQuoteLineItem(
+  dealId: string,
+  lineItemId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["create-quote"].data.lineItems =
+    existing.stages["create-quote"].data.lineItems.filter(item => item.id !== lineItemId)
+  existing.stages["create-quote"].data.isEdited = true
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Push quote to HubSpot and create quote with link/PDF
+ */
+export async function pushQuoteToHubspot(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  // In production, this would call the HubSpot API
+  // For now, we generate placeholder links
+  const quoteId = `QT-${Date.now()}`
+
+  existing.stages["create-quote"].data.hubspotSynced = true
+  existing.stages["create-quote"].data.hubspotSyncedAt = now
+  existing.stages["create-quote"].data.hubspotQuoteLink = `https://app.hubspot.com/quotes/${quoteId}`
+  existing.stages["create-quote"].data.hubspotQuotePdfUrl = `https://app.hubspot.com/quotes/${quoteId}/pdf`
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Confirm quote and move to Quote Sent stage
+ */
+export async function confirmQuoteAndMoveToSent(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["create-quote"].data.quoteConfirmedAt = now
+  existing.stages["create-quote"].status = "completed"
+  existing.stages["create-quote"].completedAt = now
+
+  // Move to Quote Sent stage
+  existing.currentStage = "quote-sent"
+  existing.stages["quote-sent"].status = "in_progress"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// Quote Sent Stage Functions
+// ============================================
+
+/**
+ * Initialize quote sent email
+ */
+export async function initializeQuoteSentEmail(
+  dealId: string,
+  recipientEmail: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  // Get company and contact name from sales intake
+  const salesIntake = existing.stages["sales-intake"].data.formData
+  const companyName = salesIntake?.companyName || "your company"
+  const contactName = salesIntake?.contactName || "there"
+
+  // Calculate total monthly price
+  const totalMonthly = existing.stages["create-quote"].data.lineItems
+    .reduce((sum, item) => sum + item.monthlyPrice, 0)
+
+  // Build services list
+  const servicesList = existing.stages["create-quote"].data.lineItems
+    .map(item => `• ${item.service}: $${item.monthlyPrice}/month`)
+    .join("\n")
+
+  const subject = `Growth Lab Proposal for ${companyName}`
+  const body = `Hi ${contactName},
+
+Thank you for your interest in Growth Lab Financial. Based on our review, I'm pleased to share our proposal for ${companyName}.
+
+Proposed Services:
+${servicesList}
+
+Total Monthly Investment: $${totalMonthly}/month
+
+If this looks good, just reply to this email and I'll prepare the engagement agreement for your review.
+
+Please let me know if you have any questions!
+
+Best regards,
+Tim`
+
+  existing.stages["quote-sent"].data.emailSubject = subject
+  existing.stages["quote-sent"].data.emailBody = body
+  existing.stages["quote-sent"].data.sentTo = recipientEmail
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update quote sent email content
+ */
+export async function updateQuoteSentEmail(
+  dealId: string,
+  subject: string,
+  body: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["quote-sent"].data.emailSubject = subject
+  existing.stages["quote-sent"].data.emailBody = body
+  existing.stages["quote-sent"].data.isEdited = true
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark quote email as sent and start follow-up sequence
+ */
+export async function markQuoteEmailSent(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date()
+  const nowISO = now.toISOString()
+
+  existing.stages["quote-sent"].data.sentAt = nowISO
+  existing.stages["quote-sent"].data.followUpSequenceStarted = true
+  existing.stages["quote-sent"].data.followUpSequenceStartedAt = nowISO
+  existing.stages["quote-sent"].data.nextFollowUpAt = addBusinessDays(now, 3).toISOString()
+  existing.stages["quote-sent"].data.followUpCount = 0
+
+  existing.updatedAt = nowISO
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Record prospect response to quote
+ */
+export async function recordQuoteResponse(
+  dealId: string,
+  responseType: "approved" | "declined"
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["quote-sent"].data.prospectRespondedAt = now
+  existing.stages["quote-sent"].data.responseType = responseType
+  existing.stages["quote-sent"].data.followUpSequenceStarted = false  // Stop follow-ups
+
+  if (responseType === "approved") {
+    // Complete this stage and skip Quote Approved - go directly to Prepare Engagement
+    existing.stages["quote-sent"].status = "completed"
+    existing.stages["quote-sent"].completedAt = now
+
+    // Skip Quote Approved stage
+    existing.stages["quote-approved"].status = "skipped"
+    existing.stages["quote-approved"].completedAt = now
+    existing.stages["quote-approved"].data.approvedAt = now
+    existing.stages["quote-approved"].data.movedToEngagementAt = now
+
+    // Move to Prepare Engagement
+    existing.currentStage = "prepare-engagement"
+    existing.stages["prepare-engagement"].status = "in_progress"
+  } else if (responseType === "declined") {
+    // Complete quote-sent stage
+    existing.stages["quote-sent"].status = "completed"
+    existing.stages["quote-sent"].completedAt = now
+
+    // Mark all remaining stages as N/A (skipped)
+    const stagesToSkip: (keyof typeof existing.stages)[] = [
+      "quote-approved",
+      "prepare-engagement",
+      "internal-engagement-review",
+      "send-engagement",
+      "closed-won"
+    ]
+
+    for (const stageId of stagesToSkip) {
+      existing.stages[stageId].status = "skipped"
+    }
+
+    // Move to Closed Lost
+    existing.currentStage = "closed-lost"
+    existing.stages["closed-lost"].status = "in_progress"
+    existing.stages["closed-lost"].data.lostFromStage = "quote-sent"
+    existing.stages["closed-lost"].data.lostReason = "declined"
+    existing.stages["closed-lost"].data.closedAt = now
+  }
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// Quote Approved Stage Functions
+// ============================================
+
+/**
+ * Update approval notes
+ */
+export async function updateQuoteApprovalNotes(
+  dealId: string,
+  notes: string,
+  approvedBy?: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["quote-approved"].data.approvalNotes = notes
+  if (approvedBy) {
+    existing.stages["quote-approved"].data.approvedBy = approvedBy
+  }
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Send acknowledgment email (placeholder)
+ */
+export async function sendQuoteAcknowledgment(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["quote-approved"].data.acknowledgmentSentAt = now
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Move to Prepare Engagement stage
+ */
+export async function moveToPreparingEngagement(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["quote-approved"].data.movedToEngagementAt = now
+  existing.stages["quote-approved"].status = "completed"
+  existing.stages["quote-approved"].completedAt = now
+
+  existing.currentStage = "prepare-engagement"
+  existing.stages["prepare-engagement"].status = "in_progress"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// Prepare Engagement Walkthrough Stage Functions
+// ============================================
+
+/**
+ * Generate walkthrough placeholder text based on quote and sales data
+ */
+function generateWalkthroughText(
+  companyName: string,
+  contactName: string,
+  lineItems: { service: string; monthlyPrice: number }[]
+): string {
+  const totalMonthly = lineItems.reduce((sum, item) => sum + item.monthlyPrice, 0)
+  const servicesList = lineItems.map(item => `- ${item.service}: $${item.monthlyPrice}/month`).join("\n")
+
+  return `ENGAGEMENT WALKTHROUGH
+For: ${companyName}
+
+Dear ${contactName},
+
+Thank you for choosing Growth Lab Financial. This document outlines our engagement and what you can expect as our client.
+
+SERVICES INCLUDED:
+${servicesList}
+
+TOTAL MONTHLY INVESTMENT: $${totalMonthly}/month
+
+WHAT HAPPENS NEXT:
+1. Onboarding Call - We'll schedule a 30-minute call to gather your login credentials and understand your current setup.
+
+2. Data Migration - Our team will review your existing books and set up proper chart of accounts.
+
+3. Monthly Process - You'll receive:
+   • Monthly financial statements by the 15th
+   • Quarterly check-in calls
+   • Unlimited email support
+
+TERMS:
+- Billing: Monthly, due on the 1st
+- Start Date: Upon signature
+- Cancellation: 30-day notice required
+
+We're excited to partner with ${companyName} and help you focus on growing your business while we handle the numbers.
+
+Please review this walkthrough carefully. Once approved, we'll send the formal engagement agreement for signature.
+
+Best regards,
+The Growth Lab Team`
+}
+
+/**
+ * Start generating walkthrough with AI (placeholder - sets generating state)
+ */
+export async function startWalkthroughGeneration(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["prepare-engagement"].data.isGenerating = true
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Complete walkthrough generation - generates the actual text
+ */
+export async function completeWalkthroughGeneration(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  // Get data for walkthrough
+  const salesIntake = existing.stages["sales-intake"].data.formData
+  const companyName = salesIntake?.companyName || "Company"
+  const contactName = salesIntake?.contactName || "Valued Client"
+  const lineItems = existing.stages["create-quote"].data.lineItems
+
+  // Generate walkthrough text
+  const walkthroughText = generateWalkthroughText(companyName, contactName, lineItems)
+
+  existing.stages["prepare-engagement"].data.walkthroughText = walkthroughText
+  existing.stages["prepare-engagement"].data.walkthroughGeneratedAt = now
+  existing.stages["prepare-engagement"].data.isGenerating = false
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update walkthrough text (for user edits)
+ */
+export async function updateWalkthroughText(
+  dealId: string,
+  text: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["prepare-engagement"].data.walkthroughText = text
+  existing.stages["prepare-engagement"].data.isEdited = true
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Confirm walkthrough and move to EA Internal Review stage
+ */
+export async function confirmWalkthroughAndMoveToReview(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["prepare-engagement"].data.walkthroughConfirmedAt = now
+  existing.stages["prepare-engagement"].status = "completed"
+  existing.stages["prepare-engagement"].completedAt = now
+
+  // Move to EA Internal Review
+  existing.currentStage = "internal-engagement-review"
+  existing.stages["internal-engagement-review"].status = "in_progress"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// EA Internal Review Stage Functions
+// ============================================
+
+/**
+ * Generate internal review email template
+ */
+function generateEAInternalReviewEmail(
+  companyName: string,
+  contactName: string,
+  totalMonthly: number,
+  walkthroughText: string
+): { subject: string; body: string } {
+  return {
+    subject: `Engagement Review Required: ${companyName} - $${totalMonthly.toLocaleString()}/mo`,
+    body: `Hi team,
+
+An engagement walkthrough has been prepared for ${companyName} and is ready for internal review before sending to the customer.
+
+Client Details:
+- Company: ${companyName}
+- Contact: ${contactName}
+- Deal Value: $${totalMonthly.toLocaleString()}/mo
+
+Please review the walkthrough below and confirm:
+1. Services and pricing are accurate
+2. Terms are appropriate for this client
+3. Any special considerations are noted
+
+WALKTHROUGH DOCUMENT:
+---
+${walkthroughText}
+---
+
+Reply to this email with any feedback or changes needed. Once approved, we will send the engagement agreement to the customer for signature.
+
+Thanks,
+Tim`
+  }
+}
+
+/**
+ * Initialize EA Internal Review email with template
+ */
+export async function initializeEAInternalReview(
+  dealId: string,
+  recipients: { name: string; email: string }[]
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  // Get data for email
+  const salesIntake = existing.stages["sales-intake"].data.formData
+  const companyName = salesIntake?.companyName || "Company"
+  const contactName = salesIntake?.contactName || "Client"
+  const totalMonthly = existing.stages["create-quote"].data.lineItems
+    .reduce((sum, item) => sum + item.monthlyPrice, 0)
+  const walkthroughText = existing.stages["prepare-engagement"].data.walkthroughText
+
+  const { subject, body } = generateEAInternalReviewEmail(
+    companyName,
+    contactName,
+    totalMonthly,
+    walkthroughText
+  )
+
+  existing.stages["internal-engagement-review"].data = {
+    recipients,
+    emailSubject: subject,
+    emailBody: body,
+    isEdited: false,
+    sentAt: null,
+    readyToSendAt: null
+  }
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update EA Internal Review email content
+ */
+export async function updateEAInternalReviewEmail(
+  dealId: string,
+  subject: string,
+  body: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["internal-engagement-review"].data.emailSubject = subject
+  existing.stages["internal-engagement-review"].data.emailBody = body
+  existing.stages["internal-engagement-review"].data.isEdited = true
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark EA Internal Review email as sent
+ */
+export async function markEAInternalReviewSent(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["internal-engagement-review"].data.sentAt = now
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark EA Internal Review as ready to send to customer
+ */
+export async function markEAReadyToSend(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["internal-engagement-review"].data.readyToSendAt = now
+  existing.stages["internal-engagement-review"].status = "completed"
+  existing.stages["internal-engagement-review"].completedAt = now
+
+  // Move to Send Engagement
+  existing.currentStage = "send-engagement"
+  existing.stages["send-engagement"].status = "in_progress"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// Send Engagement Stage Functions - Simplified
+// ============================================
+
+/**
+ * Initialize customer email for send engagement
+ */
+export async function initializeEngagementCustomerEmail(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  // Get company and contact name from sales intake
+  const salesIntake = existing.stages["sales-intake"].data.formData
+  const companyName = salesIntake?.companyName || "your company"
+  const contactName = salesIntake?.contactName || "there"
+  const lineItems = existing.stages["create-quote"].data.lineItems
+  const totalMonthly = lineItems.reduce((sum, item) => sum + item.monthlyPrice, 0)
+
+  const serviceList = lineItems.map(item => `- ${item.service}: $${item.monthlyPrice}/mo`).join("\n")
+
+  const subject = `Welcome to Growth Lab - Engagement Confirmation for ${companyName}`
+  const body = `Hi ${contactName},
+
+Welcome to Growth Lab! We're excited to officially begin our partnership with ${companyName}.
+
+Here's a summary of your services:
+
+${serviceList}
+
+Total: $${totalMonthly.toLocaleString()}/month
+
+WHAT HAPPENS NEXT:
+1. You'll receive an onboarding email with next steps
+2. We'll schedule a kickoff call to gather your login credentials
+3. Your dedicated team will begin the transition process
+
+If you have any questions, please don't hesitate to reach out.
+
+We look forward to supporting ${companyName}'s financial success!
+
+Best regards,
+Tim`
+
+  existing.stages["send-engagement"].data.customerEmailSubject = subject
+  existing.stages["send-engagement"].data.customerEmailBody = body
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update customer email subject and body
+ */
+export async function updateEngagementCustomerEmail(
+  dealId: string,
+  subject: string,
+  body: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["send-engagement"].data.customerEmailSubject = subject
+  existing.stages["send-engagement"].data.customerEmailBody = body
+  existing.stages["send-engagement"].data.isEdited = true
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Send via HubSpot and move deal to Closed Won - completes the pipeline
+ */
+export async function sendViaHubspotAndCloseWon(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  // Mark as sent via HubSpot
+  existing.stages["send-engagement"].data.sentViaHubspotAt = now
+
+  // Complete Send Engagement stage
+  existing.stages["send-engagement"].status = "completed"
+  existing.stages["send-engagement"].completedAt = now
+
+  // Mark Closed Won as completed (pipeline is done!)
+  existing.stages["closed-won"].status = "completed"
+  existing.stages["closed-won"].completedAt = now
+  existing.currentStage = "closed-won"
+
+  // Calculate final deal value from quote
+  const totalMonthly = existing.stages["create-quote"].data.lineItems
+    .reduce((sum, item) => sum + item.monthlyPrice, 0)
+
+  existing.stages["closed-won"].data.closedAt = now
+  existing.stages["closed-won"].data.finalDealValue = totalMonthly
+  existing.stages["closed-won"].data.servicesIncluded = existing.stages["create-quote"].data.lineItems
+    .map(item => ({ service: item.service, monthlyPrice: item.monthlyPrice }))
+
+  // Mark Closed Lost as skipped (deal was won, not lost)
+  existing.stages["closed-lost"].status = "skipped"
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// Closed Won Stage Functions
+// ============================================
+
+/**
+ * Update closing notes
+ */
+export async function updateClosingNotes(
+  dealId: string,
+  notes: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["closed-won"].data.closingNotes = notes
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark closed won as synced to HubSpot (placeholder)
+ */
+export async function markClosedWonSyncedToHubspot(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["closed-won"].data.hubspotSynced = true
+  existing.stages["closed-won"].data.hubspotSyncedAt = now
+
+  // Mark as completed
+  existing.stages["closed-won"].status = "completed"
+  existing.stages["closed-won"].completedAt = now
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+// ============================================
+// Closed Lost Stage Functions
+// ============================================
+
+/**
+ * Mark deal as lost from any stage
+ */
+export async function markDealAsLost(
+  dealId: string,
+  reason: LostReason,
+  details: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  // Record which stage we came from
+  const previousStage = existing.currentStage
+
+  // Mark previous stage as skipped if not completed
+  if (existing.stages[previousStage].status !== "completed") {
+    existing.stages[previousStage].status = "skipped"
+  }
+
+  // Move to Closed Lost
+  existing.currentStage = "closed-lost"
+  existing.stages["closed-lost"].status = "in_progress"
+  existing.stages["closed-lost"].data.closedAt = now
+  existing.stages["closed-lost"].data.lostReason = reason
+  existing.stages["closed-lost"].data.lostReasonDetails = details
+  existing.stages["closed-lost"].data.lostFromStage = previousStage
+
+  existing.updatedAt = now
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Update lost reason details
+ */
+export async function updateLostReasonDetails(
+  dealId: string,
+  reason: LostReason,
+  details: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  existing.stages["closed-lost"].data.lostReason = reason
+  existing.stages["closed-lost"].data.lostReasonDetails = details
+
+  existing.updatedAt = new Date().toISOString()
+  saveAllTimelines(timelines)
+
+  return existing
+}
+
+/**
+ * Mark closed lost as synced to HubSpot (placeholder)
+ */
+export async function markClosedLostSyncedToHubspot(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  const now = new Date().toISOString()
+
+  existing.stages["closed-lost"].data.hubspotSynced = true
+  existing.stages["closed-lost"].data.hubspotSyncedAt = now
+
+  // Mark as completed
+  existing.stages["closed-lost"].status = "completed"
+  existing.stages["closed-lost"].completedAt = now
 
   existing.updatedAt = now
   saveAllTimelines(timelines)

@@ -1,7 +1,22 @@
 "use client"
 
 // Sales Pipeline Stage Types
-export type SalesPipelineStageId = "demo-call" | "sales-intake" | "follow-up-email" | "reminder-sequence" | "internal-review" | "gl-review" | "gl-review-comparison"
+export type SalesPipelineStageId =
+  | "demo-call"
+  | "sales-intake"
+  | "follow-up-email"
+  | "reminder-sequence"
+  | "internal-review"
+  | "gl-review"
+  | "gl-review-comparison"
+  | "create-quote"
+  | "quote-sent"
+  | "quote-approved"
+  | "prepare-engagement"
+  | "internal-engagement-review"
+  | "send-engagement"
+  | "closed-won"
+  | "closed-lost"
 
 export type SalesPipelineStageStatus =
   | "pending"
@@ -349,6 +364,155 @@ export interface GLReviewComparisonStageData {
   movedToCreateQuoteAt: string | null
 }
 
+// ============================================
+// NEW STAGES: Post-GL Review Comparison
+// ============================================
+
+// Quote line item for pricing
+export interface QuoteLineItem {
+  id: string
+  service: string
+  description: string
+  monthlyPrice: number
+  isCustom: boolean
+}
+
+// Create Quote Stage Data
+export interface CreateQuoteStageData {
+  // Accounting pricing (auto-calculated placeholder)
+  accountingMonthlyPrice: number | null
+  accountingPriceCalculatedAt: string | null
+  accountingPriceBreakdown: string | null  // Human-readable breakdown
+
+  // Quote line items (accounting + additional services)
+  lineItems: QuoteLineItem[]
+
+  // Editing state
+  isEdited: boolean
+
+  // HubSpot sync
+  hubspotSynced: boolean
+  hubspotSyncedAt: string | null
+  hubspotQuoteLink: string | null  // Link to the quote in HubSpot
+  hubspotQuotePdfUrl: string | null  // Direct link to download quote PDF
+
+  // Completion
+  quoteConfirmedAt: string | null
+}
+
+// Quote Sent Stage Data
+export interface QuoteSentStageData {
+  // Email content
+  emailSubject: string
+  emailBody: string
+  isEdited: boolean
+
+  // Send tracking
+  sentAt: string | null
+  sentTo: string
+
+  // Follow-up sequence
+  followUpSequenceStarted: boolean
+  followUpSequenceStartedAt: string | null
+  nextFollowUpAt: string | null  // 3 business days
+  followUpCount: number
+
+  // Response tracking
+  prospectRespondedAt: string | null
+  responseType: "approved" | "declined" | null
+}
+
+// Quote Approved Stage Data
+export interface QuoteApprovedStageData {
+  approvedAt: string | null
+  approvedBy: string | null  // Customer name/email
+  approvalNotes: string
+
+  // Auto-reply tracking
+  acknowledgmentSentAt: string | null
+
+  // Transition
+  movedToEngagementAt: string | null
+}
+
+// Prepare Engagement Walkthrough Stage Data
+export interface PrepareEngagementStageData {
+  // AI-generated walkthrough
+  walkthroughText: string
+  walkthroughGeneratedAt: string | null
+  isGenerating: boolean
+
+  // Editing state
+  isEdited: boolean
+
+  // Completion
+  walkthroughConfirmedAt: string | null
+}
+
+// EA Internal Review Stage Data - send walkthrough to internal team for review
+export interface InternalEngagementReviewStageData {
+  // Recipients for the internal email
+  recipients: { name: string; email: string }[]
+
+  // Email content
+  emailSubject: string
+  emailBody: string
+  isEdited: boolean
+
+  // Email tracking
+  sentAt: string | null
+
+  // Completion - ready to send to customer
+  readyToSendAt: string | null
+}
+
+// Send Engagement Stage Data - simplified to just customer email + HubSpot sync
+export interface SendEngagementStageData {
+  // Customer email content
+  customerEmailSubject: string
+  customerEmailBody: string
+  isEdited: boolean
+
+  // Send tracking - sends via HubSpot and moves deal to Closed Won
+  sentViaHubspotAt: string | null
+}
+
+// Closed Won Stage Data
+export interface ClosedWonStageData {
+  closedAt: string | null
+  finalDealValue: number | null
+
+  // Services included
+  servicesIncluded: {
+    service: string
+    monthlyPrice: number
+  }[]
+
+  // Notes
+  closingNotes: string
+
+  // HubSpot sync (placeholder)
+  hubspotSynced: boolean
+  hubspotSyncedAt: string | null
+}
+
+// Lost reason options
+export type LostReason = "no_response" | "declined" | "competitor" | "timing" | "budget" | "other"
+
+// Closed Lost Stage Data
+export interface ClosedLostStageData {
+  closedAt: string | null
+  lostReason: LostReason | null
+  lostReasonDetails: string
+
+  // Which stage it came from
+  lostFromStage: SalesPipelineStageId | null
+
+  // HubSpot sync (placeholder)
+  hubspotSynced: boolean
+  hubspotSyncedAt: string | null
+}
+
 // Full Timeline State for a Deal
 export interface SalesPipelineTimelineState {
   dealId: string
@@ -388,6 +552,46 @@ export interface SalesPipelineTimelineState {
       status: SalesPipelineStageStatus
       completedAt: string | null
       data: GLReviewComparisonStageData
+    }
+    "create-quote": {
+      status: SalesPipelineStageStatus
+      completedAt: string | null
+      data: CreateQuoteStageData
+    }
+    "quote-sent": {
+      status: SalesPipelineStageStatus
+      completedAt: string | null
+      data: QuoteSentStageData
+    }
+    "quote-approved": {
+      status: SalesPipelineStageStatus
+      completedAt: string | null
+      data: QuoteApprovedStageData
+    }
+    "prepare-engagement": {
+      status: SalesPipelineStageStatus
+      completedAt: string | null
+      data: PrepareEngagementStageData
+    }
+    "internal-engagement-review": {
+      status: SalesPipelineStageStatus
+      completedAt: string | null
+      data: InternalEngagementReviewStageData
+    }
+    "send-engagement": {
+      status: SalesPipelineStageStatus
+      completedAt: string | null
+      data: SendEngagementStageData
+    }
+    "closed-won": {
+      status: SalesPipelineStageStatus
+      completedAt: string | null
+      data: ClosedWonStageData
+    }
+    "closed-lost": {
+      status: SalesPipelineStageStatus
+      completedAt: string | null
+      data: ClosedLostStageData
     }
   }
   createdAt: string
@@ -469,6 +673,62 @@ export const SALES_PIPELINE_STAGES: StageConfig[] = [
     title: "GL Review Comparison",
     description: "Compare the AI-generated GL Review with the team member's review. Review any differences, select the correct value for each field, and submit to move the deal to Create Quote.",
     icon: "git-compare",
+    actions: {}
+  },
+  {
+    id: "create-quote",
+    title: "Create Quote",
+    description: "Review the auto-calculated accounting price and add any additional services. Customize line items as needed, then confirm the quote to send to the prospect.",
+    icon: "calculator",
+    actions: {}
+  },
+  {
+    id: "quote-sent",
+    title: "Quote Sent",
+    description: "The quote has been sent to the prospect. Follow-up reminders will be sent automatically every 3 business days until a response is received.",
+    icon: "send",
+    actions: {}
+  },
+  {
+    id: "quote-approved",
+    title: "Quote Approved",
+    description: "The prospect has approved the quote. Prepare the engagement agreement in Ignition to proceed.",
+    icon: "check-circle",
+    actions: {}
+  },
+  {
+    id: "prepare-engagement",
+    title: "Prepare Engagement Walkthrough",
+    description: "Generate an AI-powered engagement walkthrough document that outlines the services, pricing, and terms for the customer.",
+    icon: "file-text",
+    actions: {}
+  },
+  {
+    id: "internal-engagement-review",
+    title: "EA Internal Review",
+    description: "Send the engagement walkthrough to the internal team for review before sending to the customer.",
+    icon: "user-check",
+    actions: {}
+  },
+  {
+    id: "send-engagement",
+    title: "Send Engagement",
+    description: "Send the finalized engagement agreement to the customer via Ignition. Follow-up reminders will be sent automatically until signed.",
+    icon: "file-signature",
+    actions: {}
+  },
+  {
+    id: "closed-won",
+    title: "Closed Won",
+    description: "Congratulations! The deal has been successfully closed. The engagement is signed and the customer is ready for onboarding.",
+    icon: "trophy",
+    actions: {}
+  },
+  {
+    id: "closed-lost",
+    title: "Closed Lost",
+    description: "The deal has been marked as lost. Record the reason and any learnings for future reference.",
+    icon: "x-circle",
     actions: {}
   }
 ]
@@ -782,6 +1042,107 @@ export function createInitialTimelineState(dealId: string): SalesPipelineTimelin
           customValues: null,
           comparisonCompletedAt: null,
           movedToCreateQuoteAt: null
+        }
+      },
+      "create-quote": {
+        status: "pending",
+        completedAt: null,
+        data: {
+          accountingMonthlyPrice: null,
+          accountingPriceCalculatedAt: null,
+          accountingPriceBreakdown: null,
+          lineItems: [],
+          isEdited: false,
+          hubspotSynced: false,
+          hubspotSyncedAt: null,
+          hubspotQuoteLink: null,
+          hubspotQuotePdfUrl: null,
+          quoteConfirmedAt: null
+        }
+      },
+      "quote-sent": {
+        status: "pending",
+        completedAt: null,
+        data: {
+          emailSubject: "",
+          emailBody: "",
+          isEdited: false,
+          sentAt: null,
+          sentTo: "",
+          followUpSequenceStarted: false,
+          followUpSequenceStartedAt: null,
+          nextFollowUpAt: null,
+          followUpCount: 0,
+          prospectRespondedAt: null,
+          responseType: null
+        }
+      },
+      "quote-approved": {
+        status: "pending",
+        completedAt: null,
+        data: {
+          approvedAt: null,
+          approvedBy: null,
+          approvalNotes: "",
+          acknowledgmentSentAt: null,
+          movedToEngagementAt: null
+        }
+      },
+      "prepare-engagement": {
+        status: "pending",
+        completedAt: null,
+        data: {
+          walkthroughText: "",
+          walkthroughGeneratedAt: null,
+          isGenerating: false,
+          isEdited: false,
+          walkthroughConfirmedAt: null
+        }
+      },
+      "internal-engagement-review": {
+        status: "pending",
+        completedAt: null,
+        data: {
+          recipients: [],
+          emailSubject: "",
+          emailBody: "",
+          isEdited: false,
+          sentAt: null,
+          readyToSendAt: null
+        }
+      },
+      "send-engagement": {
+        status: "pending",
+        completedAt: null,
+        data: {
+          customerEmailSubject: "",
+          customerEmailBody: "",
+          isEdited: false,
+          sentViaHubspotAt: null
+        }
+      },
+      "closed-won": {
+        status: "pending",
+        completedAt: null,
+        data: {
+          closedAt: null,
+          finalDealValue: null,
+          servicesIncluded: [],
+          closingNotes: "",
+          hubspotSynced: false,
+          hubspotSyncedAt: null
+        }
+      },
+      "closed-lost": {
+        status: "pending",
+        completedAt: null,
+        data: {
+          closedAt: null,
+          lostReason: null,
+          lostReasonDetails: "",
+          lostFromStage: null,
+          hubspotSynced: false,
+          hubspotSyncedAt: null
         }
       }
     },

@@ -17,7 +17,14 @@ import {
   Repeat,
   Users,
   FileSpreadsheet,
-  GitCompare
+  GitCompare,
+  Calculator,
+  Send,
+  FileText,
+  UserCheck,
+  FileSignature,
+  Trophy,
+  XCircle
 } from "lucide-react"
 import {
   SalesPipelineTimelineState,
@@ -27,6 +34,8 @@ import {
   GLReviewFormData,
   GLReviewComparisonSelections,
   GLReviewCustomValues,
+  QuoteLineItem,
+  LostReason,
   SALES_PIPELINE_STAGES
 } from "@/lib/sales-pipeline-timeline-types"
 import {
@@ -57,7 +66,40 @@ import {
   updateFinalReviewData,
   updateCustomValues,
   submitComparisonAndMoveToQuote,
-  resetGLReviewComparison
+  resetGLReviewComparison,
+  // New stage store functions
+  initializeCreateQuote,
+  addQuoteLineItem,
+  updateQuoteLineItem,
+  removeQuoteLineItem,
+  pushQuoteToHubspot,
+  confirmQuoteAndMoveToSent,
+  initializeQuoteSentEmail,
+  updateQuoteSentEmail,
+  markQuoteEmailSent,
+  recordQuoteResponse,
+  updateQuoteApprovalNotes,
+  sendQuoteAcknowledgment,
+  moveToPreparingEngagement,
+  // Prepare Engagement Walkthrough functions
+  startWalkthroughGeneration,
+  completeWalkthroughGeneration,
+  updateWalkthroughText,
+  confirmWalkthroughAndMoveToReview,
+  // EA Internal Review functions
+  initializeEAInternalReview,
+  updateEAInternalReviewEmail,
+  markEAInternalReviewSent,
+  markEAReadyToSend,
+  // Send Engagement functions
+  initializeEngagementCustomerEmail,
+  updateEngagementCustomerEmail,
+  sendViaHubspotAndCloseWon,
+  updateClosingNotes,
+  markClosedWonSyncedToHubspot,
+  markDealAsLost,
+  updateLostReasonDetails,
+  markClosedLostSyncedToHubspot
 } from "@/lib/sales-pipeline-timeline-store"
 import { SalesIntakeForm } from "@/components/revops/sales-intake-form"
 import { FollowUpEmail } from "@/components/revops/follow-up-email"
@@ -65,6 +107,14 @@ import { ReminderSequence } from "@/components/revops/reminder-sequence"
 import { InternalReview } from "@/components/revops/internal-review"
 import { GLReviewForm } from "@/components/revops/gl-review-form"
 import { GLReviewComparison } from "@/components/revops/gl-review-comparison"
+import { CreateQuote } from "@/components/revops/create-quote"
+import { QuoteSent } from "@/components/revops/quote-sent"
+import { QuoteApproved } from "@/components/revops/quote-approved"
+import { PrepareEngagement } from "@/components/revops/prepare-engagement"
+import { EAInternalReview } from "@/components/revops/ea-internal-review"
+import { SendEngagement } from "@/components/revops/send-engagement"
+import { ClosedWon } from "@/components/revops/closed-won"
+import { ClosedLost } from "@/components/revops/closed-lost"
 import { PipelineDeal } from "@/lib/revops-pipeline-store"
 import { FileUpload } from "@/components/leads/file-upload"
 import { getFileTypeById, UploadedFile } from "@/lib/file-types"
@@ -157,7 +207,15 @@ const getStageIcon = (iconName: string) => {
     "mail": Mail,
     "users": Users,
     "file-spreadsheet": FileSpreadsheet,
-    "git-compare": GitCompare
+    "git-compare": GitCompare,
+    "calculator": Calculator,
+    "send": Send,
+    "check-circle": CheckCircle2,
+    "file-text": FileText,
+    "user-check": UserCheck,
+    "file-signature": FileSignature,
+    "trophy": Trophy,
+    "x-circle": XCircle
   }
   return iconMap[iconName] || Circle
 }
@@ -184,10 +242,21 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       const state = await getOrCreateTimelineState(deal.id)
       setTimelineState(state)
 
-      // Single-stage expansion: only expand the current stage, collapse all others
+      // Single-stage expansion: find the first non-completed stage and expand it
       const collapsed = new Set<string>()
+      let firstPendingStageId: string | null = null
+
+      // Find the first stage that is not completed
       for (const stageConfig of SALES_PIPELINE_STAGES) {
-        if (stageConfig.id !== state.currentStage) {
+        const stageData = state.stages[stageConfig.id as SalesPipelineStageId]
+        if (!firstPendingStageId && stageData?.status !== "completed") {
+          firstPendingStageId = stageConfig.id
+        }
+      }
+
+      // Collapse all stages except the first pending one
+      for (const stageConfig of SALES_PIPELINE_STAGES) {
+        if (stageConfig.id !== firstPendingStageId) {
           collapsed.add(stageConfig.id)
         }
       }
@@ -231,10 +300,21 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     const state = await getOrCreateTimelineState(deal.id)
     setTimelineState(state)
 
-    // Single-stage expansion: only expand the current stage, collapse all others
+    // Single-stage expansion: find the first non-completed stage and expand it
     const collapsed = new Set<string>()
+    let firstPendingStageId: string | null = null
+
+    // Find the first stage that is not completed
     for (const stageConfig of SALES_PIPELINE_STAGES) {
-      if (stageConfig.id !== state.currentStage) {
+      const stageData = state.stages[stageConfig.id as SalesPipelineStageId]
+      if (!firstPendingStageId && stageData?.status !== "completed") {
+        firstPendingStageId = stageConfig.id
+      }
+    }
+
+    // Collapse all stages except the first pending one
+    for (const stageConfig of SALES_PIPELINE_STAGES) {
+      if (stageConfig.id !== firstPendingStageId) {
         collapsed.add(stageConfig.id)
       }
     }
@@ -426,6 +506,166 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
   const handleResetGLReviewComparison = useCallback(async () => {
     await resetGLReviewComparison(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // Create Quote Handlers
+  const handleInitializeQuote = useCallback(async () => {
+    await initializeCreateQuote(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleAddQuoteLineItem = useCallback(async (service: string, description: string, monthlyPrice: number) => {
+    await addQuoteLineItem(deal.id, service, description, monthlyPrice)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleUpdateQuoteLineItem = useCallback(async (itemId: string, updates: Partial<Omit<QuoteLineItem, 'id'>>) => {
+    await updateQuoteLineItem(deal.id, itemId, updates)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleRemoveQuoteLineItem = useCallback(async (itemId: string) => {
+    await removeQuoteLineItem(deal.id, itemId)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handlePushQuoteToHubspot = useCallback(async () => {
+    await pushQuoteToHubspot(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleConfirmQuote = useCallback(async () => {
+    await confirmQuoteAndMoveToSent(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // Quote Sent Handlers
+  const handleInitializeQuoteSentEmail = useCallback(async (subject: string, body: string) => {
+    await initializeQuoteSentEmail(deal.id, subject, body)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleUpdateQuoteSentEmail = useCallback(async (subject: string, body: string) => {
+    await updateQuoteSentEmail(deal.id, subject, body)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleSendQuoteViaHubspot = useCallback(async () => {
+    await markQuoteEmailSent(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleEnrollQuoteInSequence = useCallback(async () => {
+    // For now, this just marks it as enrolled - in production would call HubSpot API
+    // The followUpSequenceStarted is already set when email is sent
+    await refreshState()
+  }, [refreshState])
+
+  const handleUnenrollQuoteFromSequence = useCallback(async () => {
+    // For now, this just marks it as unenrolled - in production would call HubSpot API
+    await refreshState()
+  }, [refreshState])
+
+  const handleRecordQuoteResponse = useCallback(async (responseType: "approved" | "declined") => {
+    await recordQuoteResponse(deal.id, responseType)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // Quote Approved Handlers
+  const handleUpdateQuoteApprovalNotes = useCallback(async (notes: string) => {
+    await updateQuoteApprovalNotes(deal.id, notes)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleSendQuoteAcknowledgment = useCallback(async () => {
+    await sendQuoteAcknowledgment(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleMoveToEngagement = useCallback(async () => {
+    await moveToPreparingEngagement(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // Prepare Engagement Walkthrough Handlers
+  const handleStartWalkthroughGeneration = useCallback(async () => {
+    await startWalkthroughGeneration(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleCompleteWalkthroughGeneration = useCallback(async () => {
+    await completeWalkthroughGeneration(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleUpdateWalkthroughText = useCallback(async (text: string) => {
+    await updateWalkthroughText(deal.id, text)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleConfirmWalkthrough = useCallback(async () => {
+    await confirmWalkthroughAndMoveToReview(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // EA Internal Review Handlers
+  const handleInitializeEAInternalReview = useCallback(async (recipients: { name: string; email: string }[]) => {
+    await initializeEAInternalReview(deal.id, recipients)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleUpdateEAInternalReviewEmail = useCallback(async (subject: string, body: string) => {
+    await updateEAInternalReviewEmail(deal.id, subject, body)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleSendEAInternalReview = useCallback(async () => {
+    await markEAInternalReviewSent(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleMarkEAReadyToSend = useCallback(async () => {
+    await markEAReadyToSend(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // Send Engagement Handlers - simplified
+  const handleInitializeEngagementEmail = useCallback(async () => {
+    await initializeEngagementCustomerEmail(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleUpdateEngagementEmail = useCallback(async (subject: string, body: string) => {
+    await updateEngagementCustomerEmail(deal.id, subject, body)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleSendViaHubspotAndCloseWon = useCallback(async () => {
+    await sendViaHubspotAndCloseWon(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // Closed Won Handlers
+  const handleUpdateClosingNotes = useCallback(async (notes: string) => {
+    await updateClosingNotes(deal.id, notes)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleSyncClosedWonToHubspot = useCallback(async () => {
+    await markClosedWonSyncedToHubspot(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  // Closed Lost Handlers
+  const handleMarkDealAsLost = useCallback(async (reason: LostReason, details: string) => {
+    await markDealAsLost(deal.id, reason)
+    await updateLostReasonDetails(deal.id, reason, details)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleSyncClosedLostToHubspot = useCallback(async () => {
+    await markClosedLostSyncedToHubspot(deal.id)
     await refreshState()
   }, [deal.id, refreshState])
 
@@ -646,6 +886,30 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
                       {/* Action Zone - GL Review Comparison specific - use GLReviewComparison component */}
                       {event.id === "gl-review-comparison" && renderGLReviewComparisonActions()}
+
+                      {/* Action Zone - Create Quote specific */}
+                      {event.id === "create-quote" && renderCreateQuoteActions()}
+
+                      {/* Action Zone - Quote Sent specific */}
+                      {event.id === "quote-sent" && renderQuoteSentActions()}
+
+                      {/* Action Zone - Quote Approved specific */}
+                      {event.id === "quote-approved" && renderQuoteApprovedActions()}
+
+                      {/* Action Zone - Prepare Engagement specific */}
+                      {event.id === "prepare-engagement" && renderPrepareEngagementActions()}
+
+                      {/* Action Zone - Internal Engagement Review specific */}
+                      {event.id === "internal-engagement-review" && renderInternalEngagementReviewActions()}
+
+                      {/* Action Zone - Send Engagement specific */}
+                      {event.id === "send-engagement" && renderSendEngagementActions()}
+
+                      {/* Action Zone - Closed Won specific */}
+                      {event.id === "closed-won" && renderClosedWonActions()}
+
+                      {/* Action Zone - Closed Lost specific */}
+                      {event.id === "closed-lost" && renderClosedLostActions()}
                     </>
                   )}
                 </div>
@@ -805,6 +1069,198 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         onSubmitAndMoveToQuote={handleSubmitComparisonAndMoveToQuote}
         onReset={handleResetGLReviewComparison}
         isLoading={isComparisonLoading}
+      />
+    )
+  }
+
+  function renderCreateQuoteActions() {
+    const createQuoteStage = timelineState?.stages["create-quote"]
+    if (!createQuoteStage) return null
+
+    const quoteData = createQuoteStage.data
+    if (!quoteData) return null
+
+    const glReviewData = timelineState?.stages["gl-review-comparison"]?.data?.finalReviewData ||
+                         timelineState?.stages["gl-review"]?.data?.formData || null
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+
+    return (
+      <CreateQuote
+        quoteData={quoteData}
+        glReviewData={glReviewData}
+        companyName={companyName}
+        onInitializeQuote={handleInitializeQuote}
+        onAddLineItem={handleAddQuoteLineItem}
+        onUpdateLineItem={handleUpdateQuoteLineItem}
+        onRemoveLineItem={handleRemoveQuoteLineItem}
+        onPushToHubspot={handlePushQuoteToHubspot}
+        onConfirmQuote={handleConfirmQuote}
+      />
+    )
+  }
+
+  function renderQuoteSentActions() {
+    const quoteSentStage = timelineState?.stages["quote-sent"]
+    if (!quoteSentStage) return null
+
+    const emailData = quoteSentStage.data
+    if (!emailData) return null
+
+    const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+    const contactEmail = timelineState?.stages["sales-intake"]?.data?.formData?.emailAddress || ""
+    const totalMonthly = quoteLineItems.reduce((sum, item) => sum + (item.monthlyPrice || 0), 0)
+    const hubspotQuoteLink = timelineState?.stages["create-quote"]?.data?.hubspotQuoteLink || null
+
+    return (
+      <QuoteSent
+        emailData={emailData}
+        quoteLineItems={quoteLineItems}
+        companyName={companyName}
+        contactEmail={contactEmail}
+        totalMonthly={totalMonthly}
+        hubspotQuoteLink={hubspotQuoteLink}
+        onInitialize={handleInitializeQuoteSentEmail}
+        onUpdate={handleUpdateQuoteSentEmail}
+        onSendViaHubspot={handleSendQuoteViaHubspot}
+        onEnrollInSequence={handleEnrollQuoteInSequence}
+        onUnenrollFromSequence={handleUnenrollQuoteFromSequence}
+        onRecordResponse={handleRecordQuoteResponse}
+      />
+    )
+  }
+
+  function renderQuoteApprovedActions() {
+    const quoteApprovedStage = timelineState?.stages["quote-approved"]
+    if (!quoteApprovedStage) return null
+
+    const approvalData = quoteApprovedStage.data
+    if (!approvalData) return null
+
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+    const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
+    const totalMonthly = quoteLineItems.reduce((sum, item) => sum + item.monthlyPrice, 0)
+
+    return (
+      <QuoteApproved
+        approvalData={approvalData}
+        companyName={companyName}
+        totalMonthly={totalMonthly}
+        onUpdateNotes={handleUpdateQuoteApprovalNotes}
+        onSendAcknowledgment={handleSendQuoteAcknowledgment}
+        onMoveToEngagement={handleMoveToEngagement}
+      />
+    )
+  }
+
+  function renderPrepareEngagementActions() {
+    const prepareEngagementStage = timelineState?.stages["prepare-engagement"]
+    if (!prepareEngagementStage) return null
+
+    const engagementData = prepareEngagementStage.data
+    if (!engagementData) return null
+
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+
+    return (
+      <PrepareEngagement
+        engagementData={engagementData}
+        companyName={companyName}
+        onStartGeneration={handleStartWalkthroughGeneration}
+        onCompleteGeneration={handleCompleteWalkthroughGeneration}
+        onUpdateWalkthrough={handleUpdateWalkthroughText}
+        onConfirmWalkthrough={handleConfirmWalkthrough}
+      />
+    )
+  }
+
+  function renderInternalEngagementReviewActions() {
+    const reviewStage = timelineState?.stages["internal-engagement-review"]
+    if (!reviewStage) return null
+
+    const reviewData = reviewStage.data
+    if (!reviewData) return null
+
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+    const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
+    const totalMonthly = quoteLineItems.reduce((sum, item) => sum + item.monthlyPrice, 0)
+    const walkthroughText = timelineState?.stages["prepare-engagement"]?.data?.walkthroughText || ""
+
+    return (
+      <EAInternalReview
+        reviewData={reviewData}
+        companyName={companyName}
+        totalMonthly={totalMonthly}
+        walkthroughText={walkthroughText}
+        onInitialize={handleInitializeEAInternalReview}
+        onUpdateEmail={handleUpdateEAInternalReviewEmail}
+        onSendReview={handleSendEAInternalReview}
+        onMarkReadyToSend={handleMarkEAReadyToSend}
+      />
+    )
+  }
+
+  function renderSendEngagementActions() {
+    const sendEngagementStage = timelineState?.stages["send-engagement"]
+    if (!sendEngagementStage) return null
+
+    const engagementData = sendEngagementStage.data
+    if (!engagementData) return null
+
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+    const contactName = timelineState?.stages["sales-intake"]?.data?.formData?.contactName || ""
+    const contactEmail = timelineState?.stages["sales-intake"]?.data?.formData?.emailAddress || ""
+    const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
+    const totalMonthly = quoteLineItems.reduce((sum, item) => sum + item.monthlyPrice, 0)
+
+    return (
+      <SendEngagement
+        engagementData={engagementData}
+        companyName={companyName}
+        contactName={contactName}
+        contactEmail={contactEmail}
+        totalMonthly={totalMonthly}
+        onInitializeEmail={handleInitializeEngagementEmail}
+        onUpdateEmail={handleUpdateEngagementEmail}
+        onSendViaHubspot={handleSendViaHubspotAndCloseWon}
+      />
+    )
+  }
+
+  function renderClosedWonActions() {
+    const closedWonStage = timelineState?.stages["closed-won"]
+    if (!closedWonStage) return null
+
+    const wonData = closedWonStage.data
+    if (!wonData) return null
+
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+
+    return (
+      <ClosedWon
+        wonData={wonData}
+        companyName={companyName}
+        onUpdateNotes={handleUpdateClosingNotes}
+        onSyncToHubspot={handleSyncClosedWonToHubspot}
+      />
+    )
+  }
+
+  function renderClosedLostActions() {
+    const closedLostStage = timelineState?.stages["closed-lost"]
+    if (!closedLostStage) return null
+
+    const lostData = closedLostStage.data
+    if (!lostData) return null
+
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+
+    return (
+      <ClosedLost
+        lostData={lostData}
+        companyName={companyName}
+        onUpdateDetails={handleMarkDealAsLost}
+        onSyncToHubspot={handleSyncClosedLostToHubspot}
       />
     )
   }

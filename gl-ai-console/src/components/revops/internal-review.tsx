@@ -1,17 +1,19 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   InternalReviewStageData,
   SalesIntakeFormData,
-  DEFAULT_INTERNAL_RECIPIENTS,
   INTERNAL_ASSIGNMENT_EMAIL
 } from "@/lib/sales-pipeline-timeline-types"
+import {
+  getActiveRecipients
+} from "@/lib/internal-recipients-store"
+import { ManageTeamModal } from "./manage-team-modal"
 import {
   CheckCircle2,
   Users,
@@ -19,8 +21,7 @@ import {
   Pencil,
   Eye,
   X,
-  UserPlus,
-  Trash2
+  Settings
 } from "lucide-react"
 import {
   Dialog,
@@ -46,19 +47,17 @@ export function InternalReview({
   onUpdate,
   onSend,
 }: InternalReviewProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editSubject, setEditSubject] = useState("")
-  const [editBody, setEditBody] = useState("")
-  const [editRecipients, setEditRecipients] = useState<{ name: string; email: string }[]>([])
+  const [isEditingEmail, setIsEditingEmail] = useState(false)
+  const [emailSubject, setEmailSubject] = useState("")
+  const [emailBody, setEmailBody] = useState("")
+  const [selectedRecipients, setSelectedRecipients] = useState<{ name: string; email: string }[]>([])
   const [showPreviewModal, setShowPreviewModal] = useState(false)
-  const [newRecipientName, setNewRecipientName] = useState("")
-  const [newRecipientEmail, setNewRecipientEmail] = useState("")
+  const [showManageTeamModal, setShowManageTeamModal] = useState(false)
 
   // Use ref to track if we've already initialized to prevent infinite loops
   const hasInitialized = useRef(false)
 
   // Initialize email template when component mounts
-  // Check emailBody instead of recipients since we now start with no recipients selected
   useEffect(() => {
     // Only initialize once when we have salesIntakeData and no email body yet
     if (!reviewData.emailBody && salesIntakeData && !hasInitialized.current) {
@@ -97,46 +96,55 @@ export function InternalReview({
     }
   }, [reviewData.emailBody, salesIntakeData, accessPlatform, onInitialize])
 
-  const handleStartEdit = () => {
-    setEditSubject(reviewData.emailSubject)
-    setEditBody(reviewData.emailBody)
-    setEditRecipients([...reviewData.recipients])
-    setIsEditing(true)
-  }
+  // Sync local state with reviewData when it changes
+  useEffect(() => {
+    if (reviewData.emailSubject) {
+      setEmailSubject(reviewData.emailSubject)
+    }
+    if (reviewData.emailBody) {
+      setEmailBody(reviewData.emailBody)
+    }
+    if (reviewData.recipients) {
+      setSelectedRecipients(reviewData.recipients)
+    }
+  }, [reviewData.emailSubject, reviewData.emailBody, reviewData.recipients])
 
-  const handleSaveEdit = () => {
-    onUpdate(editRecipients, editSubject, editBody)
-    setIsEditing(false)
-  }
-
-  const handleCancelEdit = () => {
-    setEditSubject(reviewData.emailSubject)
-    setEditBody(reviewData.emailBody)
-    setEditRecipients([...reviewData.recipients])
-    setIsEditing(false)
-  }
-
-  const handleToggleRecipient = (email: string, checked: boolean) => {
-    if (checked) {
-      const defaultRecipient = DEFAULT_INTERNAL_RECIPIENTS.find(r => r.email === email)
-      if (defaultRecipient && !editRecipients.find(r => r.email === email)) {
-        setEditRecipients([...editRecipients, defaultRecipient])
+  // Load default recipients if none selected and we have active recipients
+  useEffect(() => {
+    if (selectedRecipients.length === 0 && reviewData.recipients?.length === 0) {
+      const activeRecipients = getActiveRecipients()
+      if (activeRecipients.length > 0) {
+        setSelectedRecipients(activeRecipients)
+        // Also update the store
+        onUpdate(activeRecipients, reviewData.emailSubject || "", reviewData.emailBody || "")
       }
-    } else {
-      setEditRecipients(editRecipients.filter(r => r.email !== email))
     }
+  }, [selectedRecipients.length, reviewData.recipients?.length, reviewData.emailSubject, reviewData.emailBody, onUpdate])
+
+  const handleToggleRecipient = (recipient: { name: string; email: string }) => {
+    setSelectedRecipients(prev => {
+      const exists = prev.some(r => r.email === recipient.email)
+      let newRecipients: { name: string; email: string }[]
+      if (exists) {
+        newRecipients = prev.filter(r => r.email !== recipient.email)
+      } else {
+        newRecipients = [...prev, recipient]
+      }
+      // Update the store
+      onUpdate(newRecipients, emailSubject, emailBody)
+      return newRecipients
+    })
   }
 
-  const handleAddCustomRecipient = () => {
-    if (newRecipientName && newRecipientEmail) {
-      setEditRecipients([...editRecipients, { name: newRecipientName, email: newRecipientEmail }])
-      setNewRecipientName("")
-      setNewRecipientEmail("")
-    }
+  const handleSaveEmailEdit = () => {
+    onUpdate(selectedRecipients, emailSubject, emailBody)
+    setIsEditingEmail(false)
   }
 
-  const handleRemoveRecipient = (email: string) => {
-    setEditRecipients(editRecipients.filter(r => r.email !== email))
+  const handleCancelEmailEdit = () => {
+    setEmailSubject(reviewData.emailSubject || "")
+    setEmailBody(reviewData.emailBody || "")
+    setIsEditingEmail(false)
   }
 
   const isSent = !!reviewData.sentAt
@@ -237,7 +245,7 @@ export function InternalReview({
     )
   }
 
-  // Show email template for review/edit
+  // Show email template for review
   return (
     <div className="mt-4 p-4 border border-[#407B9D]/30 rounded-lg bg-white">
       <div className="flex items-center justify-between mb-4">
@@ -249,206 +257,158 @@ export function InternalReview({
           >
             Internal Team Assignment
           </h4>
-          {reviewData.isEdited && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30">
-              <Pencil className="w-3 h-3 mr-1" />
-              Edited
-            </span>
-          )}
         </div>
       </div>
 
       <p className="text-sm text-muted-foreground mb-4" style={{ fontFamily: "var(--font-body)" }}>
-        {isEditing
-          ? "Edit the email content and select recipients below, then save your changes."
-          : reviewData.recipients.length === 0
-            ? "Click Edit Email to select a team member to assign this client to."
-            : "Review the email template before sending to the assigned team member."}
+        Select team members to assign and review the email before sending.
       </p>
 
-      {isEditing ? (
-        // Edit mode
-        <div className="space-y-4">
-          {/* Recipients Selection */}
-          <div className="space-y-3">
-            <Label>Recipients</Label>
-            <div className="space-y-2 p-3 bg-gray-50 rounded-lg border">
-              <p className="text-xs text-muted-foreground mb-2">Default team members:</p>
-              {DEFAULT_INTERNAL_RECIPIENTS.map((recipient) => (
-                <div key={recipient.email} className="flex items-center gap-2">
-                  <Checkbox
-                    id={recipient.email}
-                    checked={editRecipients.some(r => r.email === recipient.email)}
-                    onCheckedChange={(checked: boolean) => handleToggleRecipient(recipient.email, checked)}
-                  />
-                  <label
-                    htmlFor={recipient.email}
-                    className="text-sm cursor-pointer"
-                  >
-                    {recipient.name} ({recipient.email})
-                  </label>
-                </div>
-              ))}
-            </div>
-
-            {/* Custom recipients */}
-            {editRecipients.filter(r => !DEFAULT_INTERNAL_RECIPIENTS.some(d => d.email === r.email)).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">Custom recipients:</p>
-                {editRecipients
-                  .filter(r => !DEFAULT_INTERNAL_RECIPIENTS.some(d => d.email === r.email))
-                  .map((recipient) => (
-                    <div key={recipient.email} className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded border">
-                      <span className="text-sm">{recipient.name} ({recipient.email})</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveRecipient(recipient.email)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 h-6 w-6 p-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            )}
-
-            {/* Add custom recipient */}
-            <div className="flex items-end gap-2">
-              <div className="flex-1 space-y-1">
-                <Label htmlFor="newRecipientName" className="text-xs">Name</Label>
-                <Input
-                  id="newRecipientName"
-                  value={newRecipientName}
-                  onChange={(e) => setNewRecipientName(e.target.value)}
-                  placeholder="John Doe"
-                  className="h-8"
-                />
-              </div>
-              <div className="flex-1 space-y-1">
-                <Label htmlFor="newRecipientEmail" className="text-xs">Email</Label>
-                <Input
-                  id="newRecipientEmail"
-                  value={newRecipientEmail}
-                  onChange={(e) => setNewRecipientEmail(e.target.value)}
-                  placeholder="john@example.com"
-                  className="h-8"
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddCustomRecipient}
-                disabled={!newRecipientName || !newRecipientEmail}
-                className="h-8"
+      {/* Recipients Selection - Always visible toggle pills like prepare-engagement */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <Label className="text-sm font-medium">Assign To</Label>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowManageTeamModal(true)}
+            className="h-6 text-xs text-[#407B9D] hover:bg-[#407B9D]/10"
+          >
+            <Settings className="w-3 h-3 mr-1" />
+            Manage Team
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {getActiveRecipients().map((recipient) => {
+            const isSelected = selectedRecipients.some(r => r.email === recipient.email)
+            return (
+              <button
+                key={recipient.email}
+                onClick={() => handleToggleRecipient(recipient)}
+                className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  isSelected
+                    ? "bg-[#407B9D] text-white border-[#407B9D]"
+                    : "bg-white text-gray-600 border-gray-300 hover:border-[#407B9D]"
+                }`}
               >
-                <UserPlus className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+                <Users className="w-3 h-3 mr-1.5" />
+                {recipient.name}
+              </button>
+            )
+          })}
+          {getActiveRecipients().length === 0 && (
+            <p className="text-sm text-muted-foreground italic">
+              No team members configured. Click &quot;Manage Team&quot; to add members.
+            </p>
+          )}
+        </div>
+        {selectedRecipients.length === 0 && getActiveRecipients().length > 0 && (
+          <p className="text-xs text-amber-600 mt-2">
+            Select at least one team member to assign this client to
+          </p>
+        )}
+      </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="emailSubject">Subject</Label>
+      {/* Email Content */}
+      {isEditingEmail ? (
+        <div className="space-y-3 mb-4">
+          <div>
+            <Label htmlFor="emailSubject" className="text-sm">Subject</Label>
             <Input
               id="emailSubject"
-              value={editSubject}
-              onChange={(e) => setEditSubject(e.target.value)}
+              value={emailSubject || ""}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              className="h-9 mt-1"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="emailBody">Email Body</Label>
+          <div>
+            <Label htmlFor="emailBody" className="text-sm">Email Body</Label>
             <Textarea
               id="emailBody"
-              value={editBody}
-              onChange={(e) => setEditBody(e.target.value)}
-              rows={12}
-              className="font-mono text-sm"
+              value={emailBody || ""}
+              onChange={(e) => setEmailBody(e.target.value)}
+              rows={10}
+              className="mt-1 font-mono text-sm"
             />
           </div>
-          <div className="flex items-center justify-end gap-3 pt-4 border-t">
+          <div className="flex justify-end gap-2">
             <Button
-              variant="outline"
-              onClick={handleCancelEdit}
-              className="text-gray-600 border-gray-300"
+              variant="ghost"
+              size="sm"
+              onClick={handleCancelEmailEdit}
+              className="h-8"
             >
-              <X className="w-4 h-4 mr-2" />
+              <X className="w-3 h-3 mr-1" />
               Cancel
             </Button>
             <Button
-              onClick={handleSaveEdit}
-              className="bg-[#407B9D] hover:bg-[#366a88] text-white"
+              size="sm"
+              onClick={handleSaveEmailEdit}
+              className="h-8 bg-[#407B9D] hover:bg-[#366a88] text-white"
             >
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Save Changes
+              <CheckCircle2 className="w-3 h-3 mr-1" />
+              Save
             </Button>
           </div>
         </div>
       ) : (
-        // Preview mode
-        <div className="space-y-4">
-          {/* Recipients Display */}
-          <div className="p-3 bg-gray-50 rounded-lg border">
-            <Label className="text-muted-foreground text-xs">Recipients</Label>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {reviewData.recipients.length === 0 ? (
-                <span className="text-sm text-amber-600 italic">
-                  No recipient selected - click Edit Email to assign a team member
-                </span>
-              ) : (
-                reviewData.recipients.map((recipient) => (
-                  <span
-                    key={recipient.email}
-                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30"
-                  >
-                    {recipient.name}
-                  </span>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Email Preview */}
-          <div className="border rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2 border-b">
-              <p className="text-sm">
+        <div className="border rounded-lg overflow-hidden mb-4">
+          <div className="bg-gray-50 px-3 py-2 border-b flex items-center justify-between">
+            <div>
+              <p className="text-xs">
                 <span className="text-muted-foreground">To:</span>{" "}
-                <span className={reviewData.recipients.length === 0 ? "text-amber-600 italic" : "font-medium"}>
-                  {reviewData.recipients.length === 0 ? "No recipient selected" : reviewData.recipients.map(r => r.email).join(", ")}
+                <span className={selectedRecipients.length === 0 ? "text-amber-600 italic" : "font-medium"}>
+                  {selectedRecipients.length === 0
+                    ? "No recipient selected"
+                    : selectedRecipients.map(r => r.email).join(", ")}
                 </span>
               </p>
-              <p className="text-sm">
+              <p className="text-xs">
                 <span className="text-muted-foreground">Subject:</span>{" "}
-                <span className="font-medium">{reviewData.emailSubject}</span>
+                <span className="font-medium">{emailSubject}</span>
               </p>
             </div>
-            <div className="p-4 bg-white max-h-[300px] overflow-y-auto">
-              <pre className="whitespace-pre-wrap font-sans text-sm text-[#463939]">
-                {reviewData.emailBody}
-              </pre>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsEditingEmail(true)}
+              className="h-6 text-xs text-[#407B9D] hover:bg-[#407B9D]/10"
+            >
+              <Pencil className="w-3 h-3 mr-1" />
+              Edit
+            </Button>
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={handleStartEdit}
-              className="text-[#407B9D] border-[#407B9D] hover:bg-[#407B9D]/10"
-            >
-              <Pencil className="w-4 h-4 mr-2" />
-              Edit Email
-            </Button>
-            <Button
-              onClick={onSend}
-              disabled={reviewData.recipients.length === 0}
-              className="bg-[#407B9D] hover:bg-[#366a88] text-white"
-            >
-              <Send className="w-4 h-4 mr-2" />
-              Send
-            </Button>
+          <div className="p-3 bg-white max-h-[200px] overflow-y-auto">
+            <pre className="whitespace-pre-wrap font-sans text-xs text-[#463939]">
+              {emailBody}
+            </pre>
           </div>
         </div>
       )}
+
+      {/* Send Button */}
+      <Button
+        onClick={onSend}
+        disabled={selectedRecipients.length === 0}
+        className="w-full bg-[#407B9D] hover:bg-[#366a88] text-white"
+      >
+        <Send className="w-4 h-4 mr-2" />
+        Send Internal Assignment
+      </Button>
+
+      {/* Manage Team Modal */}
+      <ManageTeamModal
+        isOpen={showManageTeamModal}
+        onClose={() => setShowManageTeamModal(false)}
+        onRecipientsUpdated={() => {
+          // Refresh recipients - keep only those that are still active
+          const activeRecipients = getActiveRecipients()
+          const stillActiveSelected = selectedRecipients.filter(
+            sr => activeRecipients.some(ar => ar.email === sr.email)
+          )
+          setSelectedRecipients(stillActiveSelected)
+        }}
+      />
     </div>
   )
 }

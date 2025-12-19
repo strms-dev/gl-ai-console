@@ -27,7 +27,9 @@ import {
   Eye,
   Pencil,
   X,
-  Check
+  Check,
+  Plus,
+  Trash2
 } from "lucide-react"
 import {
   Dialog,
@@ -76,15 +78,19 @@ const FIELD_LABELS: Record<keyof GLReviewFormData, string> = {
   additionalNotes: "Additional Notes"
 }
 
-// Fields that can be edited with simple text input
-const SIMPLE_EDITABLE_FIELDS: (keyof GLReviewFormData)[] = [
+// Fields that can be edited
+const EDITABLE_FIELDS: (keyof GLReviewFormData)[] = [
   "email",
   "companyName",
   "leadName",
   "coaRevenueCategories",
   "activeClasses",
   "catchupDateRange",
-  "additionalNotes"
+  "additionalNotes",
+  "revenueCoaAllocations",
+  "catchupRequired",
+  "accounts",
+  "ecommerce"
 ]
 
 // Transaction count display
@@ -143,9 +149,9 @@ function formatValue(field: keyof GLReviewFormData, value: unknown): string {
   return String(value)
 }
 
-// Check if field is simple editable (text/number input)
-function isSimpleEditableField(field: keyof GLReviewFormData): boolean {
-  return SIMPLE_EDITABLE_FIELDS.includes(field)
+// Check if field is editable
+function isEditableField(field: keyof GLReviewFormData): boolean {
+  return EDITABLE_FIELDS.includes(field)
 }
 
 // Comparison row component - shows AI and Team values side by side with edit capability
@@ -168,74 +174,223 @@ function ComparisonRow({
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState("")
+  // State for complex field editing
+  const [editAccounts, setEditAccounts] = useState<FinancialAccount[]>([])
+  const [editEcommerce, setEditEcommerce] = useState<ECommerceData>({
+    amazon: "", shopify: "", square: "", etsy: "", ebay: "", woocommerce: "", other: ""
+  })
 
   const isDifferent = valuesAreDifferent(aiValue, teamValue)
   const aiDisplay = formatValue(field, aiValue)
   const teamDisplay = formatValue(field, teamValue)
   const customDisplay = customValue !== undefined ? formatValue(field, customValue) : ""
-  const canEdit = isSimpleEditableField(field)
+  const canEdit = isEditableField(field)
 
   // Get the currently selected value for editing
-  const getSelectedValue = (): string => {
+  const getSelectedValue = (): unknown => {
     if (selection === "custom" && customValue !== undefined) {
-      return String(customValue || "")
+      return customValue
     }
     if (selection === "team") {
-      return String(teamValue || "")
+      return teamValue
     }
-    return String(aiValue || "")
+    return aiValue
   }
 
   const handleStartEdit = () => {
-    setEditValue(getSelectedValue())
+    const selectedVal = getSelectedValue()
+    if (field === "accounts" && Array.isArray(selectedVal)) {
+      setEditAccounts([...(selectedVal as FinancialAccount[])])
+    } else if (field === "ecommerce" && typeof selectedVal === "object") {
+      setEditEcommerce({ ...(selectedVal as ECommerceData) })
+    } else {
+      setEditValue(String(selectedVal || ""))
+    }
     setIsEditing(true)
   }
 
   const handleCancelEdit = () => {
     setIsEditing(false)
     setEditValue("")
+    setEditAccounts([])
+    setEditEcommerce({ amazon: "", shopify: "", square: "", etsy: "", ebay: "", woocommerce: "", other: "" })
   }
 
   const handleSaveEdit = () => {
-    onSaveCustomValue(editValue)
+    if (field === "accounts") {
+      onSaveCustomValue(editAccounts.filter(a => a.name.trim() !== ""))
+    } else if (field === "ecommerce") {
+      onSaveCustomValue(editEcommerce)
+    } else {
+      onSaveCustomValue(editValue)
+    }
     setIsEditing(false)
     setEditValue("")
+    setEditAccounts([])
+    setEditEcommerce({ amazon: "", shopify: "", square: "", etsy: "", ebay: "", woocommerce: "", other: "" })
+  }
+
+  // Account management helpers
+  const handleAddAccount = () => {
+    setEditAccounts([...editAccounts, { name: "", transactionCount: "" }])
+  }
+
+  const handleRemoveAccount = (index: number) => {
+    setEditAccounts(editAccounts.filter((_, i) => i !== index))
+  }
+
+  const handleUpdateAccount = (index: number, updates: Partial<FinancialAccount>) => {
+    const newAccounts = [...editAccounts]
+    newAccounts[index] = { ...newAccounts[index], ...updates }
+    setEditAccounts(newAccounts)
+  }
+
+  const handleUpdateEcommerce = (platform: keyof ECommerceData, value: string) => {
+    setEditEcommerce({ ...editEcommerce, [platform]: value })
   }
 
   // Render edit mode
   if (isEditing && canEdit) {
+    // Render appropriate input based on field type
+    const renderEditInput = () => {
+      // Financial Accounts editor
+      if (field === "accounts") {
+        return (
+          <div className="space-y-3">
+            {editAccounts.map((account, index) => (
+              <div key={index} className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
+                <div className="flex-1">
+                  <Input
+                    value={account.name}
+                    onChange={(e) => handleUpdateAccount(index, { name: e.target.value })}
+                    className="mb-2 border-[#407B9D]/30 focus:border-[#407B9D]"
+                    placeholder="Account name (e.g., Chase Business Checking)"
+                  />
+                  <select
+                    value={account.transactionCount}
+                    onChange={(e) => handleUpdateAccount(index, { transactionCount: e.target.value as TransactionCount })}
+                    className="w-full h-9 px-3 rounded-md border border-[#407B9D]/30 bg-white text-sm focus:border-[#407B9D] focus:outline-none"
+                  >
+                    <option value="">Transaction count...</option>
+                    <option value="<20">&lt;20 TRX</option>
+                    <option value="20-100">20-100 TRX</option>
+                    <option value=">100">&gt;100 TRX</option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveAccount(index)}
+                  className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={handleAddAccount}
+              className="w-full py-2 px-3 border-2 border-dashed border-[#407B9D]/30 rounded-lg text-[#407B9D] text-sm font-medium hover:bg-[#407B9D]/5 hover:border-[#407B9D]/50 transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add Account
+            </button>
+          </div>
+        )
+      }
+
+      // eCommerce Platforms editor
+      if (field === "ecommerce") {
+        const platforms: (keyof ECommerceData)[] = ["amazon", "shopify", "square", "etsy", "ebay", "woocommerce", "other"]
+        return (
+          <div className="grid grid-cols-2 gap-3">
+            {platforms.map((platform) => (
+              <div key={platform} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200">
+                <Label className="flex-1 text-sm capitalize">{ECOMMERCE_LABELS[platform]}</Label>
+                <select
+                  value={editEcommerce[platform]}
+                  onChange={(e) => handleUpdateEcommerce(platform, e.target.value)}
+                  className="w-24 h-8 px-2 rounded-md border border-[#407B9D]/30 bg-white text-sm focus:border-[#407B9D] focus:outline-none"
+                >
+                  <option value="">None</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      if (field === "additionalNotes" || field === "coaRevenueCategories") {
+        return (
+          <Textarea
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            className="w-full min-h-[100px] border-[#407B9D]/30 focus:border-[#407B9D] focus:ring-[#407B9D]"
+            placeholder={`Enter ${FIELD_LABELS[field].toLowerCase()}...`}
+          />
+        )
+      }
+      if (field === "revenueCoaAllocations") {
+        return (
+          <select
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            className="w-full h-10 px-3 rounded-md border border-[#407B9D]/30 bg-white text-sm focus:border-[#407B9D] focus:ring-1 focus:ring-[#407B9D] focus:outline-none"
+          >
+            <option value="">Select...</option>
+            <option value="1-2">1-2</option>
+            <option value="3-5">3-5</option>
+            <option value=">5">&gt;5 (Custom pricing)</option>
+          </select>
+        )
+      }
+      if (field === "catchupRequired") {
+        return (
+          <select
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            className="w-full h-10 px-3 rounded-md border border-[#407B9D]/30 bg-white text-sm focus:border-[#407B9D] focus:ring-1 focus:ring-[#407B9D] focus:outline-none"
+          >
+            <option value="">Select...</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        )
+      }
+      return (
+        <Input
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          className="w-full border-[#407B9D]/30 focus:border-[#407B9D] focus:ring-[#407B9D]"
+          placeholder={`Enter ${FIELD_LABELS[field].toLowerCase()}...`}
+        />
+      )
+    }
+
     return (
-      <div className="py-4 border-b border-gray-100 last:border-b-0 bg-purple-50/30 -mx-4 px-4">
+      <div className="py-4 border-b border-gray-100 last:border-b-0 bg-[#407B9D]/5 -mx-4 px-4">
         <div className="flex items-center gap-2 mb-3">
-          <Pencil className="w-4 h-4 text-purple-600" />
+          <Pencil className="w-4 h-4 text-[#407B9D]" />
           <Label className="text-sm font-medium text-[#463939]">
             {FIELD_LABELS[field]}
           </Label>
-          <span className="text-xs text-purple-600 font-medium">Editing custom value</span>
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/20">
+            Editing
+          </span>
         </div>
 
         <div className="space-y-3">
-          {field === "additionalNotes" || field === "coaRevenueCategories" ? (
-            <Textarea
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              className="w-full min-h-[100px]"
-              placeholder={`Enter custom ${FIELD_LABELS[field].toLowerCase()}...`}
-            />
-          ) : (
-            <Input
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              className="w-full"
-              placeholder={`Enter custom ${FIELD_LABELS[field].toLowerCase()}...`}
-            />
-          )}
+          {renderEditInput()}
 
           <div className="flex items-center gap-2">
             <Button
               size="sm"
               onClick={handleSaveEdit}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
+              className="bg-[#407B9D] hover:bg-[#366a88] text-white"
             >
               <Check className="w-4 h-4 mr-1" />
               Save
@@ -244,7 +399,7 @@ function ComparisonRow({
               size="sm"
               variant="outline"
               onClick={handleCancelEdit}
-              className="text-gray-600"
+              className="text-gray-600 border-gray-300"
             >
               <X className="w-4 h-4 mr-1" />
               Cancel
@@ -258,21 +413,35 @@ function ComparisonRow({
   // Show custom value if selected
   if (selection === "custom" && customValue !== undefined) {
     return (
-      <div className="py-4 border-b border-gray-100 last:border-b-0 bg-purple-50/30 -mx-4 px-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Pencil className="w-4 h-4 text-purple-600" />
-          <Label className="text-sm font-medium text-[#463939]">
-            {FIELD_LABELS[field]}
-          </Label>
-          <span className="text-xs text-purple-600 font-medium">Custom value</span>
+      <div className="py-4 border-b border-gray-100 last:border-b-0 bg-[#95CBD7]/10 -mx-4 px-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Pencil className="w-4 h-4 text-[#407B9D]" />
+            <Label className="text-sm font-medium text-[#463939]">
+              {FIELD_LABELS[field]}
+            </Label>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#95CBD7]/30 text-[#407B9D] border border-[#95CBD7]">
+              Custom
+            </span>
+          </div>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={handleStartEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#407B9D] bg-[#407B9D]/10 hover:bg-[#407B9D]/20 rounded-md transition-colors border border-[#407B9D]/20"
+            >
+              <Pencil className="w-3 h-3" />
+              Edit
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           {/* AI Value - clickable to select */}
           <button
             type="button"
             onClick={() => onSelect("ai")}
-            className="p-3 rounded-lg border-2 text-left transition-all border-gray-200 hover:border-gray-300 opacity-60"
+            className="p-3 rounded-lg border-2 text-left transition-all border-gray-200 hover:border-[#407B9D]/50 hover:bg-gray-50 opacity-70 hover:opacity-100"
           >
             <div className="flex items-center gap-2 mb-2">
               <Bot className="w-4 h-4 text-[#407B9D]" />
@@ -285,7 +454,7 @@ function ComparisonRow({
           <button
             type="button"
             onClick={() => onSelect("team")}
-            className="p-3 rounded-lg border-2 text-left transition-all border-gray-200 hover:border-gray-300 opacity-60"
+            className="p-3 rounded-lg border-2 text-left transition-all border-gray-200 hover:border-[#5A8A4A]/50 hover:bg-gray-50 opacity-70 hover:opacity-100"
           >
             <div className="flex items-center gap-2 mb-2">
               <User className="w-4 h-4 text-[#5A8A4A]" />
@@ -295,136 +464,101 @@ function ComparisonRow({
           </button>
 
           {/* Custom Value - selected */}
-          <div className="p-3 rounded-lg border-2 text-left transition-all border-purple-500 bg-purple-500/10">
+          <div className="p-3 rounded-lg border-2 text-left transition-all border-[#407B9D] bg-[#407B9D]/10 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
-              <Pencil className="w-4 h-4 text-purple-600" />
-              <span className="text-xs font-medium text-purple-600">Custom</span>
-              <CheckCircle2 className="w-4 h-4 text-purple-600 ml-auto" />
+              <Pencil className="w-4 h-4 text-[#407B9D]" />
+              <span className="text-xs font-medium text-[#407B9D]">Custom</span>
+              <CheckCircle2 className="w-4 h-4 text-[#407B9D] ml-auto" />
             </div>
             <p className="text-sm text-[#463939]">{customDisplay}</p>
-            {canEdit && (
-              <button
-                type="button"
-                onClick={handleStartEdit}
-                className="mt-2 text-xs text-purple-600 hover:text-purple-700 underline"
-              >
-                Edit
-              </button>
-            )}
           </div>
         </div>
       </div>
     )
   }
 
+  // Determine if we have a selection (either explicit or default for matching values)
+  const hasSelection = selection !== null || !isDifferent
+
+  // For matching values, default to "ai" if no explicit selection
+  const effectiveSelection = selection || (isDifferent ? null : "ai")
+
   return (
     <div className={`py-4 border-b border-gray-100 last:border-b-0 ${isDifferent ? "bg-amber-50/30 -mx-4 px-4" : ""}`}>
-      <div className="flex items-center gap-2 mb-3">
-        {isDifferent ? (
-          <>
+      {/* Header row with field name, status badge, and edit button */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {isDifferent ? (
             <AlertTriangle className="w-4 h-4 text-amber-600" />
-            <Label className="text-sm font-medium text-[#463939]">
-              {FIELD_LABELS[field]}
-            </Label>
-            <span className="text-xs text-amber-600 font-medium">Different values - select one</span>
-          </>
-        ) : (
-          <>
+          ) : (
             <CheckCircle2 className="w-4 h-4 text-green-600" />
-            <Label className="text-sm font-medium text-[#463939]">
-              {FIELD_LABELS[field]}
-            </Label>
-            <span className="text-xs text-green-600 font-medium">Values match</span>
-          </>
+          )}
+          <Label className="text-sm font-medium text-[#463939]">
+            {FIELD_LABELS[field]}
+          </Label>
+          {isDifferent ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+              Different
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+              Match
+            </span>
+          )}
+        </div>
+        {/* Edit button - shown when there is a selection and field is editable */}
+        {hasSelection && canEdit && (
+          <button
+            type="button"
+            onClick={handleStartEdit}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#407B9D] bg-[#407B9D]/10 hover:bg-[#407B9D]/20 rounded-md transition-colors border border-[#407B9D]/20"
+          >
+            <Pencil className="w-3 h-3" />
+            Edit
+          </button>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        {/* AI Value */}
-        {isDifferent ? (
-          <button
-            type="button"
-            onClick={() => onSelect("ai")}
-            className={`p-3 rounded-lg border-2 text-left transition-all ${
-              selection === "ai"
-                ? "border-[#407B9D] bg-[#407B9D]/10"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Bot className="w-4 h-4 text-[#407B9D]" />
-              <span className="text-xs font-medium text-[#407B9D]">AI Review</span>
-              {selection === "ai" && (
-                <CheckCircle2 className="w-4 h-4 text-[#407B9D] ml-auto" />
-              )}
-            </div>
-            <p className="text-sm text-[#463939]">{aiDisplay}</p>
-            {selection === "ai" && canEdit && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleStartEdit()
-                }}
-                className="mt-2 text-xs text-[#407B9D] hover:text-[#366a88] underline flex items-center gap-1"
-              >
-                <Pencil className="w-3 h-3" />
-                Edit
-              </button>
+      <div className="grid grid-cols-2 gap-3">
+        {/* AI Value - always clickable */}
+        <button
+          type="button"
+          onClick={() => onSelect("ai")}
+          className={`p-3 rounded-lg border-2 text-left transition-all ${
+            effectiveSelection === "ai"
+              ? "border-[#407B9D] bg-[#407B9D]/10 shadow-sm"
+              : "border-gray-200 hover:border-[#407B9D]/50 hover:bg-gray-50"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Bot className="w-4 h-4 text-[#407B9D]" />
+            <span className="text-xs font-medium text-[#407B9D]">AI Review</span>
+            {effectiveSelection === "ai" && (
+              <CheckCircle2 className="w-4 h-4 text-[#407B9D] ml-auto" />
             )}
-          </button>
-        ) : (
-          <div className="p-3 rounded-lg border border-gray-200 bg-gray-50/50">
-            <div className="flex items-center gap-2 mb-2">
-              <Bot className="w-4 h-4 text-[#407B9D]" />
-              <span className="text-xs font-medium text-[#407B9D]">AI Review</span>
-            </div>
-            <p className="text-sm text-[#463939]">{aiDisplay}</p>
           </div>
-        )}
+          <p className="text-sm text-[#463939]">{aiDisplay}</p>
+        </button>
 
-        {/* Team Value */}
-        {isDifferent ? (
-          <button
-            type="button"
-            onClick={() => onSelect("team")}
-            className={`p-3 rounded-lg border-2 text-left transition-all ${
-              selection === "team"
-                ? "border-[#5A8A4A] bg-[#5A8A4A]/10"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <User className="w-4 h-4 text-[#5A8A4A]" />
-              <span className="text-xs font-medium text-[#5A8A4A]">Team Review</span>
-              {selection === "team" && (
-                <CheckCircle2 className="w-4 h-4 text-[#5A8A4A] ml-auto" />
-              )}
-            </div>
-            <p className="text-sm text-[#463939]">{teamDisplay}</p>
-            {selection === "team" && canEdit && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleStartEdit()
-                }}
-                className="mt-2 text-xs text-[#5A8A4A] hover:text-[#4a7a3a] underline flex items-center gap-1"
-              >
-                <Pencil className="w-3 h-3" />
-                Edit
-              </button>
+        {/* Team Value - always clickable */}
+        <button
+          type="button"
+          onClick={() => onSelect("team")}
+          className={`p-3 rounded-lg border-2 text-left transition-all ${
+            effectiveSelection === "team"
+              ? "border-[#5A8A4A] bg-[#5A8A4A]/10 shadow-sm"
+              : "border-gray-200 hover:border-[#5A8A4A]/50 hover:bg-gray-50"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <User className="w-4 h-4 text-[#5A8A4A]" />
+            <span className="text-xs font-medium text-[#5A8A4A]">Team Review</span>
+            {effectiveSelection === "team" && (
+              <CheckCircle2 className="w-4 h-4 text-[#5A8A4A] ml-auto" />
             )}
-          </button>
-        ) : (
-          <div className="p-3 rounded-lg border border-gray-200 bg-gray-50/50">
-            <div className="flex items-center gap-2 mb-2">
-              <User className="w-4 h-4 text-[#5A8A4A]" />
-              <span className="text-xs font-medium text-[#5A8A4A]">Team Review</span>
-            </div>
-            <p className="text-sm text-[#463939]">{teamDisplay}</p>
           </div>
-        )}
+          <p className="text-sm text-[#463939]">{teamDisplay}</p>
+        </button>
       </div>
     </div>
   )
@@ -693,9 +827,9 @@ export function GLReviewComparison({
       </div>
 
       {/* Instructions */}
-      <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-        <p className="text-sm text-blue-800">
-          <strong>Tip:</strong> Select AI or Team value for each difference. After selecting, click &quot;Edit&quot; to customize the value if needed.
+      <div className="mb-4 p-3 bg-[#407B9D]/10 rounded-lg border border-[#407B9D]/20">
+        <p className="text-sm text-[#463939]">
+          <strong>How to use:</strong> Select AI or Team value for each field. Click the <span className="inline-flex items-center gap-1 font-medium text-[#407B9D]"><Pencil className="w-3 h-3" />Edit</span> button to customize any selected value.
         </p>
       </div>
 
