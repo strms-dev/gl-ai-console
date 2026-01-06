@@ -1,6 +1,15 @@
 "use client"
 
-// Application-level interface for Pipeline Deals
+import {
+  fetchPipelineDeals,
+  fetchPipelineDealById,
+  createPipelineDeal,
+  updatePipelineDealSupabase,
+  deletePipelineDealSupabase
+} from "./supabase/revops-pipeline"
+import type { RevOpsPipelineDeal, RevOpsPipelineDealInsert, RevOpsPipelineDealUpdate } from "./supabase/types"
+
+// Application-level interface for Pipeline Deals (camelCase)
 export interface PipelineDeal {
   id: string
   dealName: string
@@ -14,41 +23,66 @@ export interface PipelineDeal {
   updatedAt: string
 }
 
-const STORAGE_KEY = "revops-pipeline-deals"
-
 /**
- * Generate a unique ID for new deals
+ * Convert database row (snake_case) to application type (camelCase)
  */
-function generateId(): string {
-  return `deal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-}
-
-/**
- * Get all pipeline deals from localStorage
- */
-export async function getPipelineDeals(): Promise<PipelineDeal[]> {
-  if (typeof window === "undefined") return []
-
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) return []
-    return JSON.parse(stored) as PipelineDeal[]
-  } catch (error) {
-    console.error("Error reading pipeline deals from localStorage:", error)
-    return []
+function dbToApp(dbDeal: RevOpsPipelineDeal): PipelineDeal {
+  return {
+    id: dbDeal.id,
+    dealName: dbDeal.deal_name,
+    companyName: dbDeal.company_name,
+    firstName: dbDeal.first_name,
+    lastName: dbDeal.last_name,
+    email: dbDeal.email,
+    stage: dbDeal.stage,
+    hsStage: dbDeal.hs_stage,
+    createdAt: dbDeal.created_at,
+    updatedAt: dbDeal.updated_at,
   }
 }
 
 /**
- * Save all pipeline deals to localStorage
+ * Convert application type (camelCase) to database insert (snake_case)
  */
-function saveDeals(deals: PipelineDeal[]): void {
-  if (typeof window === "undefined") return
+function appToDbInsert(appDeal: Omit<PipelineDeal, "id" | "createdAt" | "updatedAt">): RevOpsPipelineDealInsert {
+  return {
+    deal_name: appDeal.dealName,
+    company_name: appDeal.companyName,
+    first_name: appDeal.firstName,
+    last_name: appDeal.lastName,
+    email: appDeal.email,
+    stage: appDeal.stage,
+    hs_stage: appDeal.hsStage,
+  }
+}
 
+/**
+ * Convert application update (camelCase) to database update (snake_case)
+ */
+function appToDbUpdate(updates: Partial<Omit<PipelineDeal, "id" | "createdAt" | "updatedAt">>): RevOpsPipelineDealUpdate {
+  const dbUpdate: RevOpsPipelineDealUpdate = {}
+
+  if (updates.dealName !== undefined) dbUpdate.deal_name = updates.dealName
+  if (updates.companyName !== undefined) dbUpdate.company_name = updates.companyName
+  if (updates.firstName !== undefined) dbUpdate.first_name = updates.firstName
+  if (updates.lastName !== undefined) dbUpdate.last_name = updates.lastName
+  if (updates.email !== undefined) dbUpdate.email = updates.email
+  if (updates.stage !== undefined) dbUpdate.stage = updates.stage
+  if (updates.hsStage !== undefined) dbUpdate.hs_stage = updates.hsStage
+
+  return dbUpdate
+}
+
+/**
+ * Get all pipeline deals from Supabase
+ */
+export async function getPipelineDeals(): Promise<PipelineDeal[]> {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(deals))
+    const dbDeals = await fetchPipelineDeals()
+    return dbDeals.map(dbToApp)
   } catch (error) {
-    console.error("Error saving pipeline deals to localStorage:", error)
+    console.error("Error fetching pipeline deals:", error)
+    return []
   }
 }
 
@@ -56,8 +90,13 @@ function saveDeals(deals: PipelineDeal[]): void {
  * Get a single pipeline deal by ID
  */
 export async function getPipelineDealById(id: string): Promise<PipelineDeal | null> {
-  const deals = await getPipelineDeals()
-  return deals.find((deal) => deal.id === id) || null
+  try {
+    const dbDeal = await fetchPipelineDealById(id)
+    return dbDeal ? dbToApp(dbDeal) : null
+  } catch (error) {
+    console.error("Error fetching pipeline deal:", error)
+    return null
+  }
 }
 
 /**
@@ -66,26 +105,9 @@ export async function getPipelineDealById(id: string): Promise<PipelineDeal | nu
 export async function addPipelineDeal(
   deal: Omit<PipelineDeal, "id" | "createdAt" | "updatedAt">
 ): Promise<PipelineDeal> {
-  const deals = await getPipelineDeals()
-  const now = new Date().toISOString()
-
-  const newDeal: PipelineDeal = {
-    id: generateId(),
-    dealName: deal.dealName,
-    companyName: deal.companyName,
-    firstName: deal.firstName,
-    lastName: deal.lastName,
-    email: deal.email,
-    stage: deal.stage,
-    hsStage: deal.hsStage,
-    createdAt: now,
-    updatedAt: now,
-  }
-
-  deals.unshift(newDeal) // Add to beginning of array
-  saveDeals(deals)
-
-  return newDeal
+  const dbInsert = appToDbInsert(deal)
+  const dbDeal = await createPipelineDeal(dbInsert)
+  return dbToApp(dbDeal)
 }
 
 /**
@@ -95,32 +117,25 @@ export async function updatePipelineDeal(
   id: string,
   updates: Partial<Omit<PipelineDeal, "id" | "createdAt" | "updatedAt">>
 ): Promise<PipelineDeal | null> {
-  const deals = await getPipelineDeals()
-  const index = deals.findIndex((deal) => deal.id === id)
-
-  if (index === -1) return null
-
-  const updatedDeal: PipelineDeal = {
-    ...deals[index],
-    ...updates,
-    updatedAt: new Date().toISOString(),
+  try {
+    const dbUpdate = appToDbUpdate(updates)
+    const dbDeal = await updatePipelineDealSupabase(id, dbUpdate)
+    return dbToApp(dbDeal)
+  } catch (error) {
+    console.error("Error updating pipeline deal:", error)
+    return null
   }
-
-  deals[index] = updatedDeal
-  saveDeals(deals)
-
-  return updatedDeal
 }
 
 /**
  * Delete a pipeline deal
  */
 export async function deletePipelineDeal(id: string): Promise<boolean> {
-  const deals = await getPipelineDeals()
-  const filteredDeals = deals.filter((deal) => deal.id !== id)
-
-  if (filteredDeals.length === deals.length) return false
-
-  saveDeals(filteredDeals)
-  return true
+  try {
+    await deletePipelineDealSupabase(id)
+    return true
+  } catch (error) {
+    console.error("Error deleting pipeline deal:", error)
+    return false
+  }
 }

@@ -36,16 +36,26 @@ function formatDateTime(isoString: string): string {
   })
 }
 
-// Default stage options
-const stageOptions = [
-  "Stage 1",
-  "Stage 2",
-  "Stage 3",
-  "Stage 4",
-  "Stage 5",
+// Automation stage options (matches Sales Pipeline Timeline stages)
+const automationStageOptions = [
+  "Demo Call",
+  "Sales Intake",
+  "Follow-Up Email",
+  "Reminder Sequence",
+  "Internal Team Assignment",
+  "General Ledger Review",
+  "GL Review Comparison",
+  "Create Quote",
+  "Quote Sent",
+  "Quote Approved",
+  "Prepare Engagement Walkthrough",
+  "EA Internal Review",
+  "Send Engagement",
+  "Closed Won",
+  "Closed Lost",
 ]
 
-// HubSpot stage options
+// HubSpot stage options (used for sorting)
 const hsStageOptions = [
   "MQO - Meeting Booked",
   "MQO - Financial Review",
@@ -68,18 +78,16 @@ export default function SalesPipelinePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [dealToDelete, setDealToDelete] = useState<PipelineDeal | null>(null)
 
-  // Sort state: 'updated' = by last updated, 'hsStage' = by HS Stage order
-  const [sortBy, setSortBy] = useState<'updated' | 'hsStage'>('updated')
+  // Sort state: 'updated' = by last updated, 'automationStage' = by timeline stage order, 'hsStage' = by HS Stage order
+  const [sortBy, setSortBy] = useState<'updated' | 'hsStage' | 'automationStage'>('updated')
 
-  // Form state
+  // Form state (stage and hsStage are auto-filled, not user-editable)
   const [formData, setFormData] = useState({
     dealName: "",
     companyName: "",
     firstName: "",
     lastName: "",
     email: "",
-    stage: "",
-    hsStage: "",
   })
 
   // Loading state
@@ -106,8 +114,6 @@ export default function SalesPipelinePage() {
         firstName: editingDeal.firstName || "",
         lastName: editingDeal.lastName || "",
         email: editingDeal.email || "",
-        stage: editingDeal.stage,
-        hsStage: editingDeal.hsStage || "",
       })
     } else {
       setFormData({
@@ -116,8 +122,6 @@ export default function SalesPipelinePage() {
         firstName: "",
         lastName: "",
         email: "",
-        stage: "",
-        hsStage: "",
       })
     }
   }, [editingDeal, showDealForm])
@@ -148,6 +152,15 @@ export default function SalesPipelinePage() {
       })
     }
 
+    if (sortBy === 'automationStage') {
+      // Sort by Automation Stage order (based on automationStageOptions array index)
+      return filtered.sort((a, b) => {
+        const aIndex = a.stage ? automationStageOptions.indexOf(a.stage) : automationStageOptions.length
+        const bIndex = b.stage ? automationStageOptions.indexOf(b.stage) : automationStageOptions.length
+        return aIndex - bIndex
+      })
+    }
+
     // Default: Sort by most recently updated (descending)
     return filtered.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   }, [searchTerm, deals, sortBy])
@@ -159,26 +172,24 @@ export default function SalesPipelinePage() {
 
     try {
       if (editingDeal) {
-        // Update existing deal
+        // Update existing deal (stage and hsStage are not editable via form)
         await updatePipelineDeal(editingDeal.id, {
           dealName: formData.dealName,
           companyName: formData.companyName,
           firstName: formData.firstName || null,
           lastName: formData.lastName || null,
           email: formData.email || null,
-          stage: formData.stage,
-          hsStage: formData.hsStage || null,
         })
       } else {
-        // Add new deal
+        // Add new deal with default stage values (auto-filled)
         await addPipelineDeal({
           dealName: formData.dealName,
           companyName: formData.companyName,
           firstName: formData.firstName || null,
           lastName: formData.lastName || null,
           email: formData.email || null,
-          stage: formData.stage,
-          hsStage: formData.hsStage || null,
+          stage: "Demo Call", // Default automation stage (first stage in timeline)
+          hsStage: "MQO - Meeting Booked", // Default HubSpot stage
         })
       }
 
@@ -280,10 +291,11 @@ export default function SalesPipelinePage() {
                 <span className="text-sm text-muted-foreground whitespace-nowrap">Sort by:</span>
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'updated' | 'hsStage')}
+                  onChange={(e) => setSortBy(e.target.value as 'updated' | 'hsStage' | 'automationStage')}
                   className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   <option value="updated">Last Updated</option>
+                  <option value="automationStage">Automation Stage</option>
                   <option value="hsStage">HS Stage</option>
                 </select>
               </div>
@@ -470,44 +482,6 @@ export default function SalesPipelinePage() {
                       setFormData({ ...formData, email: e.target.value })
                     }
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="stage">Automation Stage *</Label>
-                  <select
-                    id="stage"
-                    value={formData.stage}
-                    onChange={(e) =>
-                      setFormData({ ...formData, stage: e.target.value })
-                    }
-                    className="w-full h-9 rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                    required
-                  >
-                    <option value="">Select Automation Stage</option>
-                    {stageOptions.map((stage) => (
-                      <option key={stage} value={stage}>
-                        {stage}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hsStage">HS Stage *</Label>
-                  <select
-                    id="hsStage"
-                    value={formData.hsStage}
-                    onChange={(e) =>
-                      setFormData({ ...formData, hsStage: e.target.value })
-                    }
-                    className="w-full h-9 rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                    required
-                  >
-                    <option value="">Select HS Stage</option>
-                    {hsStageOptions.map((hsStage) => (
-                      <option key={hsStage} value={hsStage}>
-                        {hsStage}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               </div>
               <DialogFooter>

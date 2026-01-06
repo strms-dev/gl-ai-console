@@ -205,6 +205,44 @@ export interface Database {
           updated_at?: string
         }
       }
+      revops_pipeline_deals: {
+        Row: {
+          id: string
+          deal_name: string
+          company_name: string
+          first_name: string | null
+          last_name: string | null
+          email: string | null
+          stage: string
+          hs_stage: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          deal_name: string
+          company_name: string
+          first_name?: string | null
+          last_name?: string | null
+          email?: string | null
+          stage: string
+          hs_stage?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          deal_name?: string
+          company_name?: string
+          first_name?: string | null
+          last_name?: string | null
+          email?: string | null
+          stage?: string
+          hs_stage?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     Views: {}
@@ -236,6 +274,11 @@ export type SprintPricingUpdate = Database['public']['Tables']['strms_sprint_pri
 export type RevOpsFunnelLead = Database['public']['Tables']['revops_funnel_leads']['Row']
 export type RevOpsFunnelLeadInsert = Database['public']['Tables']['revops_funnel_leads']['Insert']
 export type RevOpsFunnelLeadUpdate = Database['public']['Tables']['revops_funnel_leads']['Update']
+
+// RevOps Pipeline Deal types
+export type RevOpsPipelineDeal = Database['public']['Tables']['revops_pipeline_deals']['Row']
+export type RevOpsPipelineDealInsert = Database['public']['Tables']['revops_pipeline_deals']['Insert']
+export type RevOpsPipelineDealUpdate = Database['public']['Tables']['revops_pipeline_deals']['Update']
 
 // Complete project data including related tables
 export interface ProjectWithDetails extends Project {

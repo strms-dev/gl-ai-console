@@ -17,9 +17,39 @@ import {
   createTestGLReviewFieldConfidence,
   createTestTeamGLReviewFormData
 } from "./sales-pipeline-timeline-types"
+import { updatePipelineDeal } from "./revops-pipeline-store"
 
 const TIMELINE_STORAGE_KEY = "revops-pipeline-timelines"
 const FILES_STORAGE_KEY = "revops-pipeline-files"
+
+// Mapping from stage IDs to display names for automation stage
+const STAGE_ID_TO_DISPLAY_NAME: Record<SalesPipelineStageId, string> = {
+  "demo-call": "Demo Call",
+  "sales-intake": "Sales Intake",
+  "follow-up-email": "Follow-Up Email",
+  "reminder-sequence": "Reminder Sequence",
+  "internal-review": "Internal Team Assignment",
+  "gl-review": "General Ledger Review",
+  "gl-review-comparison": "GL Review Comparison",
+  "create-quote": "Create Quote",
+  "quote-sent": "Quote Sent",
+  "quote-approved": "Quote Approved",
+  "prepare-engagement": "Prepare Engagement Walkthrough",
+  "internal-engagement-review": "EA Internal Review",
+  "send-engagement": "Send Engagement",
+  "closed-won": "Closed Won",
+  "closed-lost": "Closed Lost",
+}
+
+/**
+ * Update the deal's automation stage to match the current timeline stage
+ */
+async function updateDealAutomationStage(dealId: string, stageId: SalesPipelineStageId): Promise<void> {
+  const displayName = STAGE_ID_TO_DISPLAY_NAME[stageId]
+  if (displayName) {
+    await updatePipelineDeal(dealId, { stage: displayName })
+  }
+}
 
 // File data stored as base64 for localStorage persistence
 interface StoredFileData {
@@ -610,6 +640,10 @@ export async function uploadDemoTranscript(
   existing.updatedAt = now
 
   saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "sales-intake")
+
   return existing
 }
 
@@ -640,6 +674,10 @@ export async function clearDemoTranscript(
   existing.updatedAt = new Date().toISOString()
 
   saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "demo-call")
+
   return existing
 }
 
@@ -739,6 +777,9 @@ export async function confirmSalesIntake(
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "follow-up-email")
 
   return existing
 }
@@ -884,6 +925,9 @@ export async function markFollowUpEmailSent(
 
   existing.updatedAt = nowISO
   saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "reminder-sequence")
 
   return existing
 }
@@ -1073,6 +1117,9 @@ export async function markAccessReceived(
   existing.updatedAt = now
   saveAllTimelines(timelines)
 
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "internal-review")
+
   return existing
 }
 
@@ -1193,6 +1240,9 @@ export async function markInternalReviewSent(
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "gl-review")
 
   return existing
 }
@@ -1346,6 +1396,9 @@ export async function confirmGLReview(
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "gl-review-comparison")
 
   return existing
 }
@@ -1510,6 +1563,9 @@ export async function submitComparisonAndMoveToQuote(
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "create-quote")
 
   return existing
 }
@@ -1781,6 +1837,9 @@ export async function confirmQuoteAndMoveToSent(
   existing.updatedAt = now
   saveAllTimelines(timelines)
 
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "quote-sent")
+
   return existing
 }
 
@@ -1922,6 +1981,12 @@ export async function recordQuoteResponse(
     // Move to Prepare Engagement
     existing.currentStage = "prepare-engagement"
     existing.stages["prepare-engagement"].status = "in_progress"
+
+    existing.updatedAt = now
+    saveAllTimelines(timelines)
+
+    // Update deal's automation stage
+    await updateDealAutomationStage(dealId, "prepare-engagement")
   } else if (responseType === "declined") {
     // Complete quote-sent stage
     existing.stages["quote-sent"].status = "completed"
@@ -1946,10 +2011,16 @@ export async function recordQuoteResponse(
     existing.stages["closed-lost"].data.lostFromStage = "quote-sent"
     existing.stages["closed-lost"].data.lostReason = "declined"
     existing.stages["closed-lost"].data.closedAt = now
-  }
 
-  existing.updatedAt = now
-  saveAllTimelines(timelines)
+    existing.updatedAt = now
+    saveAllTimelines(timelines)
+
+    // Update deal's automation stage
+    await updateDealAutomationStage(dealId, "closed-lost")
+  } else {
+    existing.updatedAt = now
+    saveAllTimelines(timelines)
+  }
 
   return existing
 }
@@ -2025,6 +2096,9 @@ export async function moveToPreparingEngagement(
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "prepare-engagement")
 
   return existing
 }
@@ -2174,6 +2248,9 @@ export async function confirmWalkthroughAndMoveToReview(
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "internal-engagement-review")
 
   return existing
 }
@@ -2329,6 +2406,9 @@ export async function markEAReadyToSend(
   existing.updatedAt = now
   saveAllTimelines(timelines)
 
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "send-engagement")
+
   return existing
 }
 
@@ -2451,6 +2531,9 @@ export async function sendViaHubspotAndCloseWon(
   existing.updatedAt = now
   saveAllTimelines(timelines)
 
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "closed-won")
+
   return existing
 }
 
@@ -2541,6 +2624,9 @@ export async function markDealAsLost(
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "closed-lost")
 
   return existing
 }

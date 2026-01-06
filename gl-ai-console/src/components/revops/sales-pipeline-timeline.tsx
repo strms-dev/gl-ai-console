@@ -115,7 +115,7 @@ import { EAInternalReview } from "@/components/revops/ea-internal-review"
 import { SendEngagement } from "@/components/revops/send-engagement"
 import { ClosedWon } from "@/components/revops/closed-won"
 import { ClosedLost } from "@/components/revops/closed-lost"
-import { PipelineDeal } from "@/lib/revops-pipeline-store"
+import { PipelineDeal, getPipelineDealById } from "@/lib/revops-pipeline-store"
 import { FileUpload } from "@/components/leads/file-upload"
 import { getFileTypeById, UploadedFile } from "@/lib/file-types"
 
@@ -295,7 +295,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     loadState()
   }, [deal.id])
 
-  // Refresh timeline state
+  // Refresh timeline state and deal data
   const refreshState = useCallback(async () => {
     const state = await getOrCreateTimelineState(deal.id)
     setTimelineState(state)
@@ -319,7 +319,15 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       }
     }
     setCollapsedItems(collapsed)
-  }, [deal.id])
+
+    // Also refresh the deal data (automation stage may have changed)
+    if (onDealUpdate) {
+      const updatedDeal = await getPipelineDealById(deal.id)
+      if (updatedDeal) {
+        onDealUpdate(updatedDeal)
+      }
+    }
+  }, [deal.id, onDealUpdate])
 
   // Toggle collapse for a stage - only one stage can be expanded at a time
   const toggleCollapse = (id: string) => {
