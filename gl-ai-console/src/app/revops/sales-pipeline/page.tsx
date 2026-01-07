@@ -352,15 +352,18 @@ export default function SalesPipelinePage() {
                         <td className="py-3 px-4 font-medium">
                           <div className="flex items-center gap-2">
                             {deal.dealName}
-                            <a
-                              href="https://app.hubspot.com/contacts/4723689/objects/0-3/views/all/board"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[#407B9D] hover:text-[#407B9D]/80 transition-colors"
-                              title="View in HubSpot"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
+                            {deal.hsDealUrl && (
+                              <a
+                                href={deal.hsDealUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#407B9D] hover:text-[#407B9D]/80 transition-colors"
+                                title="View in HubSpot"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4">{deal.companyName}</td>

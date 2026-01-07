@@ -146,14 +146,16 @@ export default function DealDetailsPage() {
                   {deal.hsStage}
                 </span>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`https://app.hubspot.com/contacts/deals/${deal.id}`, "_blank")}
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                View in HubSpot
-              </Button>
+              {deal.hsDealUrl && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(deal.hsDealUrl!, "_blank")}
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View in HubSpot
+                </Button>
+              )}
             </div>
           </div>
         </div>

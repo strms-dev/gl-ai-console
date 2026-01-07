@@ -19,6 +19,8 @@ export interface PipelineDeal {
   email: string | null
   stage: string
   hsStage: string | null
+  hsDealId: string | null
+  hsDealUrl: string | null
   createdAt: string
   updatedAt: string
 }
@@ -36,6 +38,8 @@ function dbToApp(dbDeal: RevOpsPipelineDeal): PipelineDeal {
     email: dbDeal.email,
     stage: dbDeal.stage,
     hsStage: dbDeal.hs_stage,
+    hsDealId: dbDeal.hs_deal_id,
+    hsDealUrl: dbDeal.hs_deal_url,
     createdAt: dbDeal.created_at,
     updatedAt: dbDeal.updated_at,
   }
@@ -53,6 +57,8 @@ function appToDbInsert(appDeal: Omit<PipelineDeal, "id" | "createdAt" | "updated
     email: appDeal.email,
     stage: appDeal.stage,
     hs_stage: appDeal.hsStage,
+    hs_deal_id: appDeal.hsDealId,
+    hs_deal_url: appDeal.hsDealUrl,
   }
 }
 
@@ -69,6 +75,8 @@ function appToDbUpdate(updates: Partial<Omit<PipelineDeal, "id" | "createdAt" | 
   if (updates.email !== undefined) dbUpdate.email = updates.email
   if (updates.stage !== undefined) dbUpdate.stage = updates.stage
   if (updates.hsStage !== undefined) dbUpdate.hs_stage = updates.hsStage
+  if (updates.hsDealId !== undefined) dbUpdate.hs_deal_id = updates.hsDealId
+  if (updates.hsDealUrl !== undefined) dbUpdate.hs_deal_url = updates.hsDealUrl
 
   return dbUpdate
 }

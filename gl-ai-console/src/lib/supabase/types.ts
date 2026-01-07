@@ -215,6 +215,8 @@ export interface Database {
           email: string | null
           stage: string
           hs_stage: string | null
+          hs_deal_id: string | null
+          hs_deal_url: string | null
           created_at: string
           updated_at: string
         }
@@ -227,6 +229,8 @@ export interface Database {
           email?: string | null
           stage: string
           hs_stage?: string | null
+          hs_deal_id?: string | null
+          hs_deal_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -239,6 +243,8 @@ export interface Database {
           email?: string | null
           stage?: string
           hs_stage?: string | null
+          hs_deal_id?: string | null
+          hs_deal_url?: string | null
           created_at?: string
           updated_at?: string
         }
