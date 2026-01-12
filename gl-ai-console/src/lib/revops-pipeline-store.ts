@@ -7,6 +7,7 @@ import {
   updatePipelineDealSupabase,
   deletePipelineDealSupabase
 } from "./supabase/revops-pipeline"
+import { deleteRevOpsDealFiles } from "./supabase/revops-files"
 import type { RevOpsPipelineDeal, RevOpsPipelineDealInsert, RevOpsPipelineDealUpdate } from "./supabase/types"
 
 // Application-level interface for Pipeline Deals (camelCase)
@@ -137,9 +138,14 @@ export async function updatePipelineDeal(
 
 /**
  * Delete a pipeline deal
+ * Also cleans up associated files from storage
  */
 export async function deletePipelineDeal(id: string): Promise<boolean> {
   try {
+    // Delete files from storage first (DB records cascade automatically via FK)
+    await deleteRevOpsDealFiles(id)
+
+    // Delete the deal (will cascade delete file metadata via FK constraint)
     await deletePipelineDealSupabase(id)
     return true
   } catch (error) {

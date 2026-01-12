@@ -1,0 +1,553 @@
+{
+  "name": "Sales Intake AI Auto-Fill",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sales-intake-ai",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -80,
+        -352
+      ],
+      "id": "webhook-sales-intake-ai",
+      "name": "Catch Deal ID",
+      "webhookId": "sales-intake-ai-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "validate-deal-id-exists",
+              "leftValue": "={{ $json.body.deal_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "validate-deal-id-uuid",
+              "leftValue": "={{ $json.body.deal_id }}",
+              "rightValue": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        144,
+        -352
+      ],
+      "id": "validate-deal-id",
+      "name": "Validate Deal ID"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "revops_pipeline_files",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "deal_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.body.deal_id }}"
+            },
+            {
+              "keyName": "file_type_id",
+              "condition": "eq",
+              "keyValue": "demo-call-transcript"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        368,
+        -352
+      ],
+      "id": "query-transcript-metadata",
+      "name": "Query Transcript Metadata",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-transcript-exists",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        592,
+        -352
+      ],
+      "id": "check-transcript-found",
+      "name": "Check Transcript Found"
+    },
+    {
+      "parameters": {
+        "url": "=https://scahyfdsgpfurpcnwyrb.supabase.co/storage/v1/object/{{ $json.storage_bucket }}/{{ $json.storage_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        816,
+        -352
+      ],
+      "id": "download-transcript",
+      "name": "Download Transcript",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8o7ThfsHa3QWcSYa",
+          "name": "GL AI Console Supabase Service Role Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const dealId = $('Catch Deal ID').first().json.body.deal_id;\nconst transcriptContent = $input.first().json.data;\n\nreturn [{\n  json: {\n    deal_id: dealId,\n    transcript_content: transcriptContent\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -352
+      ],
+      "id": "prepare-transcript-data",
+      "name": "Prepare Transcript Data"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4o"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are an expert at analyzing sales demo call transcripts and extracting structured information for a bookkeeping services company called GrowthLab.\n\nAnalyze the transcript and answer ALL of the following 25 questions. Return your answers as a JSON object with two keys:\n1. \"answers\" - object with camelCase field names exactly matching the form fields below\n2. \"confidence\" - object with the same keys, values are \"high\", \"medium\", or \"low\"\n\nQUESTIONS TO ANSWER (with valid options):\n\n1. companyName (string) - The company name\n2. contactName (string) - The primary contact person's name\n3. emailAddress (string) - The contact's email address\n\n4. entityType - Organization type. Valid options: \"non-profit\", \"c-corp\", \"s-corp\", \"llc\", \"other\", or \"\" if unknown\n5. hasRestrictedGrants - Does the organization have restricted grants? Valid: \"yes\", \"no\", or \"\"\n\n6. usesQboOrXero - Do they use QuickBooks Online or Xero? Valid: \"yes\", \"no\", or \"\"\n7. accountingPlatform - Which accounting platform? Valid: \"qbo\", \"xero\", \"other\", or \"\"\n8. accountingBasis - Accounting method. Valid: \"cash\", \"accrual\", \"modified-cash\", or \"\"\n9. bookkeepingCadence - How often is bookkeeping done? Valid: \"weekly\", \"biweekly\", \"monthly\", \"quarterly\", or \"\"\n10. needsFinancialsBefore15th - Do they need financials before the 15th? Valid: \"yes-board\", \"yes-investors\", \"yes-just-want\", \"no\", or \"\"\n11. financialReviewFrequency - How often do they review financials? Valid: \"none\", \"weekly\", \"biweekly\", \"monthly\", \"quarterly\", or \"\"\n\n12. payrollProvider - Which payroll provider? Valid: \"adp\", \"gusto\", \"onpay\", \"paychex\", \"rippling\", \"justworks\", \"paycor\", \"zenefits\", \"other\", or \"\"\n13. has401k - Do they have a 401k plan? Valid: \"yes\", \"no\", or \"\"\n14. payrollDepartments - Number of payroll departments. Valid: \"0\", \"1\", \"2\", \"3\", \"4\", \"5\", or \"\"\n15. employeeCount - Number of employees. Valid: \"0\", \"1-5\", \"6-20\", \"21+\", or \"\"\n\n16. tracksExpensesByEmployee - Do they track expenses by employee? Valid: \"yes\", \"no\", or \"\"\n17. expensePlatform - Which expense platform? Valid: \"divvy\", \"brex\", \"ramp\", \"expensify\", \"hubdoc\", \"other\", or \"\"\n18. expensePlatformEmployees - Number of employees using expense platform. Valid: \"1\"-\"10\", \"10+\", or \"\"\n\n19. needsBillPaySupport - Do they need bill pay support? Valid: \"yes\", \"no\", or \"\"\n20. billPayCadence - How often is bill pay done? Valid: \"weekly\", \"biweekly\", \"monthly\", \"quarterly\", or \"\"\n21. billsPerMonth - Number of bills per month. Valid: \"up-to-25\", \"over-25\", or \"\"\n\n22. needsInvoicingSupport - Do they need invoicing support? Valid: \"yes\", \"no\", or \"\"\n23. invoicingCadence - How often is invoicing done? Valid: \"weekly\", \"biweekly\", \"monthly\", \"quarterly\", \"annually\", or \"\"\n24. invoicesPerMonth - Number of invoices per month. Valid: \"up-to-25\", \"over-25\", or \"\"\n\n25. interestedInCfoReview - Are they interested in CFO review services? Valid: \"yes\", \"no\", or \"\"\n\nADDITIONAL FIELDS (free text):\n- additionalNotes (string) - Any additional notes or context from the call\n- firefliesVideoLink (string) - Leave empty unless mentioned in transcript\n\nCONFIDENCE RULES:\n- \"high\": The information was explicitly stated in the transcript\n- \"medium\": The information was implied or can be reasonably inferred from context\n- \"low\": The information is uncertain, barely mentioned, or is a guess\n\nIMPORTANT:\n- Only use the exact valid options provided above for dropdown fields\n- Use empty string \"\" if information is not found or uncertain\n- Return ONLY valid JSON, no markdown formatting or code blocks\n- All field names in answers and confidence must be camelCase as shown above",
+              "role": "system"
+            },
+            {
+              "content": "=Analyze this demo call transcript and extract the sales intake information:\n\n{{ $json.transcript_content }}",
+              "role": "user"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1264,
+        -352
+      ],
+      "id": "generate-intake-with-ai",
+      "name": "Generate Intake With AI",
+      "credentials": {
+        "openAiApi": {
+          "id": "lSSimk5MMw6cbVWo",
+          "name": "Automation OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the AI response and prepare for Supabase insert\nconst dealId = $('Catch Deal ID').first().json.body.deal_id;\nconst aiResponse = $input.first().json.message.content;\n\nlet parsedData;\ntry {\n  // Try to parse the JSON response\n  parsedData = JSON.parse(aiResponse);\n} catch (error) {\n  // If JSON parsing fails, try to extract JSON from markdown code blocks\n  const jsonMatch = aiResponse.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (jsonMatch) {\n    parsedData = JSON.parse(jsonMatch[1]);\n  } else {\n    throw new Error('Failed to parse AI response as JSON');\n  }\n}\n\nconst answers = parsedData.answers || {};\nconst confidence = parsedData.confidence || {};\n\n// Helper function to convert camelCase to snake_case\nfunction toSnakeCase(str) {\n  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);\n}\n\n// Build the Supabase insert object with snake_case column names\nconst supabaseData = {\n  deal_id: dealId,\n  company_name: answers.companyName || null,\n  contact_name: answers.contactName || null,\n  email_address: answers.emailAddress || null,\n  entity_type: answers.entityType || null,\n  has_restricted_grants: answers.hasRestrictedGrants || null,\n  uses_qbo_or_xero: answers.usesQboOrXero || null,\n  accounting_platform: answers.accountingPlatform || null,\n  accounting_basis: answers.accountingBasis || null,\n  bookkeeping_cadence: answers.bookkeepingCadence || null,\n  needs_financials_before_15th: answers.needsFinancialsBefore15th || null,\n  financial_review_frequency: answers.financialReviewFrequency || null,\n  payroll_provider: answers.payrollProvider || null,\n  has_401k: answers.has401k || null,\n  payroll_departments: answers.payrollDepartments || null,\n  employee_count: answers.employeeCount || null,\n  tracks_expenses_by_employee: answers.tracksExpensesByEmployee || null,\n  expense_platform: answers.expensePlatform || null,\n  expense_platform_employees: answers.expensePlatformEmployees || null,\n  needs_bill_pay_support: answers.needsBillPaySupport || null,\n  bill_pay_cadence: answers.billPayCadence || null,\n  bills_per_month: answers.billsPerMonth || null,\n  needs_invoicing_support: answers.needsInvoicingSupport || null,\n  invoicing_cadence: answers.invoicingCadence || null,\n  invoices_per_month: answers.invoicesPerMonth || null,\n  interested_in_cfo_review: answers.interestedInCfoReview || null,\n  additional_notes: answers.additionalNotes || null,\n  fireflies_video_link: answers.firefliesVideoLink || null,\n  field_confidence: confidence,\n  is_auto_filled: true,\n  auto_filled_at: new Date().toISOString(),\n  is_confirmed: false,\n  confirmed_at: null\n};\n\nreturn [{\n  json: {\n    deal_id: dealId,\n    supabase_data: supabaseData,\n    raw_answers: answers,\n    raw_confidence: confidence\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        -352
+      ],
+      "id": "parse-ai-response",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "revops_sales_intakes",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "deal_id",
+              "fieldValue": "={{ $json.supabase_data.deal_id }}"
+            },
+            {
+              "fieldId": "company_name",
+              "fieldValue": "={{ $json.supabase_data.company_name }}"
+            },
+            {
+              "fieldId": "contact_name",
+              "fieldValue": "={{ $json.supabase_data.contact_name }}"
+            },
+            {
+              "fieldId": "email_address",
+              "fieldValue": "={{ $json.supabase_data.email_address }}"
+            },
+            {
+              "fieldId": "entity_type",
+              "fieldValue": "={{ $json.supabase_data.entity_type }}"
+            },
+            {
+              "fieldId": "has_restricted_grants",
+              "fieldValue": "={{ $json.supabase_data.has_restricted_grants }}"
+            },
+            {
+              "fieldId": "uses_qbo_or_xero",
+              "fieldValue": "={{ $json.supabase_data.uses_qbo_or_xero }}"
+            },
+            {
+              "fieldId": "accounting_platform",
+              "fieldValue": "={{ $json.supabase_data.accounting_platform }}"
+            },
+            {
+              "fieldId": "accounting_basis",
+              "fieldValue": "={{ $json.supabase_data.accounting_basis }}"
+            },
+            {
+              "fieldId": "bookkeeping_cadence",
+              "fieldValue": "={{ $json.supabase_data.bookkeeping_cadence }}"
+            },
+            {
+              "fieldId": "needs_financials_before_15th",
+              "fieldValue": "={{ $json.supabase_data.needs_financials_before_15th }}"
+            },
+            {
+              "fieldId": "financial_review_frequency",
+              "fieldValue": "={{ $json.supabase_data.financial_review_frequency }}"
+            },
+            {
+              "fieldId": "payroll_provider",
+              "fieldValue": "={{ $json.supabase_data.payroll_provider }}"
+            },
+            {
+              "fieldId": "has_401k",
+              "fieldValue": "={{ $json.supabase_data.has_401k }}"
+            },
+            {
+              "fieldId": "payroll_departments",
+              "fieldValue": "={{ $json.supabase_data.payroll_departments }}"
+            },
+            {
+              "fieldId": "employee_count",
+              "fieldValue": "={{ $json.supabase_data.employee_count }}"
+            },
+            {
+              "fieldId": "tracks_expenses_by_employee",
+              "fieldValue": "={{ $json.supabase_data.tracks_expenses_by_employee }}"
+            },
+            {
+              "fieldId": "expense_platform",
+              "fieldValue": "={{ $json.supabase_data.expense_platform }}"
+            },
+            {
+              "fieldId": "expense_platform_employees",
+              "fieldValue": "={{ $json.supabase_data.expense_platform_employees }}"
+            },
+            {
+              "fieldId": "needs_bill_pay_support",
+              "fieldValue": "={{ $json.supabase_data.needs_bill_pay_support }}"
+            },
+            {
+              "fieldId": "bill_pay_cadence",
+              "fieldValue": "={{ $json.supabase_data.bill_pay_cadence }}"
+            },
+            {
+              "fieldId": "bills_per_month",
+              "fieldValue": "={{ $json.supabase_data.bills_per_month }}"
+            },
+            {
+              "fieldId": "needs_invoicing_support",
+              "fieldValue": "={{ $json.supabase_data.needs_invoicing_support }}"
+            },
+            {
+              "fieldId": "invoicing_cadence",
+              "fieldValue": "={{ $json.supabase_data.invoicing_cadence }}"
+            },
+            {
+              "fieldId": "invoices_per_month",
+              "fieldValue": "={{ $json.supabase_data.invoices_per_month }}"
+            },
+            {
+              "fieldId": "interested_in_cfo_review",
+              "fieldValue": "={{ $json.supabase_data.interested_in_cfo_review }}"
+            },
+            {
+              "fieldId": "additional_notes",
+              "fieldValue": "={{ $json.supabase_data.additional_notes }}"
+            },
+            {
+              "fieldId": "fireflies_video_link",
+              "fieldValue": "={{ $json.supabase_data.fireflies_video_link }}"
+            },
+            {
+              "fieldId": "field_confidence",
+              "fieldValue": "={{ JSON.stringify($json.supabase_data.field_confidence) }}"
+            },
+            {
+              "fieldId": "is_auto_filled",
+              "fieldValue": "={{ $json.supabase_data.is_auto_filled }}"
+            },
+            {
+              "fieldId": "auto_filled_at",
+              "fieldValue": "={{ $json.supabase_data.auto_filled_at }}"
+            },
+            {
+              "fieldId": "is_confirmed",
+              "fieldValue": "={{ $json.supabase_data.is_confirmed }}"
+            }
+          ]
+        },
+        "conflictFields": "deal_id"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1712,
+        -352
+      ],
+      "id": "upsert-sales-intake",
+      "name": "Upsert Sales Intake",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, deal_id: $('Catch Deal ID').first().json.body.deal_id, message: 'Sales intake data generated and saved successfully' } }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1936,
+        -352
+      ],
+      "id": "respond-success",
+      "name": "Respond Success"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Invalid deal_id provided. Must be a valid UUID.' } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        368,
+        -192
+      ],
+      "id": "respond-invalid-id",
+      "name": "Respond Invalid ID"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'No demo call transcript found for this deal.' } }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        816,
+        -192
+      ],
+      "id": "respond-no-transcript",
+      "name": "Respond No Transcript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Catch Deal ID": {
+      "main": [
+        [
+          {
+            "node": "Validate Deal ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Deal ID": {
+      "main": [
+        [
+          {
+            "node": "Query Transcript Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Transcript Metadata": {
+      "main": [
+        [
+          {
+            "node": "Check Transcript Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Transcript Found": {
+      "main": [
+        [
+          {
+            "node": "Download Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond No Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Transcript": {
+      "main": [
+        [
+          {
+            "node": "Prepare Transcript Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Transcript Data": {
+      "main": [
+        [
+          {
+            "node": "Generate Intake With AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Intake With AI": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Upsert Sales Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Sales Intake": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "sales-intake-ai-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "sales-intake-ai-workflow",
+  "tags": []
+}

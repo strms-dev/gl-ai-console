@@ -1,0 +1,587 @@
+{
+  "name": "HubSpot Deal Created - Migrate Funnel to Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "deal",
+        "operation": "get",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $json.body[0].objectId }}",
+          "mode": ""
+        },
+        "filters": {}
+      },
+      "id": "get-deal-1",
+      "name": "Get Deal Details",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        0
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "stage-check",
+              "leftValue": "={{ $json.properties.dealstage.value }}",
+              "rightValue": "3020119",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-stage-1",
+      "name": "Filter MQO Stage Only",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.hubapi.com/crm/v4/objects/deals/{{ $('Get Deal Details').item.json.dealId }}/associations/contact",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotOAuth2Api",
+        "options": {}
+      },
+      "id": "get-associations-1",
+      "name": "Get Deal Associations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        0
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "get",
+        "contactId": "={{ $json.results[0].toObjectId }}",
+        "additionalFields": {}
+      },
+      "id": "get-contact-1",
+      "name": "Get Contact Details",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        864,
+        0
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.hubapi.com/crm/v4/objects/deals/{{ $('Get Deal Details').item.json.dealId }}/associations/company",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotOAuth2Api",
+        "options": {}
+      },
+      "id": "get-company-assoc-1",
+      "name": "Get Company Associations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1088,
+        0
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "company",
+        "operation": "get",
+        "companyId": "={{ $json.results[0].toObjectId }}",
+        "additionalFields": {}
+      },
+      "id": "get-company-1",
+      "name": "Get Company Details",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        1312,
+        0
+      ],
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Safely get nested properties with optional chaining\nconst deal = $('Get Deal Details').first().json;\nconst dealProps = $('Filter MQO Stage Only').first().json.properties;\nconst contact = $('Get Contact Details').first().json;\nconst contactProps = contact.properties || {};\nconst company = $input.first().json;\nconst companyProps = company.properties || {};\n\n// Build the merged data object\nconst mergedData = {\n  // Deal info\n  hs_deal_id: String(deal.dealId),\n  hs_deal_url: `https://app.hubspot.com/contacts/4723689/record/0-3/${deal.dealId}`,\n  deal_name: dealProps.dealname?.value || `${companyProps.name?.value || 'Unknown'} Deal`,\n  deal_stage: dealProps.dealstage?.value || null,\n  \n  // Contact info\n  contact_email: contactProps.email?.value || null,\n  contact_first_name: contactProps.firstname?.value || null,\n  contact_last_name: contactProps.lastname?.value || null,\n  \n  // Company info (fallback chain: company name → contact's company field)\n  company_name: companyProps.name?.value || contactProps.company?.value || 'Unknown Company',\n  company_domain: companyProps.website?.value || null\n};\n\nreturn [{ json: mergedData }];\n"
+      },
+      "id": "merge-data-1",
+      "name": "Merge HubSpot Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "revops_funnel_leads",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "condition": "eq",
+              "keyValue": "={{ $json.contact_email }}"
+            }
+          ]
+        }
+      },
+      "id": "find-funnel-lead-1",
+      "name": "Find Funnel Lead by Email",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-results",
+              "leftValue": "={{ Object.keys($json).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-funnel-found-1",
+      "name": "Funnel Lead Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1984,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "revops_pipeline_deals",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "deal_name",
+              "fieldValue": "={{ $('Merge HubSpot Data').item.json.deal_name }}"
+            },
+            {
+              "fieldId": "company_name",
+              "fieldValue": "={{ $('Find Funnel Lead by Email').item.json.company_name || $('Merge HubSpot Data').item.json.company_name }}"
+            },
+            {
+              "fieldId": "first_name",
+              "fieldValue": "={{ $('Find Funnel Lead by Email').item.json.first_name || $('Merge HubSpot Data').item.json.contact_first_name }}"
+            },
+            {
+              "fieldId": "last_name",
+              "fieldValue": "={{ $('Find Funnel Lead by Email').item.json.last_name || $('Merge HubSpot Data').item.json.contact_last_name }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $('Find Funnel Lead by Email').item.json.email || $('Merge HubSpot Data').item.json.contact_email }}"
+            },
+            {
+              "fieldId": "stage",
+              "fieldValue": "Demo Call"
+            },
+            {
+              "fieldId": "hs_stage",
+              "fieldValue": "MQO - Meeting Booked"
+            },
+            {
+              "fieldId": "hs_deal_id",
+              "fieldValue": "={{ $('Merge HubSpot Data').item.json.hs_deal_id }}"
+            },
+            {
+              "fieldId": "hs_deal_url",
+              "fieldValue": "={{ $('Merge HubSpot Data').item.json.hs_deal_url }}"
+            }
+          ]
+        }
+      },
+      "id": "create-pipeline-with-funnel-1",
+      "name": "Create Pipeline Deal (with Funnel Data)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2208,
+        -96
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "tableId": "revops_funnel_leads",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Find Funnel Lead by Email').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "delete-funnel-lead-1",
+      "name": "Delete Funnel Lead",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2432,
+        -96
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "revops_pipeline_deals",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "deal_name",
+              "fieldValue": "={{ $('Merge HubSpot Data').item.json.deal_name }}"
+            },
+            {
+              "fieldId": "company_name",
+              "fieldValue": "={{ $('Merge HubSpot Data').item.json.company_name }}"
+            },
+            {
+              "fieldId": "first_name",
+              "fieldValue": "={{ $('Merge HubSpot Data').item.json.contact_first_name }}"
+            },
+            {
+              "fieldId": "last_name",
+              "fieldValue": "={{ $('Merge HubSpot Data').item.json.contact_last_name }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $('Merge HubSpot Data').item.json.contact_email }}"
+            },
+            {
+              "fieldId": "stage",
+              "fieldValue": "Demo Call"
+            },
+            {
+              "fieldId": "hs_stage",
+              "fieldValue": "MQO - Meeting Booked"
+            },
+            {
+              "fieldId": "hs_deal_id",
+              "fieldValue": "={{ $('Merge HubSpot Data').item.json.hs_deal_id }}"
+            },
+            {
+              "fieldId": "hs_deal_url",
+              "fieldValue": "={{ $('Merge HubSpot Data').item.json.hs_deal_url }}"
+            }
+          ]
+        }
+      },
+      "id": "create-pipeline-no-funnel-1",
+      "name": "Create Pipeline Deal (HubSpot Only)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2208,
+        96
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "funnel-to-pipeline",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -32,
+        0
+      ],
+      "id": "6816f7de-f068-4fe3-b713-7c6c1233e7ca",
+      "name": "Trigger On HS Deal Creation - WH",
+      "webhookId": "ec9c4200-9c0d-4c77-82b4-3b4ea8400f53"
+    }
+  ],
+  "pinData": {
+    "Trigger On HS Deal Creation - WH": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.srv1055749.hstgr.cloud",
+            "user-agent": "axios/1.12.0",
+            "content-length": "264",
+            "accept": "application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7",
+            "accept-encoding": "gzip, compress, deflate, br",
+            "content-type": "application/json",
+            "x-forwarded-for": "172.18.0.1",
+            "x-forwarded-host": "n8n.srv1055749.hstgr.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "658a1a16248d",
+            "x-real-ip": "172.18.0.1"
+          },
+          "params": {},
+          "query": {},
+          "body": [
+            {
+              "eventId": 4028585488,
+              "subscriptionId": 5108761,
+              "portalId": 4723689,
+              "appId": 22032041,
+              "occurredAt": 1767823092255,
+              "subscriptionType": "deal.creation",
+              "attemptNumber": 0,
+              "objectId": 53394414098,
+              "changeFlag": "CREATED",
+              "changeSource": "CRM_UI",
+              "sourceId": "userId:45206060"
+            }
+          ],
+          "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook/funnel-to-pipeline",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Get Deal Details": {
+      "main": [
+        [
+          {
+            "node": "Filter MQO Stage Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter MQO Stage Only": {
+      "main": [
+        [
+          {
+            "node": "Get Deal Associations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Deal Associations": {
+      "main": [
+        [
+          {
+            "node": "Get Contact Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Contact Details": {
+      "main": [
+        [
+          {
+            "node": "Get Company Associations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Company Associations": {
+      "main": [
+        [
+          {
+            "node": "Get Company Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Company Details": {
+      "main": [
+        [
+          {
+            "node": "Merge HubSpot Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge HubSpot Data": {
+      "main": [
+        [
+          {
+            "node": "Find Funnel Lead by Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Funnel Lead by Email": {
+      "main": [
+        [
+          {
+            "node": "Funnel Lead Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Funnel Lead Found?": {
+      "main": [
+        [
+          {
+            "node": "Create Pipeline Deal (with Funnel Data)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Pipeline Deal (HubSpot Only)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Pipeline Deal (with Funnel Data)": {
+      "main": [
+        [
+          {
+            "node": "Delete Funnel Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger On HS Deal Creation - WH": {
+      "main": [
+        [
+          {
+            "node": "Get Deal Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "timezone": "America/New_York",
+    "executionTimeout": -1,
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
+  },
+  "versionId": "b4a04104-cbaa-4070-b878-eb6d43db3f0e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "z88VzbXCTk0wMUAL",
+  "tags": []
+}

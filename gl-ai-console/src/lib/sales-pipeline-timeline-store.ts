@@ -18,9 +18,24 @@ import {
   createTestTeamGLReviewFormData
 } from "./sales-pipeline-timeline-types"
 import { updatePipelineDeal } from "./revops-pipeline-store"
+import {
+  replaceRevOpsFile,
+  deleteRevOpsFilesByType,
+  getRevOpsFileByType
+} from "./supabase/revops-files"
+import {
+  fetchSalesIntakeByDealId,
+  updateSalesIntakeSupabase,
+  confirmSalesIntakeSupabase,
+  deleteSalesIntakeSupabase
+} from "./supabase/revops-sales-intakes"
+import type { RevOpsPipelineFile } from "./supabase/types"
+
+// n8n webhook URL for AI auto-fill
+const SALES_INTAKE_AI_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/sales-intake-ai"
 
 const TIMELINE_STORAGE_KEY = "revops-pipeline-timelines"
-const FILES_STORAGE_KEY = "revops-pipeline-files"
+const FILES_STORAGE_KEY = "revops-pipeline-files" // Kept for backward compatibility migration
 
 // Mapping from stage IDs to display names for automation stage
 const STAGE_ID_TO_DISPLAY_NAME: Record<SalesPipelineStageId, string> = {
@@ -621,9 +636,14 @@ export async function uploadDemoTranscript(
 
   if (!existing) return null
 
-  // Save the actual file to localStorage if provided
+  // Save the actual file to Supabase if provided (replaceRevOpsFile handles existing files)
   if (file) {
-    await saveFileToStorage(dealId, 'revops-demo-call-transcript', file)
+    try {
+      await replaceRevOpsFile(dealId, 'revops-demo-call-transcript', file, 'User')
+    } catch (error) {
+      console.error('Error uploading demo transcript to Supabase:', error)
+      // Continue with state update even if upload fails
+    }
   }
 
   const now = new Date().toISOString()
@@ -658,8 +678,13 @@ export async function clearDemoTranscript(
 
   if (!existing) return null
 
-  // Delete the file from localStorage
-  deleteFileFromStorage(dealId, 'revops-demo-call-transcript')
+  // Delete the file from Supabase
+  try {
+    await deleteRevOpsFilesByType(dealId, 'revops-demo-call-transcript')
+  } catch (error) {
+    console.error('Error deleting demo transcript from Supabase:', error)
+    // Continue with state update even if delete fails
+  }
 
   existing.stages["demo-call"].status = "in_progress"
   existing.stages["demo-call"].completedAt = null
@@ -677,6 +702,55 @@ export async function clearDemoTranscript(
 
   // Update deal's automation stage
   await updateDealAutomationStage(dealId, "demo-call")
+
+  return existing
+}
+
+/**
+ * Get demo transcript file from Supabase
+ */
+export async function getDemoTranscriptFile(
+  dealId: string
+): Promise<RevOpsPipelineFile | null> {
+  try {
+    return await getRevOpsFileByType(dealId, 'revops-demo-call-transcript')
+  } catch (error) {
+    console.error('Error getting demo transcript from Supabase:', error)
+    return null
+  }
+}
+
+/**
+ * Sync localStorage state with Supabase file (used when localStorage was cleared)
+ * This only updates localStorage state - does NOT upload to Supabase
+ */
+export async function syncDemoTranscriptState(
+  dealId: string,
+  fileName: string,
+  uploadedAt: string
+): Promise<SalesPipelineTimelineState | null> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (!existing) return null
+
+  // Only update state - do NOT upload file (it already exists in Supabase)
+  existing.stages["demo-call"].status = "completed"
+  existing.stages["demo-call"].completedAt = uploadedAt
+  existing.stages["demo-call"].data.transcriptUploaded = true
+  existing.stages["demo-call"].data.transcriptFileName = fileName
+  existing.stages["demo-call"].data.transcriptUploadedAt = uploadedAt
+
+  // Move to sales-intake stage
+  existing.currentStage = "sales-intake"
+  existing.stages["sales-intake"].status = "in_progress"
+
+  existing.updatedAt = new Date().toISOString()
+
+  saveAllTimelines(timelines)
+
+  // Update deal's automation stage
+  await updateDealAutomationStage(dealId, "sales-intake")
 
   return existing
 }
@@ -700,7 +774,83 @@ export async function deleteTimelineState(dealId: string): Promise<boolean> {
 // ============================================
 
 /**
- * Auto-fill sales intake form with test data
+ * Trigger AI auto-fill for sales intake via n8n webhook
+ * Returns true if webhook was triggered successfully
+ * The actual data will be populated by the n8n workflow into Supabase
+ */
+export async function triggerSalesIntakeAI(
+  dealId: string
+): Promise<boolean> {
+  try {
+    const response = await fetch(SALES_INTAKE_AI_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ deal_id: dealId })
+    })
+
+    if (!response.ok) {
+      console.error('Failed to trigger sales intake AI:', response.statusText)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error triggering sales intake AI:', error)
+    return false
+  }
+}
+
+/**
+ * Load sales intake data from Supabase and sync to localStorage
+ * Returns the form data if found, null otherwise
+ */
+export async function loadSalesIntakeFromSupabase(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  try {
+    const intakeData = await fetchSalesIntakeByDealId(dealId)
+
+    if (!intakeData) {
+      return null
+    }
+
+    // Sync Supabase data to localStorage state
+    const timelines = getAllTimelines()
+    const existing = timelines[dealId]
+
+    if (!existing) return null
+
+    existing.stages["sales-intake"].data = {
+      formData: intakeData.formData,
+      isAutoFilled: intakeData.isAutoFilled,
+      autoFilledAt: intakeData.autoFilledAt,
+      confirmedAt: intakeData.confirmedAt,
+      fieldConfidence: intakeData.fieldConfidence
+    }
+
+    if (intakeData.isAutoFilled && !intakeData.isConfirmed) {
+      existing.stages["sales-intake"].status = "in_progress"
+    } else if (intakeData.isConfirmed) {
+      existing.stages["sales-intake"].status = "completed"
+      existing.stages["sales-intake"].completedAt = intakeData.confirmedAt
+    }
+
+    existing.updatedAt = new Date().toISOString()
+    saveAllTimelines(timelines)
+
+    return existing
+  } catch (error) {
+    console.error('Error loading sales intake from Supabase:', error)
+    return null
+  }
+}
+
+/**
+ * Auto-fill sales intake form with test data (LEGACY - for backwards compatibility)
+ * This is the original function that uses dummy data
+ * For production, use triggerSalesIntakeAI() instead
  */
 export async function autoFillSalesIntake(
   dealId: string
@@ -731,6 +881,7 @@ export async function autoFillSalesIntake(
 
 /**
  * Update sales intake form data (for user edits)
+ * Updates both localStorage and Supabase
  */
 export async function updateSalesIntakeForm(
   dealId: string,
@@ -743,6 +894,7 @@ export async function updateSalesIntakeForm(
 
   const now = new Date().toISOString()
 
+  // Update localStorage
   existing.stages["sales-intake"].data = {
     ...existing.stages["sales-intake"].data,
     formData
@@ -751,11 +903,20 @@ export async function updateSalesIntakeForm(
   existing.updatedAt = now
   saveAllTimelines(timelines)
 
+  // Update Supabase (async, don't block on errors)
+  try {
+    await updateSalesIntakeSupabase(dealId, formData)
+  } catch (error) {
+    console.error('Error updating sales intake in Supabase:', error)
+    // Continue - localStorage is already updated
+  }
+
   return existing
 }
 
 /**
  * Confirm sales intake form (complete the stage)
+ * Updates both localStorage and Supabase
  */
 export async function confirmSalesIntake(
   dealId: string
@@ -767,6 +928,7 @@ export async function confirmSalesIntake(
 
   const now = new Date().toISOString()
 
+  // Update localStorage
   existing.stages["sales-intake"].data.confirmedAt = now
   existing.stages["sales-intake"].status = "completed"
   existing.stages["sales-intake"].completedAt = now
@@ -778,6 +940,18 @@ export async function confirmSalesIntake(
   existing.updatedAt = now
   saveAllTimelines(timelines)
 
+  // Update Supabase - save final form data and mark as confirmed
+  try {
+    const formData = existing.stages["sales-intake"].data.formData
+    if (formData) {
+      await updateSalesIntakeSupabase(dealId, formData)
+    }
+    await confirmSalesIntakeSupabase(dealId)
+  } catch (error) {
+    console.error('Error confirming sales intake in Supabase:', error)
+    // Continue - localStorage is already updated
+  }
+
   // Update deal's automation stage
   await updateDealAutomationStage(dealId, "follow-up-email")
 
@@ -786,6 +960,7 @@ export async function confirmSalesIntake(
 
 /**
  * Reset sales intake form (clear data and go back to action-required)
+ * Clears both localStorage and Supabase
  */
 export async function resetSalesIntake(
   dealId: string
@@ -797,6 +972,7 @@ export async function resetSalesIntake(
 
   const now = new Date().toISOString()
 
+  // Reset localStorage
   existing.stages["sales-intake"].data = {
     formData: null,
     isAutoFilled: false,
@@ -809,6 +985,14 @@ export async function resetSalesIntake(
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
+
+  // Delete from Supabase
+  try {
+    await deleteSalesIntakeSupabase(dealId)
+  } catch (error) {
+    console.error('Error deleting sales intake from Supabase:', error)
+    // Continue - localStorage is already reset
+  }
 
   return existing
 }

@@ -249,6 +249,160 @@ export interface Database {
           updated_at?: string
         }
       }
+      revops_pipeline_files: {
+        Row: {
+          id: string
+          deal_id: string
+          file_type_id: string
+          file_name: string
+          file_path: string
+          file_size: number
+          uploaded_by: string
+          uploaded_at: string
+          storage_bucket: string
+          storage_path: string
+        }
+        Insert: {
+          id?: string
+          deal_id: string
+          file_type_id: string
+          file_name: string
+          file_path: string
+          file_size: number
+          uploaded_by?: string
+          uploaded_at?: string
+          storage_bucket?: string
+          storage_path: string
+        }
+        Update: {
+          id?: string
+          deal_id?: string
+          file_type_id?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          uploaded_by?: string
+          uploaded_at?: string
+          storage_bucket?: string
+          storage_path?: string
+        }
+      }
+      revops_sales_intakes: {
+        Row: {
+          id: string
+          deal_id: string
+          company_name: string | null
+          contact_name: string | null
+          email_address: string | null
+          entity_type: string | null
+          has_restricted_grants: string | null
+          uses_qbo_or_xero: string | null
+          accounting_platform: string | null
+          accounting_basis: string | null
+          bookkeeping_cadence: string | null
+          needs_financials_before_15th: string | null
+          financial_review_frequency: string | null
+          payroll_provider: string | null
+          has_401k: string | null
+          payroll_departments: string | null
+          employee_count: string | null
+          tracks_expenses_by_employee: string | null
+          expense_platform: string | null
+          expense_platform_employees: string | null
+          needs_bill_pay_support: string | null
+          bill_pay_cadence: string | null
+          bills_per_month: string | null
+          needs_invoicing_support: string | null
+          invoicing_cadence: string | null
+          invoices_per_month: string | null
+          interested_in_cfo_review: string | null
+          additional_notes: string | null
+          fireflies_video_link: string | null
+          field_confidence: Json
+          is_auto_filled: boolean
+          auto_filled_at: string | null
+          is_confirmed: boolean
+          confirmed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          deal_id: string
+          company_name?: string | null
+          contact_name?: string | null
+          email_address?: string | null
+          entity_type?: string | null
+          has_restricted_grants?: string | null
+          uses_qbo_or_xero?: string | null
+          accounting_platform?: string | null
+          accounting_basis?: string | null
+          bookkeeping_cadence?: string | null
+          needs_financials_before_15th?: string | null
+          financial_review_frequency?: string | null
+          payroll_provider?: string | null
+          has_401k?: string | null
+          payroll_departments?: string | null
+          employee_count?: string | null
+          tracks_expenses_by_employee?: string | null
+          expense_platform?: string | null
+          expense_platform_employees?: string | null
+          needs_bill_pay_support?: string | null
+          bill_pay_cadence?: string | null
+          bills_per_month?: string | null
+          needs_invoicing_support?: string | null
+          invoicing_cadence?: string | null
+          invoices_per_month?: string | null
+          interested_in_cfo_review?: string | null
+          additional_notes?: string | null
+          fireflies_video_link?: string | null
+          field_confidence?: Json
+          is_auto_filled?: boolean
+          auto_filled_at?: string | null
+          is_confirmed?: boolean
+          confirmed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          deal_id?: string
+          company_name?: string | null
+          contact_name?: string | null
+          email_address?: string | null
+          entity_type?: string | null
+          has_restricted_grants?: string | null
+          uses_qbo_or_xero?: string | null
+          accounting_platform?: string | null
+          accounting_basis?: string | null
+          bookkeeping_cadence?: string | null
+          needs_financials_before_15th?: string | null
+          financial_review_frequency?: string | null
+          payroll_provider?: string | null
+          has_401k?: string | null
+          payroll_departments?: string | null
+          employee_count?: string | null
+          tracks_expenses_by_employee?: string | null
+          expense_platform?: string | null
+          expense_platform_employees?: string | null
+          needs_bill_pay_support?: string | null
+          bill_pay_cadence?: string | null
+          bills_per_month?: string | null
+          needs_invoicing_support?: string | null
+          invoicing_cadence?: string | null
+          invoices_per_month?: string | null
+          interested_in_cfo_review?: string | null
+          additional_notes?: string | null
+          fireflies_video_link?: string | null
+          field_confidence?: Json
+          is_auto_filled?: boolean
+          auto_filled_at?: string | null
+          is_confirmed?: boolean
+          confirmed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     Views: {}
@@ -285,6 +439,16 @@ export type RevOpsFunnelLeadUpdate = Database['public']['Tables']['revops_funnel
 export type RevOpsPipelineDeal = Database['public']['Tables']['revops_pipeline_deals']['Row']
 export type RevOpsPipelineDealInsert = Database['public']['Tables']['revops_pipeline_deals']['Insert']
 export type RevOpsPipelineDealUpdate = Database['public']['Tables']['revops_pipeline_deals']['Update']
+
+// RevOps Pipeline File types
+export type RevOpsPipelineFile = Database['public']['Tables']['revops_pipeline_files']['Row']
+export type RevOpsPipelineFileInsert = Database['public']['Tables']['revops_pipeline_files']['Insert']
+export type RevOpsPipelineFileUpdate = Database['public']['Tables']['revops_pipeline_files']['Update']
+
+// RevOps Sales Intake types
+export type RevOpsSalesIntake = Database['public']['Tables']['revops_sales_intakes']['Row']
+export type RevOpsSalesIntakeInsert = Database['public']['Tables']['revops_sales_intakes']['Insert']
+export type RevOpsSalesIntakeUpdate = Database['public']['Tables']['revops_sales_intakes']['Update']
 
 // Complete project data including related tables
 export interface ProjectWithDetails extends Project {

@@ -15,9 +15,10 @@ interface FileUploadProps {
   onFileCleared?: (fileTypeId: string) => void
   existingFile?: UploadedFile
   variant?: 'compact' | 'comfortable' // compact = horizontal for timeline, comfortable = vertical for grid
+  getDownloadUrl?: (storagePath: string) => Promise<string> // Custom download URL function for different storage buckets
 }
 
-export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFile, variant = 'comfortable' }: FileUploadProps) {
+export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFile, variant = 'comfortable', getDownloadUrl }: FileUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -146,7 +147,9 @@ export function FileUpload({ fileType, onFileUploaded, onFileCleared, existingFi
       // If this file has a storage path, it's from Supabase - get the signed URL
       if (fileToDownload.storagePath && !fileToDownload.isDemoFile) {
         try {
-          const downloadUrl = await getFileDownloadUrl(fileToDownload.storagePath)
+          // Use custom download URL function if provided, otherwise use default STRMS bucket function
+          const downloadUrlFn = getDownloadUrl || getFileDownloadUrl
+          const downloadUrl = await downloadUrlFn(fileToDownload.storagePath)
 
           // Create a temporary link and trigger download
           const link = document.createElement('a')
@@ -269,7 +272,7 @@ For more information about this document, please contact the GrowthLab team.`
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
     }
-  }, [uploadedFile, existingFile, fileType])
+  }, [uploadedFile, existingFile, fileType, getDownloadUrl])
 
   const triggerFileInput = useCallback(() => {
     const input = document.getElementById(uniqueId) as HTMLInputElement

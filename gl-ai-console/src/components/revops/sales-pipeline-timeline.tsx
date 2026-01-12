@@ -42,8 +42,10 @@ import {
   getOrCreateTimelineState,
   uploadDemoTranscript,
   clearDemoTranscript,
-  getFileFromStorage,
-  autoFillSalesIntake,
+  getDemoTranscriptFile,
+  syncDemoTranscriptState,
+  triggerSalesIntakeAI,
+  loadSalesIntakeFromSupabase,
   updateSalesIntakeForm,
   confirmSalesIntake,
   resetSalesIntake,
@@ -118,6 +120,7 @@ import { ClosedLost } from "@/components/revops/closed-lost"
 import { PipelineDeal, getPipelineDealById } from "@/lib/revops-pipeline-store"
 import { FileUpload } from "@/components/leads/file-upload"
 import { getFileTypeById, UploadedFile } from "@/lib/file-types"
+import { getRevOpsFileDownloadUrl } from "@/lib/supabase/revops-files"
 
 // Timeline Event interface (similar to STRMS)
 interface TimelineEvent {
@@ -232,6 +235,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | undefined>(undefined)
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false)
   const [isAutoFillLoading, setIsAutoFillLoading] = useState(false)
+  const [isSalesIntakeAIPolling, setIsSalesIntakeAIPolling] = useState(false)
   const [isGLReviewAutoFillLoading, setIsGLReviewAutoFillLoading] = useState(false)
   const [isComparisonLoading, setIsComparisonLoading] = useState(false)
 
@@ -262,32 +266,43 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       }
       setCollapsedItems(collapsed)
 
-      // If transcript was already uploaded, restore from localStorage
-      if (state.stages["demo-call"].data.transcriptUploaded && state.stages["demo-call"].data.transcriptFileName) {
-        const storedFile = getFileFromStorage(deal.id, 'revops-demo-call-transcript')
-        if (storedFile) {
-          // Create a File object from the stored blob for download functionality
-          const file = new File([storedFile.blob], storedFile.fileName, { type: storedFile.blob.type })
+      // Always check Supabase for the transcript file (source of truth)
+      // This handles cases where localStorage was cleared but file exists in Supabase
+      try {
+        const supabaseFile = await getDemoTranscriptFile(deal.id)
+        if (supabaseFile) {
           setUploadedFile({
-            id: `${deal.id}-demo-transcript`,
+            id: supabaseFile.id,
             fileTypeId: 'revops-demo-call-transcript',
-            fileName: storedFile.fileName,
-            uploadDate: storedFile.uploadedAt,
-            fileSize: storedFile.fileSize,
-            uploadedBy: 'User',
-            fileData: file
+            fileName: supabaseFile.file_name,
+            uploadDate: supabaseFile.uploaded_at,
+            fileSize: supabaseFile.file_size,
+            uploadedBy: supabaseFile.uploaded_by,
+            storagePath: supabaseFile.storage_path
           })
-        } else {
-          // Fallback if file data not found in localStorage
-          setUploadedFile({
-            id: `${deal.id}-demo-transcript`,
-            fileTypeId: 'revops-demo-call-transcript',
-            fileName: state.stages["demo-call"].data.transcriptFileName,
-            uploadDate: state.stages["demo-call"].data.transcriptUploadedAt || new Date().toISOString(),
-            fileSize: 0,
-            uploadedBy: 'User'
-          })
+
+          // Sync localStorage state if it was out of sync
+          if (!state.stages["demo-call"].data.transcriptUploaded) {
+            // File exists in Supabase but localStorage doesn't know - sync it
+            await syncDemoTranscriptState(deal.id, supabaseFile.file_name, supabaseFile.uploaded_at)
+            // Reload state after sync
+            const syncedState = await getOrCreateTimelineState(deal.id)
+            setTimelineState(syncedState)
+          }
         }
+      } catch (error) {
+        console.error('Error loading transcript from Supabase:', error)
+      }
+
+      // Also check Supabase for sales intake data (source of truth)
+      // This handles cases where AI auto-fill completed while component wasn't mounted
+      try {
+        const salesIntakeState = await loadSalesIntakeFromSupabase(deal.id)
+        if (salesIntakeState) {
+          setTimelineState(salesIntakeState)
+        }
+      } catch (error) {
+        console.error('Error loading sales intake from Supabase:', error)
       }
 
       setIsLoading(false)
@@ -353,10 +368,29 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
   // Handle file upload from FileUpload component
   const handleFileUploaded = async (file: UploadedFile) => {
+    // Set optimistic update first
     setUploadedFile(file)
-    // Pass the actual file data to save to localStorage
-    // Cast to File since FileUpload always provides a File object
+    // Upload to Supabase via store function
     await uploadDemoTranscript(deal.id, file.fileName, file.fileData as File | undefined)
+
+    // Reload file from Supabase to get the storage path for downloads
+    try {
+      const supabaseFile = await getDemoTranscriptFile(deal.id)
+      if (supabaseFile) {
+        setUploadedFile({
+          id: supabaseFile.id,
+          fileTypeId: 'revops-demo-call-transcript',
+          fileName: supabaseFile.file_name,
+          uploadDate: supabaseFile.uploaded_at,
+          fileSize: supabaseFile.file_size,
+          uploadedBy: supabaseFile.uploaded_by,
+          storagePath: supabaseFile.storage_path
+        })
+      }
+    } catch (error) {
+      console.error('Error reloading file after upload:', error)
+    }
+
     await refreshState()
   }
 
@@ -367,15 +401,69 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     await refreshState()
   }
 
-  // Handle auto-fill for Sales Intake
+  // Handle auto-fill for Sales Intake - triggers n8n webhook and polls for results
   const handleAutoFillIntake = async () => {
     setIsAutoFillLoading(true)
-    // Simulate AI processing delay (will be replaced with real API call)
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    await autoFillSalesIntake(deal.id)
-    await refreshState()
-    setIsAutoFillLoading(false)
+    setIsSalesIntakeAIPolling(true)
+
+    // Trigger the n8n webhook to start AI processing
+    const triggered = await triggerSalesIntakeAI(deal.id)
+
+    if (!triggered) {
+      // Webhook failed - stop loading and show error
+      console.error('Failed to trigger AI webhook')
+      setIsAutoFillLoading(false)
+      setIsSalesIntakeAIPolling(false)
+      // Could add a toast/alert here in the future
+      return
+    }
+
+    console.log('AI webhook triggered successfully, polling for results...')
+    // Webhook triggered successfully - polling will handle the rest
+    // The useEffect below will poll Supabase for results
   }
+
+  // Poll for sales intake AI results from Supabase
+  useEffect(() => {
+    if (!isSalesIntakeAIPolling) return
+
+    console.log('Starting polling for sales intake AI results...')
+
+    const checkForResults = async () => {
+      try {
+        const result = await loadSalesIntakeFromSupabase(deal.id)
+
+        if (result && result.stages["sales-intake"].data.isAutoFilled) {
+          console.log('Sales intake AI results found:', result.stages["sales-intake"].data.formData?.companyName)
+          setIsSalesIntakeAIPolling(false)
+          setIsAutoFillLoading(false)
+          setTimelineState(result)
+        }
+      } catch (error) {
+        console.error('Error checking for sales intake results:', error)
+      }
+    }
+
+    // Check immediately
+    checkForResults()
+
+    // Then poll every 5 seconds
+    const interval = setInterval(checkForResults, 5000)
+
+    // Stop polling after 2 minutes (timeout)
+    const timeout = setTimeout(() => {
+      console.warn('Sales intake AI polling timed out')
+      setIsSalesIntakeAIPolling(false)
+      setIsAutoFillLoading(false)
+    }, 120000)
+
+    // Cleanup on unmount or when polling stops
+    return () => {
+      console.log('Stopping sales intake polling')
+      clearInterval(interval)
+      clearTimeout(timeout)
+    }
+  }, [isSalesIntakeAIPolling, deal.id])
 
   // Handle form data changes
   const handleIntakeFormChange = async (formData: SalesIntakeFormData) => {
@@ -944,6 +1032,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
           onFileUploaded={handleFileUploaded}
           onFileCleared={() => handleFileCleared()}
           variant="compact"
+          getDownloadUrl={getRevOpsFileDownloadUrl}
         />
       </div>
     )
