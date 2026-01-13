@@ -1,0 +1,442 @@
+{
+  "name": "RevOps Follow-Up Email via HubSpot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "revops-follow-up-email",
+        "responseMode": "responseNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        240
+      ],
+      "id": "webhook-catch-request",
+      "name": "Catch Follow-Up Request",
+      "webhookId": "revops-follow-up-email-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "validate-deal-id-exists",
+              "leftValue": "={{ $json.body.deal_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "validate-deal-id-uuid",
+              "leftValue": "={{ $json.body.deal_id }}",
+              "rightValue": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        240
+      ],
+      "id": "validate-deal-id",
+      "name": "Validate Deal ID"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "revops_pipeline_deals",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.body.deal_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        440,
+        160
+      ],
+      "id": "get-deal-details",
+      "name": "Get Deal Details",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-deal-exists",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "check-hs-deal-id-exists",
+              "leftValue": "={{ $json.hs_deal_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        160
+      ],
+      "id": "check-deal-found",
+      "name": "Check Deal Found"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare the email data from the webhook request\nconst webhookData = $('Catch Follow-Up Request').first().json.body;\nconst dealData = $input.first().json;\n\n// Get recipient email - from webhook if provided, otherwise from deal\nconst toEmail = webhookData.to_email || dealData.email || '';\n\n// Get email subject and body from webhook\nconst emailSubject = webhookData.email_subject || 'Following Up - Next Steps';\nconst emailBody = webhookData.email_body || '';\n\n// Get sender info (Tim is the default sender)\nconst fromEmail = 't.jones@growthlabfinancial.com';\nconst firstName = 'Tim';\nconst lastName = 'Jones';\n\nreturn [{\n  json: {\n    deal_id: dealData.id,\n    hs_deal_id: dealData.hs_deal_id,\n    company_name: dealData.company_name,\n    contact_email: toEmail,\n    contact_first_name: dealData.first_name || '',\n    contact_last_name: dealData.last_name || '',\n    email_subject: emailSubject,\n    email_body: emailBody,\n    from_email: fromEmail,\n    from_first_name: firstName,\n    from_last_name: lastName\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        80
+      ],
+      "id": "prepare-email-data",
+      "name": "Prepare Email Data"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "engagement",
+        "operation": "create",
+        "type": "email",
+        "metadata": {
+          "toEmail": "={{ $json.contact_email }}",
+          "fromEmail": "={{ $json.from_email }}",
+          "firstName": "={{ $json.from_first_name }}",
+          "lastName": "={{ $json.from_last_name }}",
+          "subject": "={{ $json.email_subject }}",
+          "html": "={{ $json.email_body }}"
+        },
+        "additionalFields": {
+          "associations": {
+            "dealIds": "={{ $json.hs_deal_id }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        80
+      ],
+      "id": "create-email-engagement",
+      "name": "Create Email in HubSpot",
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "deal",
+        "operation": "update",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $('Prepare Email Data').first().json.hs_deal_id }}",
+          "mode": "id"
+        },
+        "updateFields": {
+          "stage": "=135407649"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        80
+      ],
+      "id": "move-deal-need-info",
+      "name": "Move Deal to SQL - Need Info",
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Stage ID 135407649 = SQL - Need Info. Update this ID if your HubSpot pipeline has a different stage ID."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "revops_pipeline_deals",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Email Data').first().json.deal_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "hs_stage",
+              "fieldValue": "SQL - Need Info"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        80
+      ],
+      "id": "update-supabase-deal",
+      "name": "Update Supabase Deal Stage",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, deal_id: $('Prepare Email Data').first().json.deal_id, hs_deal_id: $('Prepare Email Data').first().json.hs_deal_id, message: 'Email sent via HubSpot and deal moved to SQL - Need Info' } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        80
+      ],
+      "id": "respond-success",
+      "name": "Respond Success"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Invalid deal_id provided. Must be a valid UUID.' } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        340
+      ],
+      "id": "respond-invalid-id",
+      "name": "Respond Invalid ID"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Deal not found or missing HubSpot deal ID. Make sure the deal exists and has an hs_deal_id.' } }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        260
+      ],
+      "id": "respond-deal-not-found",
+      "name": "Respond Deal Not Found"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Catch Follow-Up Request": {
+      "main": [
+        [
+          {
+            "node": "Validate Deal ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Deal ID": {
+      "main": [
+        [
+          {
+            "node": "Get Deal Details",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Deal Details": {
+      "main": [
+        [
+          {
+            "node": "Check Deal Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Deal Found": {
+      "main": [
+        [
+          {
+            "node": "Prepare Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Deal Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Email Data": {
+      "main": [
+        [
+          {
+            "node": "Create Email in HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Email in HubSpot": {
+      "main": [
+        [
+          {
+            "node": "Move Deal to SQL - Need Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move Deal to SQL - Need Info": {
+      "main": [
+        [
+          {
+            "node": "Update Supabase Deal Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Supabase Deal Stage": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timezone": "America/New_York",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "initial-version",
+  "meta": {
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "revops-follow-up-email",
+  "tags": []
+}

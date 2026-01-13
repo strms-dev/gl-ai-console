@@ -16,7 +16,9 @@ import {
   Send,
   Pencil,
   Eye,
-  X
+  X,
+  RotateCw,
+  Loader2
 } from "lucide-react"
 import {
   Dialog,
@@ -25,27 +27,37 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+// n8n webhook URL for follow-up email via HubSpot
+const FOLLOW_UP_EMAIL_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/revops-follow-up-email"
+
 interface FollowUpEmailProps {
   emailData: FollowUpEmailStageData
   salesIntakeData: SalesIntakeFormData | null
-  onInitialize: (templateType: "qbo" | "xero" | "other", subject: string, body: string) => void
-  onUpdate: (subject: string, body: string) => void
+  dealId: string
+  onInitialize: (templateType: "qbo" | "xero" | "other", toEmail: string, subject: string, body: string) => void
+  onUpdate: (toEmail: string, subject: string, body: string) => void
   onSend: () => void
   onMoveHubspotDeal: () => void
+  onReset: () => void
 }
 
 export function FollowUpEmail({
   emailData,
   salesIntakeData,
+  dealId,
   onInitialize,
   onUpdate,
   onSend,
   onMoveHubspotDeal,
+  onReset,
 }: FollowUpEmailProps) {
   const [isEditing, setIsEditing] = useState(false)
+  const [editToEmail, setEditToEmail] = useState("")
   const [editSubject, setEditSubject] = useState("")
   const [editBody, setEditBody] = useState("")
   const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
 
   // Use ref to track if we've already initialized to prevent infinite loops
   const hasInitialized = useRef(false)
@@ -71,20 +83,34 @@ export function FollowUpEmail({
 
       // Get template and replace placeholders
       const template = FOLLOW_UP_EMAIL_TEMPLATES[templateType === "other" ? "reports" : templateType]
+
+      // Replace placeholders in subject
+      const subject = template.subject
+        .replace(/\{\{companyName\}\}/g, salesIntakeData.companyName || "Your Company")
+
+      // Replace placeholders in body
+      const firefliesHtml = salesIntakeData.firefliesVideoLink
+        ? `<a href="${salesIntakeData.firefliesVideoLink}" target="_blank" rel="noopener noreferrer">Fireflies Meeting Recap</a>`
+        : "Fireflies Meeting Recap"
+
       let body = template.bodyTemplate
         .replace(/\{\{contactName\}\}/g, salesIntakeData.contactName || "there")
         .replace(/\{\{companyName\}\}/g, salesIntakeData.companyName || "your company")
         .replace(/\{\{callRecap\}\}/g, getCallRecap(salesIntakeData))
+        .replace(/\{\{firefliesLink\}\}/g, firefliesHtml)
 
-      // Add Fireflies link if available
-      if (salesIntakeData.firefliesVideoLink) {
+      // For older templates that don't use {{firefliesLink}}, add Fireflies link if available
+      if (salesIntakeData.firefliesVideoLink && body.includes("Based on our conversation, I wanted to recap the key points we discussed:")) {
         body = body.replace(
           "Based on our conversation, I wanted to recap the key points we discussed:",
           `Based on our conversation, I wanted to recap the key points we discussed:\n\nDemo Call Recording: ${salesIntakeData.firefliesVideoLink}`
         )
       }
 
-      onInitialize(templateType, template.subject, body)
+      // Set initial recipient email from sales intake data
+      const toEmail = salesIntakeData.emailAddress || ""
+
+      onInitialize(templateType, toEmail, subject, body)
     }
 
     // Reset the flag if template is cleared (for re-initialization)
@@ -141,17 +167,19 @@ export function FollowUpEmail({
   }
 
   const handleStartEdit = () => {
+    setEditToEmail(emailData.toEmail || salesIntakeData?.emailAddress || "")
     setEditSubject(emailData.emailSubject)
     setEditBody(emailData.emailBody)
     setIsEditing(true)
   }
 
   const handleSaveEdit = () => {
-    onUpdate(editSubject, editBody)
+    onUpdate(editToEmail, editSubject, editBody)
     setIsEditing(false)
   }
 
   const handleCancelEdit = () => {
+    setEditToEmail(emailData.toEmail || salesIntakeData?.emailAddress || "")
     setEditSubject(emailData.emailSubject)
     setEditBody(emailData.emailBody)
     setIsEditing(false)
@@ -159,6 +187,43 @@ export function FollowUpEmail({
 
   const isSent = !!emailData.sentAt
   const isDealMoved = emailData.hubspotDealMoved
+
+  // Handle sending email via n8n webhook to HubSpot
+  const handleSendViaHubspot = async () => {
+    setIsSending(true)
+    setSendError(null)
+
+    try {
+      const response = await fetch(FOLLOW_UP_EMAIL_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          deal_id: dealId,
+          to_email: emailData.toEmail || salesIntakeData?.emailAddress || '',
+          email_subject: emailData.emailSubject,
+          email_body: emailData.emailBody
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send email via HubSpot')
+      }
+
+      // Success - call the callbacks to update state
+      onMoveHubspotDeal()
+      onSend()
+
+    } catch (error) {
+      console.error('Error sending follow-up email:', error)
+      setSendError(error instanceof Error ? error.message : 'Failed to send email. Please try again.')
+    } finally {
+      setIsSending(false)
+    }
+  }
 
   // If email has been sent, show completed state
   if (isSent) {
@@ -183,6 +248,15 @@ export function FollowUpEmail({
             >
               <Eye className="w-4 h-4 mr-1" />
               View Email
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onReset}
+              className="text-gray-600 border-gray-300 hover:bg-gray-100"
+            >
+              <RotateCw className="w-4 h-4 mr-1" />
+              Reset Stage
             </Button>
           </div>
         </div>
@@ -215,9 +289,10 @@ export function FollowUpEmail({
               <div>
                 <Label className="text-muted-foreground">Body</Label>
                 <div className="mt-1 p-4 bg-gray-50 rounded-lg border">
-                  <pre className="whitespace-pre-wrap font-sans text-sm">
-                    {emailData.emailBody}
-                  </pre>
+                  <div
+                    className="whitespace-pre-wrap font-sans text-sm [&_a]:text-[#407B9D] [&_a]:underline [&_a]:hover:text-[#366a88] [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ul]:whitespace-normal [&_li]:ml-2"
+                    dangerouslySetInnerHTML={{ __html: emailData.emailBody }}
+                  />
                 </div>
               </div>
             </div>
@@ -284,6 +359,18 @@ export function FollowUpEmail({
         // Edit mode
         <div className="space-y-4">
           <div className="space-y-2">
+            <Label htmlFor="emailTo">To</Label>
+            <Input
+              id="emailTo"
+              value={editToEmail}
+              onChange={(e) => setEditToEmail(e.target.value)}
+              placeholder="email@example.com (comma-separated for multiple)"
+            />
+            <p className="text-xs text-muted-foreground">
+              Separate multiple email addresses with commas
+            </p>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="emailSubject">Subject</Label>
             <Input
               id="emailSubject"
@@ -327,7 +414,7 @@ export function FollowUpEmail({
             <div className="bg-gray-50 px-4 py-2 border-b">
               <p className="text-sm">
                 <span className="text-muted-foreground">To:</span>{" "}
-                <span className="font-medium">{salesIntakeData?.emailAddress || "prospect@company.com"}</span>
+                <span className="font-medium">{emailData.toEmail || salesIntakeData?.emailAddress || "prospect@company.com"}</span>
               </p>
               <p className="text-sm">
                 <span className="text-muted-foreground">Subject:</span>{" "}
@@ -335,31 +422,47 @@ export function FollowUpEmail({
               </p>
             </div>
             <div className="p-4 bg-white max-h-[300px] overflow-y-auto">
-              <pre className="whitespace-pre-wrap font-sans text-sm text-[#463939]">
-                {emailData.emailBody}
-              </pre>
+              <div
+                className="whitespace-pre-wrap font-sans text-sm text-[#463939] [&_a]:text-[#407B9D] [&_a]:underline [&_a]:hover:text-[#366a88] [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ul]:whitespace-normal [&_li]:ml-2"
+                dangerouslySetInnerHTML={{ __html: emailData.emailBody }}
+              />
             </div>
           </div>
+
+          {/* Error Message */}
+          {sendError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {sendError}
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t">
             <Button
               variant="outline"
               onClick={handleStartEdit}
+              disabled={isSending}
               className="text-[#407B9D] border-[#407B9D] hover:bg-[#407B9D]/10"
             >
               <Pencil className="w-4 h-4 mr-2" />
               Edit Email
             </Button>
             <Button
-              onClick={() => {
-                onMoveHubspotDeal()
-                onSend()
-              }}
+              onClick={handleSendViaHubspot}
+              disabled={isSending}
               className="bg-[#407B9D] hover:bg-[#366a88] text-white"
             >
-              <Send className="w-4 h-4 mr-2" />
-              Send via HubSpot &amp; Move Deal to Need Info
+              {isSending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Send via HubSpot &amp; Move Deal to Need Info
+                </>
+              )}
             </Button>
           </div>
         </div>

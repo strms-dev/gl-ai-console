@@ -1007,6 +1007,7 @@ export async function resetSalesIntake(
 export async function initializeFollowUpEmail(
   dealId: string,
   templateType: "qbo" | "xero" | "other",
+  toEmail: string,
   subject: string,
   body: string
 ): Promise<SalesPipelineTimelineState | null> {
@@ -1017,6 +1018,7 @@ export async function initializeFollowUpEmail(
 
   existing.stages["follow-up-email"].data = {
     templateType,
+    toEmail,
     emailSubject: subject,
     emailBody: body,
     isEdited: false,
@@ -1036,6 +1038,7 @@ export async function initializeFollowUpEmail(
  */
 export async function updateFollowUpEmail(
   dealId: string,
+  toEmail: string,
   subject: string,
   body: string
 ): Promise<SalesPipelineTimelineState | null> {
@@ -1044,6 +1047,7 @@ export async function updateFollowUpEmail(
 
   if (!existing) return null
 
+  existing.stages["follow-up-email"].data.toEmail = toEmail
   existing.stages["follow-up-email"].data.emailSubject = subject
   existing.stages["follow-up-email"].data.emailBody = body
   existing.stages["follow-up-email"].data.isEdited = true

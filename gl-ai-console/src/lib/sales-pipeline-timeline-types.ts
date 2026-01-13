@@ -208,6 +208,7 @@ export interface SalesIntakeStageData {
 // Follow-Up Email Stage Data
 export interface FollowUpEmailStageData {
   templateType: "qbo" | "xero" | "other" | null
+  toEmail: string  // Recipient email(s), comma-separated for multiple
   emailSubject: string
   emailBody: string
   isEdited: boolean
@@ -743,80 +744,67 @@ export const DEFAULT_INTERNAL_RECIPIENTS = [
 // Email templates based on accounting system
 export const FOLLOW_UP_EMAIL_TEMPLATES = {
   qbo: {
-    subject: "Growth Lab Follow-Up - Next Steps for Your Engagement",
-    bodyTemplate: `Hi {{contactName}},
+    subject: "Following Up - Next Steps for {{companyName}}",
+    bodyTemplate: `Hey {{contactName}},
 
-Thank you for taking the time to meet with us today. I enjoyed learning about {{companyName}} and understanding your needs.
+Was great talking with you and learning more about {{companyName}}. I am reaching out here to continue our conversation and provide some next steps.
 
-Based on our conversation, I wanted to recap the key points we discussed:
-{{callRecap}}
+As promised, you can review the Fireflies Meeting Recap as needed here >> {{firefliesLink}}
 
-Next Steps:
-To move forward, we'll need access to your QuickBooks Online account. This will allow our team to complete a general ledger review and prepare an accurate quote for your services.
+Based on our conversation, it sounds like the best fit at this time would be TYPE OUT VARIOUS SERVICES OF INTEREST
 
-Please follow these steps to grant access:
-1. Log into your QuickBooks Online account
-2. Go to Settings (gear icon) > Manage Users
-3. Click "Add User" and select "Accountant"
-4. Enter our email: access@growthlab.com
+In order for our team to run their general ledger review and run our pricing metrics, we will need to be granted QBO Accounting Access. This is a super easy process, and you can find click-by-click instructions here >> <a href="https://www.youtube.com/watch?v=1SJhZB3bpr8" target="_blank" rel="noopener noreferrer">Granting QBO Accounting Access</a> << The email you are inviting here is qbo@growthlabfinancial.com
 
-Once we have access, our team will complete the review within 2-3 business days and I'll follow up with pricing.
+Once I see that invite come through, the team will run their review, and I can get you a scoped out proposal usually within 72 business hours
 
-Please let me know if you have any questions!
+Let me know if you have any other questions, otherwise you will hear from us again soon.
 
-Best regards,
+Thanks,
 Tim`
   },
   xero: {
-    subject: "Growth Lab Follow-Up - Next Steps for Your Engagement",
-    bodyTemplate: `Hi {{contactName}},
+    subject: "Following Up - Next Steps for {{companyName}}",
+    bodyTemplate: `Hey {{contactName}},
 
-Thank you for taking the time to meet with us today. I enjoyed learning about {{companyName}} and understanding your needs.
+Was great talking with you and learning more about {{companyName}}. I am reaching out here to continue our conversation and provide some next steps.
 
-Based on our conversation, I wanted to recap the key points we discussed:
-{{callRecap}}
+As promised, you can review the Fireflies Meeting Recap as needed here >> {{firefliesLink}}
 
-Next Steps:
-To move forward, we'll need access to your Xero account. This will allow our team to complete a general ledger review and prepare an accurate quote for your services.
+Based on our conversation, it sounds like the best fit at this time would be TYPE OUT VARIOUS SERVICES OF INTEREST
 
-Please follow these steps to grant access:
-1. Log into your Xero account
-2. Go to Settings > Users
-3. Click "Invite User"
-4. Enter our email: access@growthlab.com
-5. Set the role to "Advisor"
+In order for our team to run their general ledger review and run our pricing metrics, we will need to be granted Xero Accounting Access. This is a super easy process, and you can find click-by-click instructions here >> <a href="https://www.youtube.com/watch?v=yBMxTtxxcfs" target="_blank" rel="noopener noreferrer">Granting Xero Accounting Access</a> << The email you are inviting here is xero@growthlabfinancial.com
 
-Once we have access, our team will complete the review within 2-3 business days and I'll follow up with pricing.
+Once I see that invite come through, the team will run their review, and I can get you a scoped out proposal usually within 72 business hours.
 
-Please let me know if you have any questions!
+Let me know if you have any other questions, otherwise you will hear from us again soon.
 
-Best regards,
+Thanks,
 Tim`
   },
   reports: {
-    subject: "Growth Lab Follow-Up - Next Steps for Your Engagement",
-    bodyTemplate: `Hi {{contactName}},
+    subject: "Following Up - Next Steps for {{companyName}}",
+    bodyTemplate: `Hey {{contactName}},
 
-Thank you for taking the time to meet with us today. I enjoyed learning about {{companyName}} and understanding your needs.
+Was great talking with you and learning more about {{companyName}}. I am reaching out here to continue our conversation and provide some next steps.
 
-Based on our conversation, I wanted to recap the key points we discussed:
-{{callRecap}}
+As promised, you can review the Fireflies Meeting Recap as needed here >> {{firefliesLink}}
 
-Next Steps:
-To move forward and prepare an accurate quote, we'll need the following financial reports:
-- Year-to-date Profit & Loss Statement
-- Balance Sheet as of today
-- General Ledger for the current year
-- Accounts Receivable Aging Report
-- Accounts Payable Aging Report
+Based on our conversation, it sounds like the best fit at this time would be TYPE OUT VARIOUS SERVICES OF INTEREST
 
-You can export these from your accounting system and send them directly to this email or upload them to a shared folder.
+In order for our team to run their general ledger review and pricing metrics, we will need to be sent copies of the following documents:
 
-Once we receive these documents, our team will complete the review within 2-3 business days and I'll follow up with pricing.
+<ul style="margin: 10px 0; padding-left: 20px;">
+<li>Copy of most recent year's tax filing (if applicable)</li>
+<li>Profit & Loss Report by month for past year</li>
+<li>Balance Sheet</li>
+<li>90 Day Transaction Summary for each Bank, Credit Card, or other Chart of Account that is relevant</li>
+</ul>
 
-Please let me know if you have any questions!
+Once we have those documents, our team can review and properly scope out what recurring work would be needed. I am usually able to get you a priced out quote within 72 business hours of getting access to the documents.
 
-Best regards,
+Let me know if you have any questions.
+
+Thanks,
 Tim`
   }
 }
@@ -980,6 +968,7 @@ export function createInitialTimelineState(dealId: string): SalesPipelineTimelin
         completedAt: null,
         data: {
           templateType: null,
+          toEmail: "",
           emailSubject: "",
           emailBody: "",
           isEdited: false,

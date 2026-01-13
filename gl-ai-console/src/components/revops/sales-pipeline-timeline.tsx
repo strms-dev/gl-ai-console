@@ -53,6 +53,7 @@ import {
   updateFollowUpEmail,
   markFollowUpEmailSent,
   markHubspotDealMoved,
+  resetFollowUpEmail,
   enrollInSequence,
   unenrollFromSequence,
   markAccessReceived,
@@ -484,14 +485,14 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   }
 
   // Follow-Up Email Handlers - memoized to prevent infinite re-renders
-  const handleInitializeEmail = useCallback(async (templateType: "qbo" | "xero" | "other", subject: string, body: string) => {
+  const handleInitializeEmail = useCallback(async (templateType: "qbo" | "xero" | "other", toEmail: string, subject: string, body: string) => {
     console.log("handleInitializeEmail called with:", templateType)
-    await initializeFollowUpEmail(deal.id, templateType, subject, body)
+    await initializeFollowUpEmail(deal.id, templateType, toEmail, subject, body)
     await refreshState()
   }, [deal.id, refreshState])
 
-  const handleUpdateEmail = useCallback(async (subject: string, body: string) => {
-    await updateFollowUpEmail(deal.id, subject, body)
+  const handleUpdateEmail = useCallback(async (toEmail: string, subject: string, body: string) => {
+    await updateFollowUpEmail(deal.id, toEmail, subject, body)
     await refreshState()
   }, [deal.id, refreshState])
 
@@ -506,6 +507,11 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     // In production, this would integrate with HubSpot API to move the deal
     // For now, we just mark it as moved
     await markHubspotDealMoved(deal.id)
+    await refreshState()
+  }, [deal.id, refreshState])
+
+  const handleResetFollowUpEmail = useCallback(async () => {
+    await resetFollowUpEmail(deal.id)
     await refreshState()
   }, [deal.id, refreshState])
 
@@ -1071,10 +1077,12 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       <FollowUpEmail
         emailData={followUpData}
         salesIntakeData={salesIntakeData?.formData || null}
+        dealId={deal.id}
         onInitialize={handleInitializeEmail}
         onUpdate={handleUpdateEmail}
         onSend={handleSendEmail}
         onMoveHubspotDeal={handleMoveHubspotDeal}
+        onReset={handleResetFollowUpEmail}
       />
     )
   }
