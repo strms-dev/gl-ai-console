@@ -287,6 +287,53 @@ export interface Database {
           storage_path?: string
         }
       }
+      revops_follow_up_emails: {
+        Row: {
+          id: string
+          deal_id: string
+          template_type: string | null
+          to_email: string
+          cc_email: string
+          email_subject: string
+          email_body: string
+          is_edited: boolean
+          sent_at: string | null
+          hubspot_deal_moved: boolean
+          hubspot_deal_moved_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          deal_id: string
+          template_type?: string | null
+          to_email?: string
+          cc_email?: string
+          email_subject?: string
+          email_body?: string
+          is_edited?: boolean
+          sent_at?: string | null
+          hubspot_deal_moved?: boolean
+          hubspot_deal_moved_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          deal_id?: string
+          template_type?: string | null
+          to_email?: string
+          cc_email?: string
+          email_subject?: string
+          email_body?: string
+          is_edited?: boolean
+          sent_at?: string | null
+          hubspot_deal_moved?: boolean
+          hubspot_deal_moved_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       revops_sales_intakes: {
         Row: {
           id: string
@@ -449,6 +496,37 @@ export type RevOpsPipelineFileUpdate = Database['public']['Tables']['revops_pipe
 export type RevOpsSalesIntake = Database['public']['Tables']['revops_sales_intakes']['Row']
 export type RevOpsSalesIntakeInsert = Database['public']['Tables']['revops_sales_intakes']['Insert']
 export type RevOpsSalesIntakeUpdate = Database['public']['Tables']['revops_sales_intakes']['Update']
+
+// RevOps Follow-up Email types
+export type RevOpsFollowUpEmail = Database['public']['Tables']['revops_follow_up_emails']['Row']
+export type RevOpsFollowUpEmailInsert = Database['public']['Tables']['revops_follow_up_emails']['Insert']
+export type RevOpsFollowUpEmailUpdate = Database['public']['Tables']['revops_follow_up_emails']['Update']
+
+// RevOps Pipeline Stage Data types (key-value storage for stage data)
+export interface RevOpsPipelineStageData {
+  id: string
+  deal_id: string
+  stage_id: string
+  data_key: string
+  data_value: Json
+  created_at: string
+  updated_at: string
+}
+
+export interface RevOpsPipelineStageDataInsert {
+  id?: string
+  deal_id: string
+  stage_id: string
+  data_key: string
+  data_value: Json
+  created_at?: string
+  updated_at?: string
+}
+
+export interface RevOpsPipelineStageDataUpdate {
+  data_value?: Json
+  updated_at?: string
+}
 
 // Complete project data including related tables
 export interface ProjectWithDetails extends Project {

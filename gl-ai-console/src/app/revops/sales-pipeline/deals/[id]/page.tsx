@@ -7,9 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
   ArrowLeft,
-  FileText,
-  FileSignature,
-  ClipboardList,
   ExternalLink,
 } from "lucide-react"
 import { getPipelineDealById, PipelineDeal } from "@/lib/revops-pipeline-store"
@@ -28,28 +25,6 @@ function formatDateTime(isoString: string): string {
   })
 }
 
-// Document types for RevOps
-const documentTypes = [
-  {
-    id: "proposal",
-    title: "Proposal Document",
-    description: "Sales proposal and pricing",
-    icon: FileText,
-  },
-  {
-    id: "contract",
-    title: "Contract",
-    description: "Service agreement and terms",
-    icon: FileSignature,
-  },
-  {
-    id: "notes",
-    title: "Meeting Notes",
-    description: "Notes from client meetings",
-    icon: ClipboardList,
-  },
-]
-
 export default function DealDetailsPage() {
   const params = useParams()
   const dealId = params.id as string
@@ -59,7 +34,6 @@ export default function DealDetailsPage() {
 
   // Collapsible section states
   const [detailsExpanded, setDetailsExpanded] = useState(true)
-  const [documentsExpanded, setDocumentsExpanded] = useState(false)
 
   // Load deal data
   useEffect(() => {
@@ -320,62 +294,6 @@ export default function DealDetailsPage() {
                 onDealUpdate={handleDealUpdate}
               />
             </CardContent>
-          </Card>
-
-          {/* Documents Section */}
-          <Card className="rounded-xl border shadow-sm">
-            <CardHeader
-              className="cursor-pointer"
-              onClick={() => setDocumentsExpanded(!documentsExpanded)}
-            >
-              <div className="flex items-center justify-between">
-                <CardTitle
-                  className="text-lg text-[#463939]"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
-                  Deal Documents
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-lg font-medium">
-                  {documentsExpanded ? "−" : "+"}
-                </Button>
-              </div>
-            </CardHeader>
-            {documentsExpanded && (
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {documentTypes.map((doc) => {
-                    const IconComponent = doc.icon
-                    return (
-                      <div
-                        key={doc.id}
-                        className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center hover:border-[#407B9D]/50 transition-colors"
-                      >
-                        <div className="flex justify-center mb-3">
-                          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                            <IconComponent className="w-6 h-6 text-gray-400" />
-                          </div>
-                        </div>
-                        <h4
-                          className="font-medium text-[#463939] mb-1"
-                          style={{ fontFamily: "var(--font-heading)" }}
-                        >
-                          {doc.title}
-                        </h4>
-                        <p
-                          className="text-sm text-muted-foreground mb-3"
-                          style={{ fontFamily: "var(--font-body)" }}
-                        >
-                          {doc.description}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          No file uploaded
-                        </p>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            )}
           </Card>
         </div>
       </div>

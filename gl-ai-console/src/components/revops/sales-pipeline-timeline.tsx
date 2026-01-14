@@ -9,8 +9,6 @@ import {
   RotateCw,
   AlertTriangle,
   Video,
-  Zap,
-  User,
   Calendar,
   ClipboardList,
   Mail,
@@ -46,6 +44,7 @@ import {
   syncDemoTranscriptState,
   triggerSalesIntakeAI,
   loadSalesIntakeFromSupabase,
+  loadFollowUpEmailFromSupabase,
   updateSalesIntakeForm,
   confirmSalesIntake,
   resetSalesIntake,
@@ -239,6 +238,10 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   const [isSalesIntakeAIPolling, setIsSalesIntakeAIPolling] = useState(false)
   const [isGLReviewAutoFillLoading, setIsGLReviewAutoFillLoading] = useState(false)
   const [isComparisonLoading, setIsComparisonLoading] = useState(false)
+  // Reminder sequence loading states
+  const [isEnrolling, setIsEnrolling] = useState(false)
+  const [isUnenrolling, setIsUnenrolling] = useState(false)
+  const [isProcessingAccess, setIsProcessingAccess] = useState(false)
 
   // Load timeline state
   useEffect(() => {
@@ -306,6 +309,16 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         console.error('Error loading sales intake from Supabase:', error)
       }
 
+      // Load follow-up email data from Supabase (source of truth)
+      try {
+        const followUpState = await loadFollowUpEmailFromSupabase(deal.id)
+        if (followUpState) {
+          setTimelineState(followUpState)
+        }
+      } catch (error) {
+        console.error('Error loading follow-up email from Supabase:', error)
+      }
+
       setIsLoading(false)
     }
     loadState()
@@ -313,7 +326,18 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
   // Refresh timeline state and deal data
   const refreshState = useCallback(async () => {
-    const state = await getOrCreateTimelineState(deal.id)
+    let state = await getOrCreateTimelineState(deal.id)
+
+    // Load follow-up email data from Supabase to ensure it's up to date
+    try {
+      const followUpState = await loadFollowUpEmailFromSupabase(deal.id)
+      if (followUpState) {
+        state = followUpState
+      }
+    } catch (error) {
+      console.error('Error loading follow-up email in refreshState:', error)
+    }
+
     setTimelineState(state)
 
     // Single-stage expansion: find the first non-completed stage and expand it
@@ -485,14 +509,14 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   }
 
   // Follow-Up Email Handlers - memoized to prevent infinite re-renders
-  const handleInitializeEmail = useCallback(async (templateType: "qbo" | "xero" | "other", toEmail: string, subject: string, body: string) => {
+  const handleInitializeEmail = useCallback(async (templateType: "qbo" | "xero" | "other", toEmail: string, ccEmail: string, subject: string, body: string) => {
     console.log("handleInitializeEmail called with:", templateType)
-    await initializeFollowUpEmail(deal.id, templateType, toEmail, subject, body)
+    await initializeFollowUpEmail(deal.id, templateType, toEmail, ccEmail, subject, body)
     await refreshState()
   }, [deal.id, refreshState])
 
-  const handleUpdateEmail = useCallback(async (toEmail: string, subject: string, body: string) => {
-    await updateFollowUpEmail(deal.id, toEmail, subject, body)
+  const handleUpdateEmail = useCallback(async (toEmail: string, ccEmail: string, subject: string, body: string) => {
+    await updateFollowUpEmail(deal.id, toEmail, ccEmail, subject, body)
     await refreshState()
   }, [deal.id, refreshState])
 
@@ -517,19 +541,39 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
   // Reminder Sequence Handlers
   const handleEnrollInSequence = useCallback(async () => {
-    await enrollInSequence(deal.id)
-    await refreshState()
+    setIsEnrolling(true)
+    try {
+      await enrollInSequence(deal.id)
+      await refreshState()
+    } catch (error) {
+      console.error('Error enrolling in sequence:', error)
+    } finally {
+      setIsEnrolling(false)
+    }
   }, [deal.id, refreshState])
 
   const handleUnenrollFromSequence = useCallback(async () => {
-    await unenrollFromSequence(deal.id)
-    await refreshState()
+    setIsUnenrolling(true)
+    try {
+      await unenrollFromSequence(deal.id)
+      await refreshState()
+    } catch (error) {
+      console.error('Error unenrolling from sequence:', error)
+    } finally {
+      setIsUnenrolling(false)
+    }
   }, [deal.id, refreshState])
 
-
-  const handleMarkAccessReceived = useCallback(async (platform: "qbo" | "xero" | "other") => {
-    await markAccessReceived(deal.id, platform)
-    await refreshState()
+  const handleMarkAccessReceived = useCallback(async () => {
+    setIsProcessingAccess(true)
+    try {
+      await markAccessReceived(deal.id)
+      await refreshState()
+    } catch (error) {
+      console.error('Error marking access received:', error)
+    } finally {
+      setIsProcessingAccess(false)
+    }
   }, [deal.id, refreshState])
 
   // Internal Review Handlers
@@ -803,8 +847,6 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   // Calculate progress stats
   const totalStages = events.length
   const completedStages = events.filter(e => e.status === "completed").length
-  const automatedStages = events.filter(e => e.automationLevel === "fully-automated").length
-  const manualStages = events.filter(e => e.automationLevel === "manual-intervention").length
   const progressPercent = totalStages > 0 ? (completedStages / totalStages) * 100 : 0
 
   return (
@@ -835,27 +877,13 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         {!isHeaderCollapsed && (
           <>
             {/* Progress Bar */}
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-4 mt-3">
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
               <div
                 className="h-2 rounded-full transition-all duration-500 bg-[#407B9D]"
                 style={{
                   width: `${progressPercent}%`
                 }}
               />
-            </div>
-
-            {/* Stage Type Badges */}
-            <div className="flex items-center justify-center gap-6">
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[#C8E4BB]/20 text-[#5A8A4A] border border-[#C8E4BB]/40">
-                <Zap className="w-3.5 h-3.5 mr-1" />
-                Automated
-                <span className="ml-1.5 text-muted-foreground">{automatedStages} {automatedStages === 1 ? 'stage' : 'stages'}</span>
-              </span>
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30">
-                <User className="w-3.5 h-3.5 mr-1" />
-                Manual
-                <span className="ml-1.5 text-muted-foreground">{manualStages} {manualStages === 1 ? 'stage' : 'stages'}</span>
-              </span>
             </div>
           </>
         )}
@@ -908,19 +936,6 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
                       )} style={{ fontFamily: "var(--font-heading)" }}>
                         {event.title}
                       </h3>
-                      {/* Automation Level Badge */}
-                      <span className={cn(
-                        "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border",
-                        event.automationLevel === "fully-automated"
-                          ? "bg-[#C8E4BB]/20 text-[#5A8A4A] border-[#C8E4BB]/40"
-                          : "bg-[#407B9D]/10 text-[#407B9D] border-[#407B9D]/30"
-                      )}>
-                        {event.automationLevel === "fully-automated" ? (
-                          <><Zap className="w-4 h-4 inline mr-1" /> Automated</>
-                        ) : (
-                          <><User className="w-4 h-4 inline mr-1" /> Manual</>
-                        )}
-                      </span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1078,6 +1093,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         emailData={followUpData}
         salesIntakeData={salesIntakeData?.formData || null}
         dealId={deal.id}
+        hsDealUrl={deal.hsDealUrl}
         onInitialize={handleInitializeEmail}
         onUpdate={handleUpdateEmail}
         onSend={handleSendEmail}
@@ -1095,15 +1111,28 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     const reminderData = reminderStage.data
     if (!reminderData) return null
 
-    const salesIntakeData = timelineState?.stages["sales-intake"]?.data?.formData || null
+    // Get follow-up email sent date
+    const followUpEmailSentAt = timelineState?.stages["follow-up-email"]?.data?.sentAt || null
+
+    // Get platform from reminder data or sales intake
+    const platform = reminderData.platform ||
+      (timelineState?.stages["sales-intake"]?.data?.formData?.accountingPlatform as "qbo" | "xero" | "other" | null) ||
+      null
 
     return (
       <ReminderSequence
-        sequenceData={reminderData}
-        salesIntakeData={salesIntakeData}
+        dealId={deal.id}
+        platform={platform}
+        followUpEmailSentAt={followUpEmailSentAt}
+        status={reminderData.status}
+        enrolledAt={reminderData.enrolledAt || null}
+        accessReceivedAt={reminderData.accessReceivedAt || null}
         onEnroll={handleEnrollInSequence}
         onUnenroll={handleUnenrollFromSequence}
-        onMarkAccessReceived={handleMarkAccessReceived}
+        onAccessReceived={handleMarkAccessReceived}
+        isEnrolling={isEnrolling}
+        isUnenrolling={isUnenrolling}
+        isProcessingAccess={isProcessingAccess}
       />
     )
   }
@@ -1117,7 +1146,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     if (!reviewData) return null
 
     const salesIntakeData = timelineState?.stages["sales-intake"]?.data?.formData || null
-    const accessPlatform = timelineState?.stages["reminder-sequence"]?.data?.accessPlatform || null
+    // Use platform from reminder-sequence data (simplified type no longer has accessPlatform)
+    const accessPlatform = timelineState?.stages["reminder-sequence"]?.data?.platform || null
 
     return (
       <InternalReview

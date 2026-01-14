@@ -1,5 +1,5 @@
 {
-  "name": "RevOps Follow-Up Email via HubSpot",
+  "name": "Move Deal to Need Info (Follow-Up Confirmed)",
   "nodes": [
     {
       "parameters": {
@@ -28,11 +28,11 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        0,
-        240
+        -880,
+        192
       ],
-      "id": "webhook-catch-request",
-      "name": "Catch Follow-Up Request",
+      "id": "9572b70c-79e0-4d50-af47-c40e7a40cc10",
+      "name": "Catch Follow-Up Confirmed",
       "webhookId": "revops-follow-up-email-webhook"
     },
     {
@@ -72,10 +72,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        220,
-        240
+        -656,
+        192
       ],
-      "id": "validate-deal-id",
+      "id": "f7db4509-0645-42d9-95a7-c0f374cf0309",
       "name": "Validate Deal ID"
     },
     {
@@ -94,10 +94,10 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        440,
-        160
+        -432,
+        96
       ],
-      "id": "get-deal-details",
+      "id": "b90d9680-9cab-4ddf-915a-179d0346be3b",
       "name": "Get Deal Details",
       "credentials": {
         "supabaseApi": {
@@ -144,59 +144,11 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        660,
-        160
+        -208,
+        96
       ],
-      "id": "check-deal-found",
+      "id": "2f59cd10-c265-405e-a0fe-66bb63992725",
       "name": "Check Deal Found"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Prepare the email data from the webhook request\nconst webhookData = $('Catch Follow-Up Request').first().json.body;\nconst dealData = $input.first().json;\n\n// Get recipient email - from webhook if provided, otherwise from deal\nconst toEmail = webhookData.to_email || dealData.email || '';\n\n// Get email subject and body from webhook\nconst emailSubject = webhookData.email_subject || 'Following Up - Next Steps';\nconst emailBody = webhookData.email_body || '';\n\n// Get sender info (Tim is the default sender)\nconst fromEmail = 't.jones@growthlabfinancial.com';\nconst firstName = 'Tim';\nconst lastName = 'Jones';\n\nreturn [{\n  json: {\n    deal_id: dealData.id,\n    hs_deal_id: dealData.hs_deal_id,\n    company_name: dealData.company_name,\n    contact_email: toEmail,\n    contact_first_name: dealData.first_name || '',\n    contact_last_name: dealData.last_name || '',\n    email_subject: emailSubject,\n    email_body: emailBody,\n    from_email: fromEmail,\n    from_first_name: firstName,\n    from_last_name: lastName\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        880,
-        80
-      ],
-      "id": "prepare-email-data",
-      "name": "Prepare Email Data"
-    },
-    {
-      "parameters": {
-        "authentication": "oAuth2",
-        "resource": "engagement",
-        "operation": "create",
-        "type": "email",
-        "metadata": {
-          "toEmail": "={{ $json.contact_email }}",
-          "fromEmail": "={{ $json.from_email }}",
-          "firstName": "={{ $json.from_first_name }}",
-          "lastName": "={{ $json.from_last_name }}",
-          "subject": "={{ $json.email_subject }}",
-          "html": "={{ $json.email_body }}"
-        },
-        "additionalFields": {
-          "associations": {
-            "dealIds": "={{ $json.hs_deal_id }}"
-          }
-        }
-      },
-      "type": "n8n-nodes-base.hubspot",
-      "typeVersion": 2.2,
-      "position": [
-        1100,
-        80
-      ],
-      "id": "create-email-engagement",
-      "name": "Create Email in HubSpot",
-      "credentials": {
-        "hubspotOAuth2Api": {
-          "id": "1ao5IPqi22U8ZzU3",
-          "name": "GL HubSpot OAuth"
-        }
-      }
     },
     {
       "parameters": {
@@ -205,7 +157,7 @@
         "operation": "update",
         "dealId": {
           "__rl": true,
-          "value": "={{ $('Prepare Email Data').first().json.hs_deal_id }}",
+          "value": "={{ $json.hs_deal_id }}",
           "mode": "id"
         },
         "updateFields": {
@@ -215,18 +167,18 @@
       "type": "n8n-nodes-base.hubspot",
       "typeVersion": 2.2,
       "position": [
-        1320,
-        80
+        16,
+        0
       ],
-      "id": "move-deal-need-info",
+      "id": "89c83087-d8eb-40f7-9316-469ed25a0d77",
       "name": "Move Deal to SQL - Need Info",
+      "notesInFlow": true,
       "credentials": {
         "hubspotOAuth2Api": {
           "id": "1ao5IPqi22U8ZzU3",
           "name": "GL HubSpot OAuth"
         }
       },
-      "notesInFlow": true,
       "notes": "Stage ID 135407649 = SQL - Need Info. Update this ID if your HubSpot pipeline has a different stage ID."
     },
     {
@@ -239,7 +191,7 @@
             {
               "keyName": "id",
               "condition": "eq",
-              "keyValue": "={{ $('Prepare Email Data').first().json.deal_id }}"
+              "keyValue": "={{ $('Get Deal Details').first().json.id }}"
             }
           ]
         },
@@ -259,10 +211,10 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        1540,
-        80
+        240,
+        0
       ],
-      "id": "update-supabase-deal",
+      "id": "1e3a2047-c5b5-4b32-bfcb-9d335a69da13",
       "name": "Update Supabase Deal Stage",
       "credentials": {
         "supabaseApi": {
@@ -273,17 +225,64 @@
     },
     {
       "parameters": {
+        "operation": "update",
+        "tableId": "revops_follow_up_emails",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "deal_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get Deal Details').first().json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "hubspot_deal_moved",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "hubspot_deal_moved_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        464,
+        0
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Update Follow-Up Email Status",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: true, deal_id: $('Prepare Email Data').first().json.deal_id, hs_deal_id: $('Prepare Email Data').first().json.hs_deal_id, message: 'Email sent via HubSpot and deal moved to SQL - Need Info' } }}",
+        "responseBody": "={{ { success: true, deal_id: $('Get Deal Details').first().json.id, hs_deal_id: $('Get Deal Details').first().json.hs_deal_id, message: 'Deal moved to SQL - Need Info' } }}",
         "options": {}
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        1760,
-        80
+        688,
+        0
       ],
-      "id": "respond-success",
+      "id": "52254a6a-be8e-4fc8-b09a-75b608188f73",
       "name": "Respond Success"
     },
     {
@@ -297,10 +296,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        440,
-        340
+        -432,
+        288
       ],
-      "id": "respond-invalid-id",
+      "id": "50230a31-9243-4724-abb5-3322ea90c9d7",
       "name": "Respond Invalid ID"
     },
     {
@@ -314,16 +313,37 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        880,
-        260
+        16,
+        192
       ],
-      "id": "respond-deal-not-found",
+      "id": "328b6d6f-fd7b-4354-96e7-c763a23b1b3a",
       "name": "Respond Deal Not Found"
     }
   ],
-  "pinData": {},
+  "pinData": {
+    "Catch Follow-Up Confirmed": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.srv1055749.hstgr.cloud",
+            "content-type": "application/json"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "deal_id": "091dfc57-052b-4564-afff-46752758fc48"
+          },
+          "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook/revops-follow-up-email",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
   "connections": {
-    "Catch Follow-Up Request": {
+    "Catch Follow-Up Confirmed": {
       "main": [
         [
           {
@@ -367,7 +387,7 @@
       "main": [
         [
           {
-            "node": "Prepare Email Data",
+            "node": "Move Deal to SQL - Need Info",
             "type": "main",
             "index": 0
           }
@@ -375,28 +395,6 @@
         [
           {
             "node": "Respond Deal Not Found",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Prepare Email Data": {
-      "main": [
-        [
-          {
-            "node": "Create Email in HubSpot",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Create Email in HubSpot": {
-      "main": [
-        [
-          {
-            "node": "Move Deal to SQL - Need Info",
             "type": "main",
             "index": 0
           }
@@ -418,6 +416,17 @@
       "main": [
         [
           {
+            "node": "Update Follow-Up Email Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Follow-Up Email Status": {
+      "main": [
+        [
+          {
             "node": "Respond Success",
             "type": "main",
             "index": 0
@@ -426,17 +435,19 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": false,
+    "timeSavedMode": "fixed",
     "timezone": "America/New_York",
-    "callerPolicy": "workflowsFromSameOwner"
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
   },
-  "versionId": "initial-version",
+  "versionId": "14151f70-0694-4955-b1ff-3196e698c1d9",
   "meta": {
     "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
   },
-  "id": "revops-follow-up-email",
+  "id": "BJsSKd89NPuZ24axlgA8x",
   "tags": []
 }

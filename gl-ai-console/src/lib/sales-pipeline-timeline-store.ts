@@ -11,8 +11,6 @@ import {
   QuoteLineItem,
   LostReason,
   createInitialTimelineState,
-  createTestSalesIntakeFormData,
-  createTestFieldConfidence,
   createTestGLReviewFormData,
   createTestGLReviewFieldConfidence,
   createTestTeamGLReviewFormData
@@ -29,10 +27,28 @@ import {
   confirmSalesIntakeSupabase,
   deleteSalesIntakeSupabase
 } from "./supabase/revops-sales-intakes"
+import {
+  fetchFollowUpEmailByDealId,
+  initializeFollowUpEmailSupabase,
+  updateFollowUpEmailSupabase,
+  markFollowUpEmailSentSupabase,
+  markHubspotDealMovedSupabase,
+  deleteFollowUpEmailSupabase
+} from "./supabase/revops-follow-up-emails"
+import {
+  getReminderSequenceData,
+  initializeReminderSequence,
+  markEnrolledInSequenceSupabase,
+  markUnenrolledFromSequenceSupabase,
+  markAccessReceivedSupabase,
+  resetReminderSequenceSupabase
+} from "./supabase/revops-stage-data"
 import type { RevOpsPipelineFile } from "./supabase/types"
 
-// n8n webhook URL for AI auto-fill
+// n8n webhook URLs
 const SALES_INTAKE_AI_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/sales-intake-ai"
+const ENROLL_SEQUENCE_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/revops-enroll-sequence"
+const UNENROLL_SEQUENCE_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/revops-unenroll-sequence"
 
 const TIMELINE_STORAGE_KEY = "revops-pipeline-timelines"
 const FILES_STORAGE_KEY = "revops-pipeline-files" // Kept for backward compatibility migration
@@ -235,6 +251,8 @@ export async function getOrCreateTimelineState(dealId: string): Promise<SalesPip
         completedAt: null,
         data: {
           templateType: null,
+          toEmail: "",
+          ccEmail: "",
           emailSubject: "",
           emailBody: "",
           isEdited: false,
@@ -243,6 +261,12 @@ export async function getOrCreateTimelineState(dealId: string): Promise<SalesPip
           hubspotDealMovedAt: null
         }
       }
+      needsSave = true
+    }
+
+    // Migrate existing follow-up-email data to add ccEmail if missing
+    if (existing.stages["follow-up-email"]?.data && !("ccEmail" in existing.stages["follow-up-email"].data)) {
+      existing.stages["follow-up-email"].data.ccEmail = ""
       needsSave = true
     }
 
@@ -848,38 +872,6 @@ export async function loadSalesIntakeFromSupabase(
 }
 
 /**
- * Auto-fill sales intake form with test data (LEGACY - for backwards compatibility)
- * This is the original function that uses dummy data
- * For production, use triggerSalesIntakeAI() instead
- */
-export async function autoFillSalesIntake(
-  dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-  const testData = createTestSalesIntakeFormData()
-  const testConfidence = createTestFieldConfidence()
-
-  existing.stages["sales-intake"].data = {
-    formData: testData,
-    isAutoFilled: true,
-    autoFilledAt: now,
-    confirmedAt: null,
-    fieldConfidence: testConfidence
-  }
-  existing.stages["sales-intake"].status = "in_progress"
-
-  existing.updatedAt = now
-  saveAllTimelines(timelines)
-
-  return existing
-}
-
-/**
  * Update sales intake form data (for user edits)
  * Updates both localStorage and Supabase
  */
@@ -1002,12 +994,67 @@ export async function resetSalesIntake(
 // ============================================
 
 /**
+ * Load follow-up email data from Supabase
+ * Returns the state with follow-up email data loaded from database
+ */
+export async function loadFollowUpEmailFromSupabase(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  try {
+    const emailData = await fetchFollowUpEmailByDealId(dealId)
+
+    if (!emailData) {
+      return null
+    }
+
+    // Get current timeline state
+    const timelines = getAllTimelines()
+    const existing = timelines[dealId]
+
+    if (!existing) return null
+
+    // Update state from Supabase data
+    existing.stages["follow-up-email"].data = {
+      templateType: emailData.templateType,
+      toEmail: emailData.toEmail,
+      ccEmail: emailData.ccEmail,
+      emailSubject: emailData.emailSubject,
+      emailBody: emailData.emailBody,
+      isEdited: emailData.isEdited,
+      sentAt: emailData.sentAt,
+      hubspotDealMoved: emailData.hubspotDealMoved,
+      hubspotDealMovedAt: emailData.hubspotDealMovedAt
+    }
+
+    // Update stage status based on data
+    if (emailData.sentAt) {
+      existing.stages["follow-up-email"].status = "completed"
+      existing.stages["follow-up-email"].completedAt = emailData.sentAt
+    } else if (emailData.templateType) {
+      existing.stages["follow-up-email"].status = "in_progress"
+    }
+
+    existing.updatedAt = new Date().toISOString()
+
+    // Save to localStorage for cache
+    saveAllTimelines(timelines)
+
+    return existing
+  } catch (error) {
+    console.error('Error loading follow-up email from Supabase:', error)
+    return null
+  }
+}
+
+/**
  * Initialize follow-up email with template based on accounting platform
+ * Stores data in Supabase (source of truth)
  */
 export async function initializeFollowUpEmail(
   dealId: string,
   templateType: "qbo" | "xero" | "other",
   toEmail: string,
+  ccEmail: string,
   subject: string,
   body: string
 ): Promise<SalesPipelineTimelineState | null> {
@@ -1016,9 +1063,19 @@ export async function initializeFollowUpEmail(
 
   if (!existing) return null
 
+  // Store in Supabase (source of truth)
+  try {
+    await initializeFollowUpEmailSupabase(dealId, templateType, toEmail, ccEmail, subject, body)
+  } catch (error) {
+    console.error('Error initializing follow-up email in Supabase:', error)
+    throw error
+  }
+
+  // Update local state for immediate UI response
   existing.stages["follow-up-email"].data = {
     templateType,
     toEmail,
+    ccEmail,
     emailSubject: subject,
     emailBody: body,
     isEdited: false,
@@ -1028,6 +1085,8 @@ export async function initializeFollowUpEmail(
   }
 
   existing.updatedAt = new Date().toISOString()
+
+  // Save to localStorage for cache
   saveAllTimelines(timelines)
 
   return existing
@@ -1035,10 +1094,12 @@ export async function initializeFollowUpEmail(
 
 /**
  * Update follow-up email content (for user edits)
+ * Stores data in Supabase (source of truth)
  */
 export async function updateFollowUpEmail(
   dealId: string,
   toEmail: string,
+  ccEmail: string,
   subject: string,
   body: string
 ): Promise<SalesPipelineTimelineState | null> {
@@ -1047,12 +1108,24 @@ export async function updateFollowUpEmail(
 
   if (!existing) return null
 
+  // Store in Supabase (source of truth)
+  try {
+    await updateFollowUpEmailSupabase(dealId, toEmail, ccEmail, subject, body)
+  } catch (error) {
+    console.error('Error updating follow-up email in Supabase:', error)
+    throw error
+  }
+
+  // Update local state for immediate UI response
   existing.stages["follow-up-email"].data.toEmail = toEmail
+  existing.stages["follow-up-email"].data.ccEmail = ccEmail
   existing.stages["follow-up-email"].data.emailSubject = subject
   existing.stages["follow-up-email"].data.emailBody = body
   existing.stages["follow-up-email"].data.isEdited = true
 
   existing.updatedAt = new Date().toISOString()
+
+  // Save to localStorage for cache
   saveAllTimelines(timelines)
 
   return existing
@@ -1078,6 +1151,7 @@ function addBusinessDays(date: Date, days: number): Date {
 
 /**
  * Mark follow-up email as sent
+ * Stores data in Supabase (source of truth)
  */
 export async function markFollowUpEmailSent(
   dealId: string
@@ -1090,38 +1164,46 @@ export async function markFollowUpEmailSent(
   const now = new Date()
   const nowISO = now.toISOString()
 
+  // Store in Supabase (source of truth)
+  try {
+    await markFollowUpEmailSentSupabase(dealId)
+  } catch (error) {
+    console.error('Error marking follow-up email as sent in Supabase:', error)
+    throw error
+  }
+
+  // Update local state for immediate UI response
   existing.stages["follow-up-email"].data.sentAt = nowISO
   existing.stages["follow-up-email"].status = "completed"
   existing.stages["follow-up-email"].completedAt = nowISO
 
-  // Move to reminder-sequence stage and schedule auto-enrollment
+  // Move to reminder-sequence stage (manual enrollment only - no auto-scheduling)
   existing.currentStage = "reminder-sequence"
   existing.stages["reminder-sequence"].status = "in_progress"
+  existing.stages["reminder-sequence"].data.status = "not_enrolled"
 
-  // Calculate scheduled enrollment date (3 business days from now)
-  const scheduledDate = addBusinessDays(now, 3)
-  existing.stages["reminder-sequence"].data.status = "scheduled"
-  existing.stages["reminder-sequence"].data.scheduledEnrollmentAt = scheduledDate.toISOString()
-
-  // Set sequence type based on accounting platform from sales intake
+  // Set platform based on accounting platform from sales intake
   const accountingPlatform = existing.stages["sales-intake"].data.formData?.accountingPlatform
   if (accountingPlatform === "qbo" || accountingPlatform === "xero") {
-    existing.stages["reminder-sequence"].data.sequenceType = accountingPlatform
+    existing.stages["reminder-sequence"].data.platform = accountingPlatform
   } else {
-    existing.stages["reminder-sequence"].data.sequenceType = "other"
+    existing.stages["reminder-sequence"].data.platform = "other"
   }
 
   existing.updatedAt = nowISO
-  saveAllTimelines(timelines)
 
   // Update deal's automation stage
   await updateDealAutomationStage(dealId, "reminder-sequence")
+
+  // Save to localStorage for cache
+  saveAllTimelines(timelines)
 
   return existing
 }
 
 /**
  * Mark HubSpot deal as moved to Need Info
+ * Stores data in Supabase (source of truth)
  */
 export async function markHubspotDealMoved(
   dealId: string
@@ -1133,10 +1215,21 @@ export async function markHubspotDealMoved(
 
   const now = new Date().toISOString()
 
+  // Store in Supabase (source of truth)
+  try {
+    await markHubspotDealMovedSupabase(dealId)
+  } catch (error) {
+    console.error('Error marking HubSpot deal as moved in Supabase:', error)
+    throw error
+  }
+
+  // Update local state for immediate UI response
   existing.stages["follow-up-email"].data.hubspotDealMoved = true
   existing.stages["follow-up-email"].data.hubspotDealMovedAt = now
 
   existing.updatedAt = now
+
+  // Save to localStorage for cache
   saveAllTimelines(timelines)
 
   return existing
@@ -1144,6 +1237,7 @@ export async function markHubspotDealMoved(
 
 /**
  * Reset follow-up email stage
+ * Deletes from Supabase and resets local state
  */
 export async function resetFollowUpEmail(
   dealId: string
@@ -1153,8 +1247,19 @@ export async function resetFollowUpEmail(
 
   if (!existing) return null
 
+  // Delete from Supabase (source of truth)
+  try {
+    await deleteFollowUpEmailSupabase(dealId)
+  } catch (error) {
+    console.error('Error deleting follow-up email from Supabase:', error)
+    // Continue - still reset local state
+  }
+
+  // Update local state
   existing.stages["follow-up-email"].data = {
     templateType: null,
+    toEmail: "",
+    ccEmail: "",
     emailSubject: "",
     emailBody: "",
     isEdited: false,
@@ -1166,6 +1271,8 @@ export async function resetFollowUpEmail(
   existing.stages["follow-up-email"].completedAt = null
 
   existing.updatedAt = new Date().toISOString()
+
+  // Save to localStorage for cache
   saveAllTimelines(timelines)
 
   return existing
@@ -1175,140 +1282,199 @@ export async function resetFollowUpEmail(
 // Reminder Sequence Stage Functions
 // ============================================
 
+export interface EnrollSequenceResult {
+  success: boolean
+  sequenceId?: string
+  sequenceName?: string
+  contactId?: string
+  error?: string
+  requiresManualFollowUp?: boolean
+}
+
+export interface UnenrollSequenceResult {
+  success: boolean
+  wasEnrolled?: boolean
+  error?: string
+}
+
 /**
- * Manually enroll contact in HubSpot sequence
+ * Enroll contact in HubSpot sequence via n8n workflow
+ * For QBO/Xero platforms, triggers enrollment in the respective sequence
+ * For Other platform, returns requires_manual_follow_up: true
  */
 export async function enrollInSequence(
   dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
+): Promise<EnrollSequenceResult> {
+  try {
+    console.log('Enrolling contact in sequence for deal:', dealId)
 
-  if (!existing) return null
+    const response = await fetch(ENROLL_SEQUENCE_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deal_id: dealId })
+    })
 
-  const now = new Date().toISOString()
+    const result = await response.json()
+    console.log('Enroll sequence result:', result)
 
-  existing.stages["reminder-sequence"].data.status = "enrolled"
-  existing.stages["reminder-sequence"].data.enrolledAt = now
-  existing.stages["reminder-sequence"].data.enrolledBy = "manual"
+    if (result.success) {
+      // Update local timeline state
+      const timelines = getAllTimelines()
+      const existing = timelines[dealId]
+      if (existing) {
+        const now = new Date().toISOString()
+        existing.stages["reminder-sequence"].data.status = "enrolled"
+        existing.stages["reminder-sequence"].data.enrolledAt = now
+        existing.updatedAt = now
+        saveAllTimelines(timelines)
+      }
+    }
 
-  existing.updatedAt = now
-  saveAllTimelines(timelines)
-
-  return existing
+    return result as EnrollSequenceResult
+  } catch (error) {
+    console.error('Error enrolling in sequence:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
 }
 
 /**
- * Mark contact as auto-enrolled (called by automation)
- */
-export async function markAutoEnrolled(
-  dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-
-  existing.stages["reminder-sequence"].data.status = "enrolled"
-  existing.stages["reminder-sequence"].data.enrolledAt = now
-  existing.stages["reminder-sequence"].data.enrolledBy = "auto"
-
-  existing.updatedAt = now
-  saveAllTimelines(timelines)
-
-  return existing
-}
-
-/**
- * Manually unenroll contact from sequence
+ * Unenroll contact from HubSpot sequence via n8n workflow
+ * Does NOT advance to next stage - just unenrolls
  */
 export async function unenrollFromSequence(
   dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
+): Promise<UnenrollSequenceResult> {
+  try {
+    console.log('Unenrolling contact from sequence for deal:', dealId)
 
-  if (!existing) return null
+    const response = await fetch(UNENROLL_SEQUENCE_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deal_id: dealId })
+    })
 
-  const now = new Date().toISOString()
+    const result = await response.json()
+    console.log('Unenroll sequence result:', result)
 
-  existing.stages["reminder-sequence"].data.status = "unenrolled_response"
-  existing.stages["reminder-sequence"].data.unenrolledAt = now
-  existing.stages["reminder-sequence"].data.unenrollmentReason = "manual"
+    if (result.success) {
+      // Update local timeline state
+      const timelines = getAllTimelines()
+      const existing = timelines[dealId]
+      if (existing) {
+        const now = new Date().toISOString()
+        existing.stages["reminder-sequence"].data.status = "not_enrolled"
+        existing.stages["reminder-sequence"].data.unenrolledAt = now
+        existing.updatedAt = now
+        saveAllTimelines(timelines)
+      }
 
-  existing.updatedAt = now
-  saveAllTimelines(timelines)
+      // Also update Supabase
+      await markUnenrolledFromSequenceSupabase(dealId)
+    }
 
-  return existing
+    return result as UnenrollSequenceResult
+  } catch (error) {
+    console.error('Error unenrolling from sequence:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
 }
 
 /**
- * Mark contact as responded (auto-unenrolls from sequence)
- */
-export async function markContactResponded(
-  dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
-
-  if (!existing) return null
-
-  const now = new Date().toISOString()
-
-  existing.stages["reminder-sequence"].data.contactRespondedAt = now
-  existing.stages["reminder-sequence"].data.status = "unenrolled_response"
-  existing.stages["reminder-sequence"].data.unenrolledAt = now
-  existing.stages["reminder-sequence"].data.unenrollmentReason = "response"
-
-  existing.updatedAt = now
-  saveAllTimelines(timelines)
-
-  return existing
-}
-
-/**
- * Mark accounting access as received (auto-unenrolls and completes stage)
+ * Mark accounting access as received
+ * 1. Calls unenroll workflow (waits for success)
+ * 2. Updates Supabase
+ * 3. Advances to internal-review stage
  */
 export async function markAccessReceived(
-  dealId: string,
-  platform: "qbo" | "xero" | "other"
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
+  dealId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log('Marking access received for deal:', dealId)
 
-  if (!existing) return null
+    // 1. Call unenroll workflow (returns success even if not enrolled)
+    const unenrollResult = await fetch(UNENROLL_SEQUENCE_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deal_id: dealId })
+    })
 
-  const now = new Date().toISOString()
+    const unenrollData = await unenrollResult.json()
+    console.log('Unenroll result:', unenrollData)
 
-  existing.stages["reminder-sequence"].data.accessReceivedAt = now
-  existing.stages["reminder-sequence"].data.accessPlatform = platform
+    if (!unenrollData.success) {
+      return {
+        success: false,
+        error: unenrollData.error || 'Failed to unenroll from sequence'
+      }
+    }
 
-  // If enrolled, unenroll
-  if (existing.stages["reminder-sequence"].data.status === "enrolled") {
-    existing.stages["reminder-sequence"].data.status = "unenrolled_access"
-    existing.stages["reminder-sequence"].data.unenrolledAt = now
-    existing.stages["reminder-sequence"].data.unenrollmentReason = "access_received"
-  } else {
-    existing.stages["reminder-sequence"].data.status = "unenrolled_access"
+    // 2. Update Supabase
+    await markAccessReceivedSupabase(dealId)
+
+    // 3. Update local timeline state and advance to next stage
+    const timelines = getAllTimelines()
+    const existing = timelines[dealId]
+    if (existing) {
+      const now = new Date().toISOString()
+
+      // Update reminder-sequence stage
+      existing.stages["reminder-sequence"].data.status = "access_received"
+      existing.stages["reminder-sequence"].data.accessReceivedAt = now
+      existing.stages["reminder-sequence"].data.unenrolledAt = now
+      existing.stages["reminder-sequence"].status = "completed"
+      existing.stages["reminder-sequence"].completedAt = now
+
+      // Move to internal-review stage
+      existing.currentStage = "internal-review"
+      existing.stages["internal-review"].status = "in_progress"
+
+      existing.updatedAt = now
+      saveAllTimelines(timelines)
+
+      // Update deal's automation stage
+      await updateDealAutomationStage(dealId, "internal-review")
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error marking access received:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
   }
+}
 
-  // Complete the stage
-  existing.stages["reminder-sequence"].status = "completed"
-  existing.stages["reminder-sequence"].completedAt = now
+/**
+ * Load reminder sequence data from Supabase and update local state
+ */
+export async function loadReminderSequenceData(
+  dealId: string
+): Promise<void> {
+  try {
+    const data = await getReminderSequenceData(dealId)
 
-  // Move to internal-review stage
-  existing.currentStage = "internal-review"
-  existing.stages["internal-review"].status = "in_progress"
-
-  existing.updatedAt = now
-  saveAllTimelines(timelines)
-
-  // Update deal's automation stage
-  await updateDealAutomationStage(dealId, "internal-review")
-
-  return existing
+    const timelines = getAllTimelines()
+    const existing = timelines[dealId]
+    if (existing) {
+      existing.stages["reminder-sequence"].data = {
+        status: data.status,
+        platform: data.platform,
+        enrolledAt: data.enrolledAt,
+        unenrolledAt: data.unenrolledAt,
+        accessReceivedAt: data.accessReceivedAt
+      }
+      saveAllTimelines(timelines)
+    }
+  } catch (error) {
+    console.error('Error loading reminder sequence data:', error)
+  }
 }
 
 /**
@@ -1322,17 +1488,16 @@ export async function resetReminderSequence(
 
   if (!existing) return null
 
+  // Reset Supabase data
+  await resetReminderSequenceSupabase(dealId)
+
+  // Reset local state
   existing.stages["reminder-sequence"].data = {
     status: "not_enrolled",
-    sequenceType: null,
-    scheduledEnrollmentAt: null,
+    platform: null,
     enrolledAt: null,
-    enrolledBy: null,
     unenrolledAt: null,
-    unenrollmentReason: null,
-    accessReceivedAt: null,
-    accessPlatform: null,
-    contactRespondedAt: null
+    accessReceivedAt: null
   }
   existing.stages["reminder-sequence"].status = "in_progress"
   existing.stages["reminder-sequence"].completedAt = null

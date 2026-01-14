@@ -209,6 +209,7 @@ export interface SalesIntakeStageData {
 export interface FollowUpEmailStageData {
   templateType: "qbo" | "xero" | "other" | null
   toEmail: string  // Recipient email(s), comma-separated for multiple
+  ccEmail: string  // CC email(s), comma-separated for multiple
   emailSubject: string
   emailBody: string
   isEdited: boolean
@@ -218,28 +219,24 @@ export interface FollowUpEmailStageData {
 }
 
 // Reminder Sequence Stage Data
-export type ReminderSequenceStatus = "not_enrolled" | "scheduled" | "enrolled" | "unenrolled_response" | "unenrolled_access"
+// Simplified: removed auto-enrollment, now manual-only
+export type ReminderSequenceStatus = "not_enrolled" | "enrolled" | "access_received"
 
 export interface ReminderSequenceStageData {
   // Enrollment status
   status: ReminderSequenceStatus
-  sequenceType: "qbo" | "xero" | "other" | null  // Based on accounting platform
 
-  // Auto-enrollment tracking
-  scheduledEnrollmentAt: string | null  // 3 business days after follow-up email sent
+  // Platform (determines which HubSpot sequence to use)
+  platform: "qbo" | "xero" | "other" | null
+
+  // Enrollment tracking
   enrolledAt: string | null
-  enrolledBy: "auto" | "manual" | null
 
   // Unenrollment tracking
   unenrolledAt: string | null
-  unenrollmentReason: "response" | "access_received" | "manual" | null
 
-  // Access tracking
+  // Access received tracking (completes the stage)
   accessReceivedAt: string | null
-  accessPlatform: "qbo" | "xero" | "other" | null
-
-  // Contact response tracking
-  contactRespondedAt: string | null
 }
 
 // Internal Review Stage Data - for assigning GL review to internal team
@@ -651,7 +648,7 @@ export const SALES_PIPELINE_STAGES: StageConfig[] = [
   {
     id: "reminder-sequence",
     title: "Reminder Sequence",
-    description: "If no response is received, the contact will be automatically enrolled in a HubSpot reminder sequence 3 business days after the follow-up email is sent. They will be unenrolled when they respond or grant access.",
+    description: "Manually enroll the contact in a HubSpot reminder sequence to send automated follow-up emails. Once you receive access to their accounting platform, mark it as received to move to the next stage.",
     icon: "repeat",
     actions: {}
   },
@@ -744,16 +741,16 @@ export const DEFAULT_INTERNAL_RECIPIENTS = [
 // Email templates based on accounting system
 export const FOLLOW_UP_EMAIL_TEMPLATES = {
   qbo: {
-    subject: "Following Up - Next Steps for {{companyName}}",
+    subject: "GrowthLab Follow Up - Next Steps",
     bodyTemplate: `Hey {{contactName}},
 
 Was great talking with you and learning more about {{companyName}}. I am reaching out here to continue our conversation and provide some next steps.
 
 As promised, you can review the Fireflies Meeting Recap as needed here >> {{firefliesLink}}
 
-Based on our conversation, it sounds like the best fit at this time would be TYPE OUT VARIOUS SERVICES OF INTEREST
+Based on our conversation, it sounds like the best fit at this time would be <strong>TYPE OUT VARIOUS SERVICES OF INTEREST</strong>
 
-In order for our team to run their general ledger review and run our pricing metrics, we will need to be granted QBO Accounting Access. This is a super easy process, and you can find click-by-click instructions here >> <a href="https://www.youtube.com/watch?v=1SJhZB3bpr8" target="_blank" rel="noopener noreferrer">Granting QBO Accounting Access</a> << The email you are inviting here is qbo@growthlabfinancial.com
+In order for our team to run their general ledger review and run our pricing metrics, we will need to be granted QBO Accounting Access. This is a super easy process, and you can find click-by-click instructions here >> <a href="https://www.youtube.com/watch?v=1SJhZB3bpr8" target="_blank" rel="noopener noreferrer">Granting QBO Accounting Access</a> << The email you are inviting here is <strong>qbo@growthlabfinancial.com</strong>
 
 Once I see that invite come through, the team will run their review, and I can get you a scoped out proposal usually within 72 business hours
 
@@ -763,16 +760,16 @@ Thanks,
 Tim`
   },
   xero: {
-    subject: "Following Up - Next Steps for {{companyName}}",
+    subject: "GrowthLab Follow Up - Next Steps",
     bodyTemplate: `Hey {{contactName}},
 
 Was great talking with you and learning more about {{companyName}}. I am reaching out here to continue our conversation and provide some next steps.
 
 As promised, you can review the Fireflies Meeting Recap as needed here >> {{firefliesLink}}
 
-Based on our conversation, it sounds like the best fit at this time would be TYPE OUT VARIOUS SERVICES OF INTEREST
+Based on our conversation, it sounds like the best fit at this time would be <strong>TYPE OUT VARIOUS SERVICES OF INTEREST</strong>
 
-In order for our team to run their general ledger review and run our pricing metrics, we will need to be granted Xero Accounting Access. This is a super easy process, and you can find click-by-click instructions here >> <a href="https://www.youtube.com/watch?v=yBMxTtxxcfs" target="_blank" rel="noopener noreferrer">Granting Xero Accounting Access</a> << The email you are inviting here is xero@growthlabfinancial.com
+In order for our team to run their general ledger review and run our pricing metrics, we will need to be granted Xero Accounting Access. This is a super easy process, and you can find click-by-click instructions here >> <a href="https://www.youtube.com/watch?v=yBMxTtxxcfs" target="_blank" rel="noopener noreferrer">Granting Xero Accounting Access</a> << The email you are inviting here is <strong>xero@growthlabfinancial.com</strong>
 
 Once I see that invite come through, the team will run their review, and I can get you a scoped out proposal usually within 72 business hours.
 
@@ -782,14 +779,14 @@ Thanks,
 Tim`
   },
   reports: {
-    subject: "Following Up - Next Steps for {{companyName}}",
+    subject: "GrowthLab Follow Up - Next Steps",
     bodyTemplate: `Hey {{contactName}},
 
 Was great talking with you and learning more about {{companyName}}. I am reaching out here to continue our conversation and provide some next steps.
 
 As promised, you can review the Fireflies Meeting Recap as needed here >> {{firefliesLink}}
 
-Based on our conversation, it sounds like the best fit at this time would be TYPE OUT VARIOUS SERVICES OF INTEREST
+Based on our conversation, it sounds like the best fit at this time would be <strong>TYPE OUT VARIOUS SERVICES OF INTEREST</strong>
 
 In order for our team to run their general ledger review and pricing metrics, we will need to be sent copies of the following documents:
 
@@ -969,6 +966,7 @@ export function createInitialTimelineState(dealId: string): SalesPipelineTimelin
         data: {
           templateType: null,
           toEmail: "",
+          ccEmail: "",
           emailSubject: "",
           emailBody: "",
           isEdited: false,
@@ -982,15 +980,10 @@ export function createInitialTimelineState(dealId: string): SalesPipelineTimelin
         completedAt: null,
         data: {
           status: "not_enrolled",
-          sequenceType: null,
-          scheduledEnrollmentAt: null,
+          platform: null,
           enrolledAt: null,
-          enrolledBy: null,
           unenrolledAt: null,
-          unenrollmentReason: null,
-          accessReceivedAt: null,
-          accessPlatform: null,
-          contactRespondedAt: null
+          accessReceivedAt: null
         }
       },
       "internal-review": {

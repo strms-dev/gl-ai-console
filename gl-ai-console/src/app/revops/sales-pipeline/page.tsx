@@ -190,6 +190,8 @@ export default function SalesPipelinePage() {
           email: formData.email || null,
           stage: "Demo Call", // Default automation stage (first stage in timeline)
           hsStage: "MQO - Meeting Booked", // Default HubSpot stage
+          hsDealId: null, // No HubSpot deal ID initially
+          hsDealUrl: null, // No HubSpot deal URL initially
         })
       }
 
