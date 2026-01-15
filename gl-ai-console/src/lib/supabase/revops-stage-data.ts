@@ -262,3 +262,99 @@ export async function resetReminderSequenceSupabase(
 ): Promise<void> {
   await deleteStageData(dealId, REMINDER_SEQUENCE_STAGE_ID)
 }
+
+// ============================================
+// Internal Review Specific Functions
+// ============================================
+
+export interface InternalReviewSupabaseData {
+  toRecipients: { name: string; email: string }[]
+  ccTimEnabled: boolean
+  emailSubject: string
+  emailBody: string
+  isEdited: boolean
+  sentAt: string | null
+}
+
+const INTERNAL_REVIEW_STAGE_ID = 'internal-review'
+
+/**
+ * Get internal review data for a deal
+ */
+export async function getInternalReviewData(
+  dealId: string
+): Promise<InternalReviewSupabaseData | null> {
+  const data = await getStageData(dealId, INTERNAL_REVIEW_STAGE_ID)
+
+  // If no data exists, return null
+  if (Object.keys(data).length === 0) {
+    return null
+  }
+
+  return {
+    toRecipients: (data.to_recipients as { name: string; email: string }[]) || [],
+    ccTimEnabled: data.cc_tim_enabled !== false, // Default to true
+    emailSubject: (data.email_subject as string) || '',
+    emailBody: (data.email_body as string) || '',
+    isEdited: (data.is_edited as boolean) || false,
+    sentAt: (data.sent_at as string) || null,
+  }
+}
+
+/**
+ * Initialize internal review data for a deal
+ */
+export async function initializeInternalReviewSupabase(
+  dealId: string,
+  toRecipients: { name: string; email: string }[],
+  ccTimEnabled: boolean,
+  emailSubject: string,
+  emailBody: string
+): Promise<void> {
+  await setStageDataBatch(dealId, INTERNAL_REVIEW_STAGE_ID, {
+    to_recipients: toRecipients,
+    cc_tim_enabled: ccTimEnabled,
+    email_subject: emailSubject,
+    email_body: emailBody,
+    is_edited: false,
+    sent_at: null,
+  })
+}
+
+/**
+ * Update internal review email content
+ */
+export async function updateInternalReviewSupabase(
+  dealId: string,
+  toRecipients: { name: string; email: string }[],
+  ccTimEnabled: boolean,
+  emailSubject: string,
+  emailBody: string
+): Promise<void> {
+  await setStageDataBatch(dealId, INTERNAL_REVIEW_STAGE_ID, {
+    to_recipients: toRecipients,
+    cc_tim_enabled: ccTimEnabled,
+    email_subject: emailSubject,
+    email_body: emailBody,
+    is_edited: true,
+  })
+}
+
+/**
+ * Mark internal review email as sent
+ */
+export async function markInternalReviewSentSupabase(
+  dealId: string
+): Promise<void> {
+  const now = new Date().toISOString()
+  await setStageDataValue(dealId, INTERNAL_REVIEW_STAGE_ID, 'sent_at', now)
+}
+
+/**
+ * Reset internal review data
+ */
+export async function resetInternalReviewSupabase(
+  dealId: string
+): Promise<void> {
+  await deleteStageData(dealId, INTERNAL_REVIEW_STAGE_ID)
+}

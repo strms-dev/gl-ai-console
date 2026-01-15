@@ -41,14 +41,18 @@ import {
   markEnrolledInSequenceSupabase,
   markUnenrolledFromSequenceSupabase,
   markAccessReceivedSupabase,
-  resetReminderSequenceSupabase
+  resetReminderSequenceSupabase,
+  getInternalReviewData,
+  initializeInternalReviewSupabase,
+  updateInternalReviewSupabase,
+  markInternalReviewSentSupabase,
+  resetInternalReviewSupabase
 } from "./supabase/revops-stage-data"
 import type { RevOpsPipelineFile } from "./supabase/types"
 
 // n8n webhook URLs
 const SALES_INTAKE_AI_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/sales-intake-ai"
-const ENROLL_SEQUENCE_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/revops-enroll-sequence"
-const UNENROLL_SEQUENCE_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/revops-unenroll-sequence"
+const INTERNAL_ASSIGNMENT_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/revops-internal-assignment"
 
 const TIMELINE_STORAGE_KEY = "revops-pipeline-timelines"
 const FILES_STORAGE_KEY = "revops-pipeline-files" // Kept for backward compatibility migration
@@ -1184,11 +1188,16 @@ export async function markFollowUpEmailSent(
 
   // Set platform based on accounting platform from sales intake
   const accountingPlatform = existing.stages["sales-intake"].data.formData?.accountingPlatform
+  let platform: "qbo" | "xero" | "other"
   if (accountingPlatform === "qbo" || accountingPlatform === "xero") {
-    existing.stages["reminder-sequence"].data.platform = accountingPlatform
+    platform = accountingPlatform
   } else {
-    existing.stages["reminder-sequence"].data.platform = "other"
+    platform = "other"
   }
+  existing.stages["reminder-sequence"].data.platform = platform
+
+  // Initialize reminder sequence in Supabase (source of truth)
+  await initializeReminderSequence(dealId, platform)
 
   existing.updatedAt = nowISO
 
@@ -1298,98 +1307,58 @@ export interface UnenrollSequenceResult {
 }
 
 /**
- * Enroll contact in HubSpot sequence via n8n workflow
- * For QBO/Xero platforms, triggers enrollment in the respective sequence
- * For Other platform, returns requires_manual_follow_up: true
+ * Mark contact as enrolled in HubSpot sequence (manual tracking only)
+ * The user will manually enroll the contact in HubSpot via the sequence link
  */
 export async function enrollInSequence(
   dealId: string
-): Promise<EnrollSequenceResult> {
-  try {
-    console.log('Enrolling contact in sequence for deal:', dealId)
+): Promise<void> {
+  console.log('Marking contact as enrolled for deal:', dealId)
 
-    const response = await fetch(ENROLL_SEQUENCE_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deal_id: dealId })
-    })
+  // Update Supabase
+  await markEnrolledInSequenceSupabase(dealId)
 
-    const result = await response.json()
-    console.log('Enroll sequence result:', result)
-
-    if (result.success) {
-      // Update local timeline state
-      const timelines = getAllTimelines()
-      const existing = timelines[dealId]
-      if (existing) {
-        const now = new Date().toISOString()
-        existing.stages["reminder-sequence"].data.status = "enrolled"
-        existing.stages["reminder-sequence"].data.enrolledAt = now
-        existing.updatedAt = now
-        saveAllTimelines(timelines)
-      }
-    }
-
-    return result as EnrollSequenceResult
-  } catch (error) {
-    console.error('Error enrolling in sequence:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }
+  // Update local timeline state
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+  if (existing) {
+    const now = new Date().toISOString()
+    existing.stages["reminder-sequence"].data.status = "enrolled"
+    existing.stages["reminder-sequence"].data.enrolledAt = now
+    existing.updatedAt = now
+    saveAllTimelines(timelines)
   }
 }
 
 /**
- * Unenroll contact from HubSpot sequence via n8n workflow
- * Does NOT advance to next stage - just unenrolls
+ * Mark contact as unenrolled from HubSpot sequence (without access received)
+ * Used when user wants to unenroll before client grants access
  */
 export async function unenrollFromSequence(
   dealId: string
-): Promise<UnenrollSequenceResult> {
-  try {
-    console.log('Unenrolling contact from sequence for deal:', dealId)
+): Promise<void> {
+  console.log('Marking contact as unenrolled for deal:', dealId)
 
-    const response = await fetch(UNENROLL_SEQUENCE_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deal_id: dealId })
-    })
+  // Update Supabase
+  await markUnenrolledFromSequenceSupabase(dealId)
 
-    const result = await response.json()
-    console.log('Unenroll sequence result:', result)
-
-    if (result.success) {
-      // Update local timeline state
-      const timelines = getAllTimelines()
-      const existing = timelines[dealId]
-      if (existing) {
-        const now = new Date().toISOString()
-        existing.stages["reminder-sequence"].data.status = "not_enrolled"
-        existing.stages["reminder-sequence"].data.unenrolledAt = now
-        existing.updatedAt = now
-        saveAllTimelines(timelines)
-      }
-
-      // Also update Supabase
-      await markUnenrolledFromSequenceSupabase(dealId)
-    }
-
-    return result as UnenrollSequenceResult
-  } catch (error) {
-    console.error('Error unenrolling from sequence:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }
+  // Update local timeline state
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+  if (existing) {
+    const now = new Date().toISOString()
+    existing.stages["reminder-sequence"].data.status = "not_enrolled"
+    existing.stages["reminder-sequence"].data.unenrolledAt = now
+    existing.updatedAt = now
+    saveAllTimelines(timelines)
   }
 }
 
 /**
  * Mark accounting access as received
- * 1. Calls unenroll workflow (waits for success)
- * 2. Updates Supabase
- * 3. Advances to internal-review stage
+ * 1. Updates Supabase
+ * 2. Advances to internal-review stage
+ * (Unenrollment from HubSpot is handled manually by the user)
  */
 export async function markAccessReceived(
   dealId: string
@@ -1397,27 +1366,10 @@ export async function markAccessReceived(
   try {
     console.log('Marking access received for deal:', dealId)
 
-    // 1. Call unenroll workflow (returns success even if not enrolled)
-    const unenrollResult = await fetch(UNENROLL_SEQUENCE_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deal_id: dealId })
-    })
-
-    const unenrollData = await unenrollResult.json()
-    console.log('Unenroll result:', unenrollData)
-
-    if (!unenrollData.success) {
-      return {
-        success: false,
-        error: unenrollData.error || 'Failed to unenroll from sequence'
-      }
-    }
-
-    // 2. Update Supabase
+    // 1. Update Supabase
     await markAccessReceivedSupabase(dealId)
 
-    // 3. Update local timeline state and advance to next stage
+    // 2. Update local timeline state and advance to next stage
     const timelines = getAllTimelines()
     const existing = timelines[dealId]
     if (existing) {
@@ -1463,6 +1415,7 @@ export async function loadReminderSequenceData(
     const timelines = getAllTimelines()
     const existing = timelines[dealId]
     if (existing) {
+      // Update data from Supabase
       existing.stages["reminder-sequence"].data = {
         status: data.status,
         platform: data.platform,
@@ -1470,6 +1423,18 @@ export async function loadReminderSequenceData(
         unenrolledAt: data.unenrolledAt,
         accessReceivedAt: data.accessReceivedAt
       }
+
+      // Also update stage status based on access received
+      if (data.status === "access_received" && data.accessReceivedAt) {
+        existing.stages["reminder-sequence"].status = "completed"
+        existing.stages["reminder-sequence"].completedAt = data.accessReceivedAt
+      } else if (data.status || data.platform) {
+        // If we have any data, stage should be in_progress at minimum
+        if (existing.stages["reminder-sequence"].status === "pending") {
+          existing.stages["reminder-sequence"].status = "in_progress"
+        }
+      }
+
       saveAllTimelines(timelines)
     }
   } catch (error) {
@@ -1513,14 +1478,78 @@ export async function resetReminderSequence(
 // ============================================
 
 /**
+ * Load internal review data from Supabase and update local state
+ */
+export async function loadInternalReviewData(
+  dealId: string
+): Promise<void> {
+  try {
+    const data = await getInternalReviewData(dealId)
+
+    const timelines = getAllTimelines()
+    const existing = timelines[dealId]
+    if (existing && data) {
+      // Update data from Supabase
+      existing.stages["internal-review"].data = {
+        recipients: data.toRecipients,
+        ccTimEnabled: data.ccTimEnabled,
+        emailSubject: data.emailSubject,
+        emailBody: data.emailBody,
+        isEdited: data.isEdited,
+        sentAt: data.sentAt,
+        reviewAssignedTo: data.toRecipients.map(r => r.email),
+        reviewCompletedAt: null,
+        reviewNotes: null
+      }
+
+      // Also update stage status based on sentAt
+      if (data.sentAt) {
+        existing.stages["internal-review"].status = "completed"
+        existing.stages["internal-review"].completedAt = data.sentAt
+
+        // If internal review is complete, gl-review should be in_progress
+        if (existing.stages["gl-review"].status === "pending") {
+          existing.stages["gl-review"].status = "in_progress"
+          existing.currentStage = "gl-review"
+        }
+      } else if (data.emailBody) {
+        // If we have email body, stage should be in_progress at minimum
+        if (existing.stages["internal-review"].status === "pending") {
+          existing.stages["internal-review"].status = "in_progress"
+        }
+      }
+
+      saveAllTimelines(timelines)
+    }
+  } catch (error) {
+    console.error('Error loading internal review data:', error)
+  }
+}
+
+/**
  * Initialize internal review email with template
+ * Only initializes if no data exists in Supabase (prevents overwriting edits)
  */
 export async function initializeInternalReview(
   dealId: string,
   recipients: { name: string; email: string }[],
+  ccTimEnabled: boolean,
   subject: string,
   body: string
 ): Promise<SalesPipelineTimelineState | null> {
+  // Check if data already exists in Supabase before initializing
+  const existingData = await getInternalReviewData(dealId)
+  if (existingData && existingData.emailBody) {
+    console.log("Internal review data already exists in Supabase, skipping initialization")
+    // Load existing data instead of overwriting
+    await loadInternalReviewData(dealId)
+    const timelines = getAllTimelines()
+    return timelines[dealId] || null
+  }
+
+  // Save to Supabase (only if no existing data)
+  await initializeInternalReviewSupabase(dealId, recipients, ccTimEnabled, subject, body)
+
   const timelines = getAllTimelines()
   const existing = timelines[dealId]
 
@@ -1528,6 +1557,7 @@ export async function initializeInternalReview(
 
   existing.stages["internal-review"].data = {
     recipients,
+    ccTimEnabled,
     emailSubject: subject,
     emailBody: body,
     isEdited: false,
@@ -1549,15 +1579,20 @@ export async function initializeInternalReview(
 export async function updateInternalReviewEmail(
   dealId: string,
   recipients: { name: string; email: string }[],
+  ccTimEnabled: boolean,
   subject: string,
   body: string
 ): Promise<SalesPipelineTimelineState | null> {
+  // Save to Supabase
+  await updateInternalReviewSupabase(dealId, recipients, ccTimEnabled, subject, body)
+
   const timelines = getAllTimelines()
   const existing = timelines[dealId]
 
   if (!existing) return null
 
   existing.stages["internal-review"].data.recipients = recipients
+  existing.stages["internal-review"].data.ccTimEnabled = ccTimEnabled
   existing.stages["internal-review"].data.emailSubject = subject
   existing.stages["internal-review"].data.emailBody = body
   existing.stages["internal-review"].data.isEdited = true
@@ -1569,35 +1604,62 @@ export async function updateInternalReviewEmail(
 }
 
 /**
- * Mark internal review email as sent
+ * Mark internal review email as sent - calls n8n webhook to send the email
  */
 export async function markInternalReviewSent(
   dealId: string
-): Promise<SalesPipelineTimelineState | null> {
-  const timelines = getAllTimelines()
-  const existing = timelines[dealId]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Call n8n webhook to send the email
+    const response = await fetch(INTERNAL_ASSIGNMENT_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deal_id: dealId })
+    })
 
-  if (!existing) return null
+    const data = await response.json()
 
-  const now = new Date().toISOString()
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Failed to send internal assignment email")
+    }
 
-  existing.stages["internal-review"].data.sentAt = now
-  existing.stages["internal-review"].data.reviewAssignedTo =
-    existing.stages["internal-review"].data.recipients.map(r => r.email)
-  existing.stages["internal-review"].status = "completed"
-  existing.stages["internal-review"].completedAt = now
+    // Update Supabase
+    await markInternalReviewSentSupabase(dealId)
 
-  // Move to gl-review stage
-  existing.currentStage = "gl-review"
-  existing.stages["gl-review"].status = "in_progress"
+    // Update localStorage
+    const timelines = getAllTimelines()
+    const existing = timelines[dealId]
 
-  existing.updatedAt = now
-  saveAllTimelines(timelines)
+    if (!existing) {
+      return { success: true } // Email sent but no local state to update
+    }
 
-  // Update deal's automation stage
-  await updateDealAutomationStage(dealId, "gl-review")
+    const now = new Date().toISOString()
 
-  return existing
+    existing.stages["internal-review"].data.sentAt = now
+    existing.stages["internal-review"].data.reviewAssignedTo =
+      existing.stages["internal-review"].data.recipients.map(r => r.email)
+    existing.stages["internal-review"].status = "completed"
+    existing.stages["internal-review"].completedAt = now
+
+    // Move to gl-review stage
+    existing.currentStage = "gl-review"
+    existing.stages["gl-review"].status = "in_progress"
+
+    existing.updatedAt = now
+    saveAllTimelines(timelines)
+
+    // Update deal's automation stage
+    await updateDealAutomationStage(dealId, "gl-review")
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error sending internal assignment email:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to send email"
+    }
+  }
 }
 
 /**
@@ -1631,6 +1693,9 @@ export async function markInternalReviewCompleted(
 export async function resetInternalReview(
   dealId: string
 ): Promise<SalesPipelineTimelineState | null> {
+  // Reset Supabase data
+  await resetInternalReviewSupabase(dealId)
+
   const timelines = getAllTimelines()
   const existing = timelines[dealId]
 
@@ -1638,6 +1703,7 @@ export async function resetInternalReview(
 
   existing.stages["internal-review"].data = {
     recipients: [],
+    ccTimEnabled: true,
     emailSubject: "",
     emailBody: "",
     isEdited: false,

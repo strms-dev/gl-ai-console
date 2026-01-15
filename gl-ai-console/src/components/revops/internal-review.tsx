@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,10 +8,12 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   InternalReviewStageData,
   SalesIntakeFormData,
-  INTERNAL_ASSIGNMENT_EMAIL
+  INTERNAL_ASSIGNMENT_EMAIL,
+  TIM_SCULLION_EMAIL
 } from "@/lib/sales-pipeline-timeline-types"
 import {
-  getActiveRecipients
+  getActiveRecipients,
+  ManagedRecipient
 } from "@/lib/internal-recipients-store"
 import { ManageTeamModal } from "./manage-team-modal"
 import {
@@ -21,7 +23,9 @@ import {
   Pencil,
   Eye,
   X,
-  Settings
+  Settings,
+  Loader2,
+  Mail
 } from "lucide-react"
 import {
   Dialog,
@@ -30,13 +34,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+// Hardcoded automation email - cannot be changed
+const AUTOMATION_FROM_EMAIL = "automation@growthlabfinancial.com"
+
 interface InternalReviewProps {
   reviewData: InternalReviewStageData
   salesIntakeData: SalesIntakeFormData | null
   accessPlatform: "qbo" | "xero" | "other" | null
-  onInitialize: (recipients: { name: string; email: string }[], subject: string, body: string) => void
-  onUpdate: (recipients: { name: string; email: string }[], subject: string, body: string) => void
-  onSend: () => void
+  dealId: string
+  onInitialize: (recipients: { name: string; email: string }[], ccTimEnabled: boolean, subject: string, body: string) => void
+  onUpdate: (recipients: { name: string; email: string }[], ccTimEnabled: boolean, subject: string, body: string) => void
+  onSend: () => Promise<{ success: boolean; error?: string }>
 }
 
 export function InternalReview({
@@ -51,11 +59,42 @@ export function InternalReview({
   const [emailSubject, setEmailSubject] = useState("")
   const [emailBody, setEmailBody] = useState("")
   const [selectedRecipients, setSelectedRecipients] = useState<{ name: string; email: string }[]>([])
+  const [ccTimEnabled, setCcTimEnabled] = useState(true)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [showManageTeamModal, setShowManageTeamModal] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
+  const [qboAccessConfirmed, setQboAccessConfirmed] = useState(false)
+
+  // Available recipients loaded from Supabase
+  const [availableRecipients, setAvailableRecipients] = useState<ManagedRecipient[]>([])
+  const [isLoadingRecipients, setIsLoadingRecipients] = useState(true)
 
   // Use ref to track if we've already initialized to prevent infinite loops
   const hasInitialized = useRef(false)
+
+  // Load available recipients from Supabase
+  useEffect(() => {
+    const loadRecipients = async () => {
+      setIsLoadingRecipients(true)
+      const recipients = await getActiveRecipients()
+      setAvailableRecipients(recipients)
+      setIsLoadingRecipients(false)
+    }
+    loadRecipients()
+  }, [])
+
+  // Generate the platform and company string for the email template
+  const getPlatformAndCompany = () => {
+    const platformNames: Record<string, string> = {
+      qbo: "QBO",
+      xero: "Xero",
+      other: "Other"
+    }
+    const platform = platformNames[accessPlatform || "other"]
+    const companyName = salesIntakeData?.companyName || "Unknown Company"
+    return `${platform}/${companyName}`
+  }
 
   // Initialize email template when component mounts
   useEffect(() => {
@@ -63,31 +102,17 @@ export function InternalReview({
     if (!reviewData.emailBody && salesIntakeData && !hasInitialized.current) {
       hasInitialized.current = true
 
-      console.log("Initializing internal review email")
+      console.log("Initializing internal review email with new template")
 
       // Get template and replace placeholders
       const template = INTERNAL_ASSIGNMENT_EMAIL
-      const platformNames: Record<string, string> = {
-        qbo: "QuickBooks Online",
-        xero: "Xero",
-        other: "Other"
-      }
+      const companyName = salesIntakeData.companyName || "Unknown Company"
 
-      // Build services needed list
-      const servicesNeeded: string[] = []
-      if (salesIntakeData.needsBillPaySupport === "yes") servicesNeeded.push("Bill Pay")
-      if (salesIntakeData.needsInvoicingSupport === "yes") servicesNeeded.push("Invoicing")
-      if (salesIntakeData.interestedInCfoReview === "yes") servicesNeeded.push("CFO Review")
-      servicesNeeded.push("Bookkeeping") // Always include bookkeeping
+      const subject = template.subject.replace(/\{\{companyName\}\}/g, companyName)
+      const body = template.bodyTemplate.replace(/\{\{platformAndCompany\}\}/g, getPlatformAndCompany())
 
-      const body = template.bodyTemplate
-        .replace(/\{\{companyName\}\}/g, salesIntakeData.companyName || "Unknown Company")
-        .replace(/\{\{contactName\}\}/g, salesIntakeData.contactName || "Unknown Contact")
-        .replace(/\{\{accountingSystem\}\}/g, platformNames[accessPlatform || "other"])
-        .replace(/\{\{servicesNeeded\}\}/g, servicesNeeded.join(", "))
-
-      // Initialize with empty recipients - user will select team members
-      onInitialize([], template.subject, body)
+      // Initialize with empty recipients and CC Tim enabled by default
+      onInitialize([], true, subject, body)
     }
 
     // Reset the flag if email body is cleared (for re-initialization)
@@ -107,19 +132,11 @@ export function InternalReview({
     if (reviewData.recipients) {
       setSelectedRecipients(reviewData.recipients)
     }
-  }, [reviewData.emailSubject, reviewData.emailBody, reviewData.recipients])
+    // Sync ccTimEnabled - default to true if undefined
+    setCcTimEnabled(reviewData.ccTimEnabled !== false)
+  }, [reviewData.emailSubject, reviewData.emailBody, reviewData.recipients, reviewData.ccTimEnabled])
 
-  // Load default recipients if none selected and we have active recipients
-  useEffect(() => {
-    if (selectedRecipients.length === 0 && reviewData.recipients?.length === 0) {
-      const activeRecipients = getActiveRecipients()
-      if (activeRecipients.length > 0) {
-        setSelectedRecipients(activeRecipients)
-        // Also update the store
-        onUpdate(activeRecipients, reviewData.emailSubject || "", reviewData.emailBody || "")
-      }
-    }
-  }, [selectedRecipients.length, reviewData.recipients?.length, reviewData.emailSubject, reviewData.emailBody, onUpdate])
+  // Note: Recipients now default to empty (nobody assigned) - users must manually select
 
   const handleToggleRecipient = (recipient: { name: string; email: string }) => {
     setSelectedRecipients(prev => {
@@ -131,13 +148,20 @@ export function InternalReview({
         newRecipients = [...prev, recipient]
       }
       // Update the store
-      onUpdate(newRecipients, emailSubject, emailBody)
+      onUpdate(newRecipients, ccTimEnabled, emailSubject, emailBody)
       return newRecipients
     })
   }
 
+  const handleToggleCcTim = () => {
+    const newValue = !ccTimEnabled
+    setCcTimEnabled(newValue)
+    // Update the store
+    onUpdate(selectedRecipients, newValue, emailSubject, emailBody)
+  }
+
   const handleSaveEmailEdit = () => {
-    onUpdate(selectedRecipients, emailSubject, emailBody)
+    onUpdate(selectedRecipients, ccTimEnabled, emailSubject, emailBody)
     setIsEditingEmail(false)
   }
 
@@ -145,6 +169,37 @@ export function InternalReview({
     setEmailSubject(reviewData.emailSubject || "")
     setEmailBody(reviewData.emailBody || "")
     setIsEditingEmail(false)
+  }
+
+  const handleSend = async () => {
+    setIsSending(true)
+    setSendError(null)
+
+    try {
+      const result = await onSend()
+      if (!result.success) {
+        setSendError(result.error || "Failed to send email")
+      }
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : "Failed to send email")
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const handleRecipientsUpdated = async () => {
+    // Reload recipients from Supabase
+    const recipients = await getActiveRecipients()
+    setAvailableRecipients(recipients)
+
+    // Keep only those that are still active
+    const stillActiveSelected = selectedRecipients.filter(
+      sr => recipients.some(ar => ar.email === sr.email)
+    )
+    if (stillActiveSelected.length !== selectedRecipients.length) {
+      setSelectedRecipients(stillActiveSelected)
+      onUpdate(stillActiveSelected, ccTimEnabled, emailSubject, emailBody)
+    }
   }
 
   const isSent = !!reviewData.sentAt
@@ -182,8 +237,16 @@ export function InternalReview({
             {reviewData.sentAt ? new Date(reviewData.sentAt).toLocaleTimeString() : ""}
           </p>
           <p className="mt-1">
-            Assigned to: {reviewData.reviewAssignedTo?.join(", ")}
+            From: {AUTOMATION_FROM_EMAIL}
           </p>
+          <p className="mt-1">
+            Assigned to: {reviewData.recipients.map(r => r.name).join(", ")}
+          </p>
+          {reviewData.ccTimEnabled && (
+            <p className="mt-1">
+              CC: {TIM_SCULLION_EMAIL}
+            </p>
+          )}
         </div>
 
         {/* Preview Modal */}
@@ -196,11 +259,21 @@ export function InternalReview({
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label className="text-muted-foreground">Recipients</Label>
+                <Label className="text-muted-foreground">From</Label>
+                <p className="font-medium mt-1">{AUTOMATION_FROM_EMAIL}</p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">To</Label>
                 <p className="font-medium mt-1">
                   {reviewData.recipients.map(r => `${r.name} <${r.email}>`).join(", ")}
                 </p>
               </div>
+              {reviewData.ccTimEnabled && (
+                <div>
+                  <Label className="text-muted-foreground">CC</Label>
+                  <p className="font-medium mt-1">{TIM_SCULLION_EMAIL}</p>
+                </div>
+              )}
               <div>
                 <Label className="text-muted-foreground">Subject</Label>
                 <p className="font-medium mt-1">{reviewData.emailSubject}</p>
@@ -279,34 +352,70 @@ export function InternalReview({
           </Button>
         </div>
         <div className="flex flex-wrap gap-2">
-          {getActiveRecipients().map((recipient) => {
-            const isSelected = selectedRecipients.some(r => r.email === recipient.email)
-            return (
-              <button
-                key={recipient.email}
-                onClick={() => handleToggleRecipient(recipient)}
-                className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                  isSelected
-                    ? "bg-[#407B9D] text-white border-[#407B9D]"
-                    : "bg-white text-gray-600 border-gray-300 hover:border-[#407B9D]"
-                }`}
-              >
-                <Users className="w-3 h-3 mr-1.5" />
-                {recipient.name}
-              </button>
-            )
-          })}
-          {getActiveRecipients().length === 0 && (
+          {isLoadingRecipients ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading team members...
+            </div>
+          ) : availableRecipients.length > 0 ? (
+            availableRecipients.map((recipient) => {
+              const isSelected = selectedRecipients.some(r => r.email === recipient.email)
+              return (
+                <button
+                  key={recipient.email}
+                  onClick={() => handleToggleRecipient(recipient)}
+                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                    isSelected
+                      ? "bg-[#407B9D] text-white border-[#407B9D]"
+                      : "bg-white text-gray-600 border-gray-300 hover:border-[#407B9D]"
+                  }`}
+                >
+                  <Users className="w-3 h-3 mr-1.5" />
+                  {recipient.name}
+                </button>
+              )
+            })
+          ) : (
             <p className="text-sm text-muted-foreground italic">
               No team members configured. Click &quot;Manage Team&quot; to add members.
             </p>
           )}
         </div>
-        {selectedRecipients.length === 0 && getActiveRecipients().length > 0 && (
+        {selectedRecipients.length === 0 && availableRecipients.length > 0 && (
           <p className="text-xs text-amber-600 mt-2">
             Select at least one team member to assign this client to
           </p>
         )}
+      </div>
+
+      {/* CC Tim Scullion Toggle */}
+      <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label className="text-sm font-medium">CC Tim Scullion</Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {TIM_SCULLION_EMAIL}
+            </p>
+          </div>
+          <button
+            onClick={handleToggleCcTim}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              ccTimEnabled ? "bg-[#407B9D]" : "bg-gray-300"
+            }`}
+            aria-label={ccTimEnabled ? "Disable CC Tim" : "Enable CC Tim"}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                ccTimEnabled ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          {ccTimEnabled
+            ? "Tim will be CC'd on this email"
+            : "Tim will not be CC'd on this email"}
+        </p>
       </div>
 
       {/* Email Content */}
@@ -354,13 +463,24 @@ export function InternalReview({
       ) : (
         <div className="border rounded-lg overflow-hidden mb-4">
           <div className="bg-gray-50 px-3 py-2 border-b flex items-center justify-between">
-            <div>
+            <div className="space-y-0.5">
+              <p className="text-xs flex items-center gap-1">
+                <Mail className="w-3 h-3 text-muted-foreground" />
+                <span className="text-muted-foreground">From:</span>{" "}
+                <span className="font-medium text-gray-500">{AUTOMATION_FROM_EMAIL}</span>
+              </p>
               <p className="text-xs">
                 <span className="text-muted-foreground">To:</span>{" "}
                 <span className={selectedRecipients.length === 0 ? "text-amber-600 italic" : "font-medium"}>
                   {selectedRecipients.length === 0
                     ? "No recipient selected"
                     : selectedRecipients.map(r => r.email).join(", ")}
+                </span>
+              </p>
+              <p className="text-xs">
+                <span className="text-muted-foreground">CC:</span>{" "}
+                <span className="font-medium">
+                  {ccTimEnabled ? TIM_SCULLION_EMAIL : "--"}
                 </span>
               </p>
               <p className="text-xs">
@@ -386,28 +506,57 @@ export function InternalReview({
         </div>
       )}
 
+      {/* QBO Access Confirmation Checkbox */}
+      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={qboAccessConfirmed}
+            onChange={(e) => setQboAccessConfirmed(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#407B9D] focus:ring-[#407B9D] cursor-pointer"
+          />
+          <div>
+            <span className="text-sm font-medium text-amber-800">
+              I confirm that I have manually given QBO access to the selected team members
+            </span>
+            <p className="text-xs text-amber-600 mt-1">
+              This must be checked before sending the internal assignment email.
+            </p>
+          </div>
+        </label>
+      </div>
+
+      {/* Error Display */}
+      {sendError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-700">{sendError}</p>
+        </div>
+      )}
+
       {/* Send Button */}
       <Button
-        onClick={onSend}
-        disabled={selectedRecipients.length === 0}
-        className="w-full bg-[#407B9D] hover:bg-[#366a88] text-white"
+        onClick={handleSend}
+        disabled={selectedRecipients.length === 0 || isSending || !qboAccessConfirmed}
+        className="w-full bg-[#407B9D] hover:bg-[#366a88] text-white disabled:opacity-50"
       >
-        <Send className="w-4 h-4 mr-2" />
-        Send Internal Assignment
+        {isSending ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Sending...
+          </>
+        ) : (
+          <>
+            <Send className="w-4 h-4 mr-2" />
+            Send Internal Assignment
+          </>
+        )}
       </Button>
 
       {/* Manage Team Modal */}
       <ManageTeamModal
         isOpen={showManageTeamModal}
         onClose={() => setShowManageTeamModal(false)}
-        onRecipientsUpdated={() => {
-          // Refresh recipients - keep only those that are still active
-          const activeRecipients = getActiveRecipients()
-          const stillActiveSelected = selectedRecipients.filter(
-            sr => activeRecipients.some(ar => ar.email === sr.email)
-          )
-          setSelectedRecipients(stillActiveSelected)
-        }}
+        onRecipientsUpdated={handleRecipientsUpdated}
       />
     </div>
   )

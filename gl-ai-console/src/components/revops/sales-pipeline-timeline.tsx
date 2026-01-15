@@ -56,6 +56,8 @@ import {
   enrollInSequence,
   unenrollFromSequence,
   markAccessReceived,
+  loadReminderSequenceData,
+  loadInternalReviewData,
   initializeInternalReview,
   updateInternalReviewEmail,
   markInternalReviewSent,
@@ -238,9 +240,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   const [isSalesIntakeAIPolling, setIsSalesIntakeAIPolling] = useState(false)
   const [isGLReviewAutoFillLoading, setIsGLReviewAutoFillLoading] = useState(false)
   const [isComparisonLoading, setIsComparisonLoading] = useState(false)
-  // Reminder sequence loading states
-  const [isEnrolling, setIsEnrolling] = useState(false)
-  const [isUnenrolling, setIsUnenrolling] = useState(false)
+  // Reminder sequence loading state
   const [isProcessingAccess, setIsProcessingAccess] = useState(false)
 
   // Load timeline state
@@ -319,6 +319,26 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         console.error('Error loading follow-up email from Supabase:', error)
       }
 
+      // Load reminder sequence data from Supabase (source of truth)
+      try {
+        await loadReminderSequenceData(deal.id)
+        // Reload state after loading reminder sequence data
+        const updatedState = await getOrCreateTimelineState(deal.id)
+        setTimelineState(updatedState)
+      } catch (error) {
+        console.error('Error loading reminder sequence from Supabase:', error)
+      }
+
+      // Load internal review data from Supabase (source of truth)
+      try {
+        await loadInternalReviewData(deal.id)
+        // Reload state after loading internal review data
+        const updatedState = await getOrCreateTimelineState(deal.id)
+        setTimelineState(updatedState)
+      } catch (error) {
+        console.error('Error loading internal review from Supabase:', error)
+      }
+
       setIsLoading(false)
     }
     loadState()
@@ -336,6 +356,24 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       }
     } catch (error) {
       console.error('Error loading follow-up email in refreshState:', error)
+    }
+
+    // Load reminder sequence data from Supabase to ensure it's up to date
+    try {
+      await loadReminderSequenceData(deal.id)
+      // Re-fetch state after loading reminder sequence data
+      state = await getOrCreateTimelineState(deal.id)
+    } catch (error) {
+      console.error('Error loading reminder sequence in refreshState:', error)
+    }
+
+    // Load internal review data from Supabase to ensure it's up to date
+    try {
+      await loadInternalReviewData(deal.id)
+      // Re-fetch state after loading internal review data
+      state = await getOrCreateTimelineState(deal.id)
+    } catch (error) {
+      console.error('Error loading internal review in refreshState:', error)
     }
 
     setTimelineState(state)
@@ -541,27 +579,13 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
   // Reminder Sequence Handlers
   const handleEnrollInSequence = useCallback(async () => {
-    setIsEnrolling(true)
-    try {
-      await enrollInSequence(deal.id)
-      await refreshState()
-    } catch (error) {
-      console.error('Error enrolling in sequence:', error)
-    } finally {
-      setIsEnrolling(false)
-    }
+    await enrollInSequence(deal.id)
+    await refreshState()
   }, [deal.id, refreshState])
 
   const handleUnenrollFromSequence = useCallback(async () => {
-    setIsUnenrolling(true)
-    try {
-      await unenrollFromSequence(deal.id)
-      await refreshState()
-    } catch (error) {
-      console.error('Error unenrolling from sequence:', error)
-    } finally {
-      setIsUnenrolling(false)
-    }
+    await unenrollFromSequence(deal.id)
+    await refreshState()
   }, [deal.id, refreshState])
 
   const handleMarkAccessReceived = useCallback(async () => {
@@ -577,22 +601,22 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   }, [deal.id, refreshState])
 
   // Internal Review Handlers
-  const handleInitializeInternalReview = useCallback(async (recipients: { name: string; email: string }[], subject: string, body: string) => {
+  const handleInitializeInternalReview = useCallback(async (recipients: { name: string; email: string }[], ccTimEnabled: boolean, subject: string, body: string) => {
     console.log("handleInitializeInternalReview called")
-    await initializeInternalReview(deal.id, recipients, subject, body)
+    await initializeInternalReview(deal.id, recipients, ccTimEnabled, subject, body)
     await refreshState()
   }, [deal.id, refreshState])
 
-  const handleUpdateInternalReview = useCallback(async (recipients: { name: string; email: string }[], subject: string, body: string) => {
-    await updateInternalReviewEmail(deal.id, recipients, subject, body)
+  const handleUpdateInternalReview = useCallback(async (recipients: { name: string; email: string }[], ccTimEnabled: boolean, subject: string, body: string) => {
+    await updateInternalReviewEmail(deal.id, recipients, ccTimEnabled, subject, body)
     await refreshState()
   }, [deal.id, refreshState])
 
-  const handleSendInternalReview = useCallback(async () => {
-    // In production, this would integrate with HubSpot API to send the email
-    // For now, we just mark it as sent
-    await markInternalReviewSent(deal.id)
+  const handleSendInternalReview = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    // Call n8n webhook to send the email
+    const result = await markInternalReviewSent(deal.id)
     await refreshState()
+    return result
   }, [deal.id, refreshState])
 
   // GL Review Handlers
@@ -1119,20 +1143,24 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       (timelineState?.stages["sales-intake"]?.data?.formData?.accountingPlatform as "qbo" | "xero" | "other" | null) ||
       null
 
+    // Get contact info from sales intake form data
+    const salesIntakeFormData = timelineState?.stages["sales-intake"]?.data?.formData
+    const contactName = salesIntakeFormData?.contactName || ""
+    const contactEmail = salesIntakeFormData?.emailAddress || ""
+
     return (
       <ReminderSequence
-        dealId={deal.id}
         platform={platform}
         followUpEmailSentAt={followUpEmailSentAt}
         status={reminderData.status}
         enrolledAt={reminderData.enrolledAt || null}
         accessReceivedAt={reminderData.accessReceivedAt || null}
+        contactName={contactName}
+        contactEmail={contactEmail}
         onEnroll={handleEnrollInSequence}
         onUnenroll={handleUnenrollFromSequence}
         onAccessReceived={handleMarkAccessReceived}
-        isEnrolling={isEnrolling}
-        isUnenrolling={isUnenrolling}
-        isProcessingAccess={isProcessingAccess}
+        isProcessing={isProcessingAccess}
       />
     )
   }
@@ -1146,14 +1174,15 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     if (!reviewData) return null
 
     const salesIntakeData = timelineState?.stages["sales-intake"]?.data?.formData || null
-    // Use platform from reminder-sequence data (simplified type no longer has accessPlatform)
-    const accessPlatform = timelineState?.stages["reminder-sequence"]?.data?.platform || null
+    // Use accountingPlatform from sales intake form, with reminder-sequence as fallback
+    const accessPlatform = salesIntakeData?.accountingPlatform || timelineState?.stages["reminder-sequence"]?.data?.platform || null
 
     return (
       <InternalReview
         reviewData={reviewData}
         salesIntakeData={salesIntakeData}
         accessPlatform={accessPlatform}
+        dealId={deal.id}
         onInitialize={handleInitializeInternalReview}
         onUpdate={handleUpdateInternalReview}
         onSend={handleSendInternalReview}

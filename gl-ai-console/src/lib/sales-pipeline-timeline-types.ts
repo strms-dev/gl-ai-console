@@ -241,8 +241,11 @@ export interface ReminderSequenceStageData {
 
 // Internal Review Stage Data - for assigning GL review to internal team
 export interface InternalReviewStageData {
-  // Recipients for the internal email
+  // Recipients for the internal email (TO field)
   recipients: { name: string; email: string }[]
+
+  // CC Tim Scullion toggle (default: true)
+  ccTimEnabled: boolean
 
   // Email content
   emailSubject: string
@@ -808,22 +811,18 @@ Tim`
 
 // Internal assignment email template
 export const INTERNAL_ASSIGNMENT_EMAIL = {
-  subject: "New Client Assigned - GL Review Required",
-  bodyTemplate: `Hi team,
+  subject: "General Ledger Review Needed For {{companyName}}",
+  bodyTemplate: `Hi Team,
 
-You've been assigned a new client for general ledger review.
+You have just been granted accounting access to the following general ledger:
 
-Client: {{companyName}}
-Contact: {{contactName}}
-Accounting System: {{accountingSystem}}
-Services Requested: {{servicesNeeded}}
+- {{platformAndCompany}}
 
-Please complete the GL review and note any findings. This will inform our pricing recommendation.
-
-Expected turnaround: 2-3 business days
-
-Tim`
+Please submit your General Ledger Review for the above account, and notify Tim when it has been completed.`
 }
+
+// Tim Scullion's email for CC
+export const TIM_SCULLION_EMAIL = "t.scullion@growthlabfinancial.com"
 
 // Empty form data for initialization
 export function createEmptySalesIntakeFormData(): SalesIntakeFormData {
@@ -991,6 +990,7 @@ export function createInitialTimelineState(dealId: string): SalesPipelineTimelin
         completedAt: null,
         data: {
           recipients: [],
+          ccTimEnabled: true,
           emailSubject: "",
           emailBody: "",
           isEdited: false,

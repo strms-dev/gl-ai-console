@@ -2,6 +2,9 @@
 
 // Managed Internal Recipients Store
 // Stores the pool of team members available for Internal Team Assignment
+// Uses Supabase for persistence
+
+import { supabase } from './supabase/client'
 
 export interface ManagedRecipient {
   id: string
@@ -11,106 +14,159 @@ export interface ManagedRecipient {
   createdAt: string
 }
 
-const STORAGE_KEY = "revops-internal-recipients"
+// Get all managed recipients from Supabase
+export async function getManagedRecipients(): Promise<ManagedRecipient[]> {
+  const { data, error } = await supabase
+    .from('revops_internal_team_members')
+    .select('id, name, email, is_active, created_at')
+    .order('created_at', { ascending: true })
 
-// Default recipients to seed the store
-const DEFAULT_RECIPIENTS: Omit<ManagedRecipient, "id" | "createdAt">[] = [
-  { name: "Lori Chambless", email: "l.chambless@growthlabfinancial.com", isActive: true },
-  { name: "Robin Brown", email: "r.brown@growthlabfinancial.com", isActive: true },
-  { name: "Stephen Cummings", email: "s.cummings@growthlabfinancial.com", isActive: true }
-]
-
-// Generate a simple unique ID
-function generateId(): string {
-  return `recipient-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-}
-
-// Get all managed recipients from localStorage
-export function getManagedRecipients(): ManagedRecipient[] {
-  if (typeof window === "undefined") return []
-
-  const stored = localStorage.getItem(STORAGE_KEY)
-
-  if (!stored) {
-    // Initialize with default recipients
-    const defaultWithIds: ManagedRecipient[] = DEFAULT_RECIPIENTS.map((r) => ({
-      ...r,
-      id: generateId(),
-      createdAt: new Date().toISOString()
-    }))
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultWithIds))
-    return defaultWithIds
-  }
-
-  try {
-    return JSON.parse(stored) as ManagedRecipient[]
-  } catch {
+  if (error) {
+    console.error('Error fetching team members:', error)
     return []
   }
+
+  return (data || []).map(row => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    isActive: row.is_active,
+    createdAt: row.created_at
+  }))
 }
 
 // Get only active recipients (for display in selection UI)
-export function getActiveRecipients(): ManagedRecipient[] {
-  return getManagedRecipients().filter(r => r.isActive)
+export async function getActiveRecipients(): Promise<ManagedRecipient[]> {
+  const { data, error } = await supabase
+    .from('revops_internal_team_members')
+    .select('id, name, email, is_active, created_at')
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching active team members:', error)
+    return []
+  }
+
+  return (data || []).map(row => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    isActive: row.is_active,
+    createdAt: row.created_at
+  }))
 }
 
 // Add a new recipient to the pool
-export function addManagedRecipient(name: string, email: string): ManagedRecipient {
-  const recipients = getManagedRecipients()
+export async function addManagedRecipient(name: string, email: string): Promise<ManagedRecipient | null> {
+  const { data, error } = await supabase
+    .from('revops_internal_team_members')
+    .insert({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      is_active: true
+    } as never)
+    .select('id, name, email, is_active, created_at')
+    .single()
 
-  const newRecipient: ManagedRecipient = {
-    id: generateId(),
-    name,
-    email,
-    isActive: true,
-    createdAt: new Date().toISOString()
+  if (error) {
+    console.error('Error adding team member:', error)
+    return null
   }
 
-  recipients.push(newRecipient)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(recipients))
-
-  return newRecipient
+  return {
+    id: data.id,
+    name: data.name,
+    email: data.email,
+    isActive: data.is_active,
+    createdAt: data.created_at
+  }
 }
 
 // Update an existing recipient
-export function updateManagedRecipient(
+export async function updateManagedRecipient(
   id: string,
   updates: Partial<Pick<ManagedRecipient, "name" | "email" | "isActive">>
-): ManagedRecipient | null {
-  const recipients = getManagedRecipients()
-  const index = recipients.findIndex(r => r.id === id)
+): Promise<ManagedRecipient | null> {
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString()
+  }
 
-  if (index === -1) return null
+  if (updates.name !== undefined) updateData.name = updates.name.trim()
+  if (updates.email !== undefined) updateData.email = updates.email.trim().toLowerCase()
+  if (updates.isActive !== undefined) updateData.is_active = updates.isActive
 
-  recipients[index] = { ...recipients[index], ...updates }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(recipients))
+  const { data, error } = await supabase
+    .from('revops_internal_team_members')
+    .update(updateData as never)
+    .eq('id', id)
+    .select('id, name, email, is_active, created_at')
+    .single()
 
-  return recipients[index]
+  if (error) {
+    console.error('Error updating team member:', error)
+    return null
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+    email: data.email,
+    isActive: data.is_active,
+    createdAt: data.created_at
+  }
 }
 
 // Delete a recipient from the pool
-export function deleteManagedRecipient(id: string): boolean {
-  const recipients = getManagedRecipients()
-  const filtered = recipients.filter(r => r.id !== id)
+export async function deleteManagedRecipient(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('revops_internal_team_members')
+    .delete()
+    .eq('id', id)
 
-  if (filtered.length === recipients.length) return false
+  if (error) {
+    console.error('Error deleting team member:', error)
+    return false
+  }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
   return true
 }
 
 // Toggle recipient active status
-export function toggleRecipientActive(id: string): ManagedRecipient | null {
-  const recipients = getManagedRecipients()
-  const recipient = recipients.find(r => r.id === id)
+export async function toggleRecipientActive(id: string): Promise<ManagedRecipient | null> {
+  // First get current state
+  const { data: current, error: fetchError } = await supabase
+    .from('revops_internal_team_members')
+    .select('is_active')
+    .eq('id', id)
+    .single()
 
-  if (!recipient) return null
+  if (fetchError || !current) {
+    console.error('Error fetching team member:', fetchError)
+    return null
+  }
 
-  return updateManagedRecipient(id, { isActive: !recipient.isActive })
+  // Toggle the active status
+  return updateManagedRecipient(id, { isActive: !current.is_active })
 }
 
 // Check if email already exists in the pool
-export function recipientEmailExists(email: string, excludeId?: string): boolean {
-  const recipients = getManagedRecipients()
-  return recipients.some(r => r.email.toLowerCase() === email.toLowerCase() && r.id !== excludeId)
+export async function recipientEmailExists(email: string, excludeId?: string): Promise<boolean> {
+  let query = supabase
+    .from('revops_internal_team_members')
+    .select('id')
+    .eq('email', email.toLowerCase())
+
+  if (excludeId) {
+    query = query.neq('id', excludeId)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error checking email existence:', error)
+    return false
+  }
+
+  return (data?.length || 0) > 0
 }

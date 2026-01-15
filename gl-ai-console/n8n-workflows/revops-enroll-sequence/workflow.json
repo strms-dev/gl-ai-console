@@ -28,10 +28,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -2224,
-        288
+        -2688,
+        480
       ],
-      "id": "15155a43-0e3e-4f29-95fe-3dc21330f260",
+      "id": "c8a5fd60-dcdc-486d-a59e-b49b5a050da0",
       "name": "Catch Enroll Request",
       "webhookId": "revops-enroll-sequence-webhook"
     },
@@ -72,10 +72,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -2000,
-        288
+        -2464,
+        480
       ],
-      "id": "f5aff46b-eee2-4ef6-b321-beab8e576520",
+      "id": "6fd519b8-6b42-4da0-88c9-e95e3b44294c",
       "name": "Validate Deal ID"
     },
     {
@@ -94,10 +94,10 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        -1776,
-        192
+        -2240,
+        384
       ],
-      "id": "c3008faa-38e4-4287-8df3-4f9f4a6d465b",
+      "id": "8ef79a99-d631-4554-93b6-dadb28e0bd99",
       "name": "Get Deal Details",
       "credentials": {
         "supabaseApi": {
@@ -134,10 +134,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -1552,
-        192
+        -2016,
+        384
       ],
-      "id": "419b03a4-08db-4df9-86a1-d924bd92ed5e",
+      "id": "05e70e9c-ba1d-4fe2-a851-42c3962e8d7f",
       "name": "Check Deal Found"
     },
     {
@@ -156,10 +156,10 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        -1328,
-        96
+        -1792,
+        288
       ],
-      "id": "a95cdd9a-e702-421a-931c-ec64569f5cc6",
+      "id": "e11c03ae-0e68-4e01-bd3d-eed325f9a459",
       "name": "Get Sales Intake",
       "credentials": {
         "supabaseApi": {
@@ -195,10 +195,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -1104,
-        96
+        -1568,
+        288
       ],
-      "id": "06abb87e-47eb-4ce1-a458-afda62256ffb",
+      "id": "1bd8418a-0e08-480a-8dba-fe8eb1494fc5",
       "name": "Is QBO?"
     },
     {
@@ -228,10 +228,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -880,
-        192
+        -1344,
+        384
       ],
-      "id": "d199756a-ea1d-4790-809c-2d8141a21ac5",
+      "id": "3bae7261-a631-4fa4-8c82-638eea4860ef",
       "name": "Is Xero?"
     },
     {
@@ -257,10 +257,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -656,
-        -96
+        -1120,
+        96
       ],
-      "id": "0d0a44ef-4029-47c6-91a5-d65d2a8ad517",
+      "id": "fe326645-94ed-4788-8262-a4b724892491",
       "name": "Set QBO Sequence"
     },
     {
@@ -286,10 +286,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -656,
-        96
+        -1120,
+        288
       ],
-      "id": "c4dc3383-a9cc-40d8-ae6e-5c58844f0d4e",
+      "id": "4fddac7e-9a90-43e9-a654-09b0679a647a",
       "name": "Set Xero Sequence"
     },
     {
@@ -316,10 +316,10 @@
       "type": "n8n-nodes-base.hubspot",
       "typeVersion": 2.2,
       "position": [
-        -432,
-        0
+        -896,
+        192
       ],
-      "id": "2c82c551-0a26-4025-92bd-48164607fb84",
+      "id": "fd317f7a-df6e-4d88-bcbd-30f77aa70ad9",
       "name": "Search HubSpot Contact",
       "alwaysOutputData": true,
       "credentials": {
@@ -357,10 +357,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        -208,
-        0
+        -672,
+        192
       ],
-      "id": "cbebe85f-8223-465e-b48b-df7ab947aa5f",
+      "id": "554ce227-52fe-42e4-b73b-94612e76ac68",
       "name": "Check Contact Found"
     },
     {
@@ -369,18 +369,27 @@
         "url": "https://api.hubapi.com/automation/v4/sequences/enrollments",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "hubspotOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "userId",
+              "value": "664091983"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contactId: String($('Search HubSpot Contact').item.json.id), sequenceId: $('Set QBO Sequence').first().json.sequence_id || $('Set Xero Sequence').first().json.sequence_id, senderEmail: 'nick@growthlab.cc' }) }}",
+        "jsonBody": "={{ JSON.stringify({ contactId: String($('Search HubSpot Contact').item.json.id), sequenceId: $('Set QBO Sequence').first().json.sequence_id || $('Set Xero Sequence').first().json.sequence_id, senderEmail: 't.scullion@growthlabfinancial.com' }) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        16,
-        -96
+        -448,
+        96
       ],
-      "id": "fbfb02fa-2225-406d-82e8-612907d132bb",
+      "id": "bc63c951-a1a9-4446-ac77-f061fc5ae373",
       "name": "Enroll in Sequence",
       "credentials": {
         "hubspotOAuth2Api": {
@@ -418,10 +427,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        240,
-        -96
+        -224,
+        96
       ],
-      "id": "0609aad9-938d-47bf-8f49-e112603fe30f",
+      "id": "95886fcd-8157-451d-b96c-fd302b027816",
       "name": "Check Enrollment Success"
     },
     {
@@ -431,10 +440,10 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        464,
-        -192
+        0,
+        0
       ],
-      "id": "dd65e18e-1f2e-4d52-abf0-678a6c74b143",
+      "id": "bd7e3dc3-8c62-4d6e-974f-2be228f919aa",
       "name": "Update Stage Status",
       "credentials": {
         "supabaseApi": {
@@ -450,10 +459,10 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        688,
-        -192
+        224,
+        0
       ],
-      "id": "06418a91-adf9-49cc-a4fc-23b46a592091",
+      "id": "76e43fb1-0efb-4873-a274-6427499a95fd",
       "name": "Update Enrolled At",
       "credentials": {
         "supabaseApi": {
@@ -471,10 +480,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        912,
-        -192
+        448,
+        0
       ],
-      "id": "b1fbd6bd-6f72-407b-b428-f7de32b5e81d",
+      "id": "1aef81eb-1d1b-4491-a39b-2285f5c4de02",
       "name": "Respond Success"
     },
     {
@@ -488,10 +497,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        -1776,
-        384
+        -2240,
+        576
       ],
-      "id": "d555caeb-1bf8-4779-ac8e-5e7e96b835b4",
+      "id": "e22294bb-d055-4fa9-b1c6-3e355b8552ff",
       "name": "Respond Invalid ID"
     },
     {
@@ -505,10 +514,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        -1328,
-        288
+        -1792,
+        480
       ],
-      "id": "048b2c99-71c4-4760-a78c-5c5ebab3ef45",
+      "id": "615c2cce-d68f-4b12-ac9a-b4f7cbd17f60",
       "name": "Respond Deal Not Found"
     },
     {
@@ -522,10 +531,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        -656,
-        288
+        -1120,
+        480
       ],
-      "id": "c4b017b1-3a81-4cbf-96f0-3e6b1815271c",
+      "id": "9cecbb9a-8fe1-49ec-819d-fef32be104e4",
       "name": "Respond No Sequence (Other Platform)"
     },
     {
@@ -539,10 +548,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        16,
-        96
+        -448,
+        288
       ],
-      "id": "7fc66444-2357-4221-8bbb-16d9c8ddb1b4",
+      "id": "beb134b0-da1d-4655-a1ab-f8a7170ad21b",
       "name": "Respond Contact Not Found"
     },
     {
@@ -556,10 +565,10 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        464,
-        0
+        0,
+        192
       ],
-      "id": "5d294ff2-8868-4995-8d9d-a295893fda83",
+      "id": "23c1f9f9-0f0a-421e-962a-6c5e2f73721a",
       "name": "Respond Enrollment Failed"
     }
   ],
@@ -821,13 +830,12 @@
     "timeSavedMode": "fixed",
     "timezone": "America/New_York",
     "callerPolicy": "workflowsFromSameOwner",
-    "executionTimeout": -1,
     "errorWorkflow": "DCoS5cl84RJM4RoS"
   },
-  "versionId": "27ddd32a-6cc8-4108-ae0b-d22dbe059780",
+  "versionId": "8ff411fc-c167-4f74-a32f-7166b3192fb8",
   "meta": {
     "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
   },
-  "id": "fhqhZLGQoH8l_GU6ycHqx",
+  "id": "vuXYlrghGDUMqeEPHFdjn",
   "tags": []
 }
