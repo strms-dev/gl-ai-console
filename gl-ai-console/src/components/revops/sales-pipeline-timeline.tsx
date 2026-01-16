@@ -62,10 +62,14 @@ import {
   updateInternalReviewEmail,
   markInternalReviewSent,
   autoFillGLReview,
+  triggerAIGLReview,
+  loadGLReviewFromSupabase,
   updateGLReviewForm,
   confirmGLReview,
   resetGLReview,
   submitTeamGLReview,
+  pollForTeamGLReview,
+  getGLReviewFormUrl,
   updateComparisonSelections,
   updateFinalReviewData,
   updateCustomValues,
@@ -376,6 +380,16 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       console.error('Error loading internal review in refreshState:', error)
     }
 
+    // Load GL review data from Supabase to ensure it's up to date
+    try {
+      const glReviewState = await loadGLReviewFromSupabase(deal.id)
+      if (glReviewState) {
+        state = glReviewState
+      }
+    } catch (error) {
+      console.error('Error loading GL review in refreshState:', error)
+    }
+
     setTimelineState(state)
 
     // Single-stage expansion: find the first non-completed stage and expand it
@@ -644,6 +658,39 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     await refreshState()
   }, [deal.id, refreshState])
 
+  // Trigger AI GL Review via n8n webhook
+  const handleTriggerAIGLReview = useCallback(async (qboClientName: string): Promise<{ success: boolean; error?: string }> => {
+    setIsGLReviewAutoFillLoading(true)
+    try {
+      const result = await triggerAIGLReview(deal.id, qboClientName)
+      if (result.success) {
+        // Start polling for AI review result
+        // The webhook will save to Supabase and we'll detect it
+        const pollInterval = setInterval(async () => {
+          await refreshState()
+          // Check if AI review is now available
+          const state = await getOrCreateTimelineState(deal.id)
+          const glReviewData = state.stages["gl-review"]?.data
+          if (glReviewData?.isAutoFilled) {
+            clearInterval(pollInterval)
+            setIsGLReviewAutoFillLoading(false)
+          }
+        }, 5000)
+        // Stop polling after 2 minutes
+        setTimeout(() => {
+          clearInterval(pollInterval)
+          setIsGLReviewAutoFillLoading(false)
+        }, 120000)
+      } else {
+        setIsGLReviewAutoFillLoading(false)
+      }
+      return result
+    } catch (error) {
+      setIsGLReviewAutoFillLoading(false)
+      return { success: false, error: error instanceof Error ? error.message : "Failed to trigger AI GL Review" }
+    }
+  }, [deal.id, refreshState])
+
   // GL Review Comparison Handlers
   const handleSimulateTeamSubmit = useCallback(async () => {
     setIsComparisonLoading(true)
@@ -677,6 +724,17 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   const handleResetGLReviewComparison = useCallback(async () => {
     await resetGLReviewComparison(deal.id)
     await refreshState()
+  }, [deal.id, refreshState])
+
+  // Poll for team GL review from Supabase
+  const handlePollForTeamReview = useCallback(async (): Promise<boolean> => {
+    const newState = await pollForTeamGLReview(deal.id)
+    if (newState) {
+      // Team review found, refresh to show it
+      await refreshState()
+      return true
+    }
+    return false
   }, [deal.id, refreshState])
 
   // Create Quote Handlers
@@ -1157,6 +1215,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         accessReceivedAt={reminderData.accessReceivedAt || null}
         contactName={contactName}
         contactEmail={contactEmail}
+        hsDealUrl={deal.hsDealUrl}
         onEnroll={handleEnrollInSequence}
         onUnenroll={handleUnenrollFromSequence}
         onAccessReceived={handleMarkAccessReceived}
@@ -1200,13 +1259,21 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
     const isConfirmed = !!glReviewData.confirmedAt
 
+    // Get company name and lead name from deal data
+    const companyNameFromDeal = deal.companyName || ""
+    const leadNameFromDeal = deal.firstName && deal.lastName
+      ? `${deal.firstName} ${deal.lastName}`
+      : deal.firstName || deal.lastName || ""
+
     return (
       <GLReviewForm
         formData={glReviewData.formData || null}
         isAutoFilled={glReviewData.isAutoFilled || false}
         isConfirmed={isConfirmed}
-        fieldConfidence={glReviewData.fieldConfidence || null}
+        companyName={companyNameFromDeal}
+        leadName={leadNameFromDeal}
         onAutoFill={handleAutoFillGLReview}
+        onTriggerAI={handleTriggerAIGLReview}
         onFormChange={handleGLReviewFormChange}
         onConfirm={handleConfirmGLReview}
         onReset={handleResetGLReview}
@@ -1226,13 +1293,16 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     return (
       <GLReviewComparison
         comparisonData={comparisonData}
+        dealId={deal.id}
         onSimulateTeamSubmit={handleSimulateTeamSubmit}
+        onPollForTeamReview={handlePollForTeamReview}
         onUpdateSelections={handleUpdateComparisonSelections}
         onUpdateFinalData={handleUpdateFinalReviewData}
         onUpdateCustomValues={handleUpdateCustomValues}
         onSubmitAndMoveToQuote={handleSubmitComparisonAndMoveToQuote}
         onReset={handleResetGLReviewComparison}
         isLoading={isComparisonLoading}
+        glReviewFormUrl={getGLReviewFormUrl(deal.id)}
       />
     )
   }

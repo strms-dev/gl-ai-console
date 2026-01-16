@@ -285,12 +285,8 @@ export interface FinancialAccount {
 }
 
 // GL Review Form Data - comprehensive form for general ledger review
+// Note: companyName and leadName are displayed from deal data, not stored in form
 export interface GLReviewFormData {
-  // Basic Info (required)
-  email: string
-  companyName: string
-  leadName: string
-
   // Financial Accounts (up to 20)
   accounts: FinancialAccount[]
 
@@ -665,14 +661,14 @@ export const SALES_PIPELINE_STAGES: StageConfig[] = [
   {
     id: "gl-review",
     title: "General Ledger Review",
-    description: "AI analyzes the client's general ledger to auto-fill the GL Review form. Review the populated answers, make any adjustments, and confirm to complete this stage.",
+    description: "Analyzes the client's general ledger to auto-fill the GL Review form. Review the populated answers, make any adjustments, and confirm to complete this stage.",
     icon: "file-spreadsheet",
     actions: {}
   },
   {
     id: "gl-review-comparison",
     title: "GL Review Comparison",
-    description: "Compare the AI-generated GL Review with the team member's review. Review any differences, select the correct value for each field, and submit to move the deal to Create Quote.",
+    description: "Compare the auto-generated GL Review with the team member's review. Review any differences, select the correct value for each field, and submit to move the deal to Create Quote.",
     icon: "git-compare",
     actions: {}
   },
@@ -1136,9 +1132,6 @@ export function createInitialTimelineState(dealId: string): SalesPipelineTimelin
 // Empty GL Review form data for initialization
 export function createEmptyGLReviewFormData(): GLReviewFormData {
   return {
-    email: "",
-    companyName: "",
-    leadName: "",
     accounts: Array(20).fill(null).map(() => ({ name: "", transactionCount: "" as TransactionCount })),
     ecommerce: {
       amazon: "",
@@ -1161,9 +1154,6 @@ export function createEmptyGLReviewFormData(): GLReviewFormData {
 // Test data for GL Review auto-fill simulation
 export function createTestGLReviewFormData(): GLReviewFormData {
   return {
-    email: "john.smith@acmetech.com",
-    companyName: "Acme Technologies Inc.",
-    leadName: "John Smith",
     accounts: [
       { name: "Chase Business Checking", transactionCount: "20-100" },
       { name: "Chase Business Savings", transactionCount: "<20" },
@@ -1190,13 +1180,10 @@ export function createTestGLReviewFormData(): GLReviewFormData {
   }
 }
 
-// Test confidence data for GL Review - simulates AI confidence from GL analysis
+// Test confidence data for GL Review - no longer used since we removed AI confidence
 export function createTestGLReviewFieldConfidence(): GLReviewFieldConfidence {
   return {
     // High confidence - from accounting system data
-    email: "high",
-    companyName: "high",
-    leadName: "high",
     accounts: "high",
     ecommerce: "medium",
 
@@ -1212,12 +1199,9 @@ export function createTestGLReviewFieldConfidence(): GLReviewFieldConfidence {
   }
 }
 
-// Test data for team member's GL Review - intentionally different from AI review for comparison testing
+// Test data for team member's GL Review - intentionally different from auto-generated review for comparison testing
 export function createTestTeamGLReviewFormData(): GLReviewFormData {
   return {
-    email: "john.smith@acmetech.com",
-    companyName: "Acme Technologies Inc.",
-    leadName: "John Smith",
     accounts: [
       { name: "Chase Business Checking", transactionCount: ">100" },  // Different from AI (<20)
       { name: "Chase Business Savings", transactionCount: "<20" },

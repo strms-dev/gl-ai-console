@@ -170,6 +170,95 @@ CREATE POLICY "Allow all operations on strms_sprint_pricing"
 -- WITH CHECK (bucket_id = 'strms-project-files');
 
 -- =====================================================
+-- REVOPS GL REVIEWS TABLE
+-- =====================================================
+-- Unified table for AI, Team, and Final GL Reviews
+-- Uses review_type field to differentiate: 'ai', 'team', 'final'
+
+CREATE TABLE IF NOT EXISTS revops_gl_reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  deal_id UUID NOT NULL REFERENCES revops_pipeline_deals(id) ON DELETE CASCADE,
+
+  -- Review type: 'ai', 'team', or 'final'
+  review_type TEXT NOT NULL CHECK (review_type IN ('ai', 'team', 'final')),
+
+  -- Basic info
+  email TEXT,
+  company_name TEXT,
+  lead_name TEXT,
+
+  -- Financial accounts (JSONB array of {name, transactionCount})
+  accounts JSONB DEFAULT '[]'::jsonb,
+
+  -- eCommerce platforms (JSONB object: {amazon, shopify, square, etsy, ebay, woocommerce, other})
+  ecommerce JSONB DEFAULT '{}'::jsonb,
+
+  -- Revenue analysis
+  revenue_coa_allocations TEXT, -- '1-2', '3-5', '>5'
+  coa_revenue_categories TEXT,
+  active_classes TEXT, -- '0' to '10'
+
+  -- Catchup bookkeeping
+  catchup_required TEXT, -- 'yes' or 'no'
+  catchup_date_range TEXT,
+
+  -- Additional notes
+  additional_notes TEXT,
+
+  -- AI-specific fields (only used when review_type = 'ai')
+  field_confidence JSONB DEFAULT '{}'::jsonb,
+  qbo_client_name TEXT,
+  qbo_access_confirmed_at TIMESTAMPTZ,
+  is_auto_filled BOOLEAN DEFAULT false,
+  auto_filled_at TIMESTAMPTZ,
+
+  -- Team-specific fields (only used when review_type = 'team')
+  submitted_by TEXT,
+  google_form_response_id TEXT,
+
+  -- Final-specific fields (only used when review_type = 'final')
+  field_selections JSONB DEFAULT '{}'::jsonb, -- Which source was used for each field
+  custom_values JSONB DEFAULT '{}'::jsonb,    -- Custom edited values
+
+  -- Common status fields
+  is_confirmed BOOLEAN DEFAULT false,
+  confirmed_at TIMESTAMPTZ,
+  confirmed_by TEXT,
+
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+
+  -- Unique constraint: one review per deal per type
+  UNIQUE(deal_id, review_type)
+);
+
+-- Create indexes for GL reviews
+CREATE INDEX IF NOT EXISTS idx_revops_gl_reviews_deal_id ON revops_gl_reviews(deal_id);
+CREATE INDEX IF NOT EXISTS idx_revops_gl_reviews_review_type ON revops_gl_reviews(review_type);
+CREATE INDEX IF NOT EXISTS idx_revops_gl_reviews_deal_type ON revops_gl_reviews(deal_id, review_type);
+
+-- Add updated_at trigger
+DROP TRIGGER IF EXISTS update_revops_gl_reviews_updated_at ON revops_gl_reviews;
+CREATE TRIGGER update_revops_gl_reviews_updated_at
+  BEFORE UPDATE ON revops_gl_reviews
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Enable RLS
+ALTER TABLE revops_gl_reviews ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policy if exists
+DROP POLICY IF EXISTS "Allow all operations on revops_gl_reviews" ON revops_gl_reviews;
+
+-- Create permissive policy
+CREATE POLICY "Allow all operations on revops_gl_reviews"
+  ON revops_gl_reviews
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
+-- =====================================================
 -- TEST DATA (Optional - uncomment to add test project)
 -- =====================================================
 -- INSERT INTO strms_projects (project_name, company, contact_name, email, current_stage)

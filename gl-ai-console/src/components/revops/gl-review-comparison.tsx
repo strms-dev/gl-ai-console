@@ -29,7 +29,9 @@ import {
   X,
   Check,
   Plus,
-  Trash2
+  Trash2,
+  ExternalLink,
+  ClipboardCopy
 } from "lucide-react"
 import {
   Dialog,
@@ -40,13 +42,16 @@ import {
 
 interface GLReviewComparisonProps {
   comparisonData: GLReviewComparisonStageData
+  dealId?: string
   onSimulateTeamSubmit: () => void
+  onPollForTeamReview?: () => Promise<boolean> // Returns true if team review is now available
   onUpdateSelections: (selections: GLReviewComparisonSelections) => void
   onUpdateFinalData: (data: GLReviewFormData) => void
   onUpdateCustomValues: (customValues: GLReviewCustomValues) => void
   onSubmitAndMoveToQuote: () => void
   onReset: () => void
   isLoading?: boolean
+  glReviewFormUrl?: string // Pre-built Google Form URL with deal_id
 }
 
 // Helper to check if two values are different
@@ -566,17 +571,23 @@ function ComparisonRow({
 
 export function GLReviewComparison({
   comparisonData,
+  dealId,
   onSimulateTeamSubmit,
+  onPollForTeamReview,
   onUpdateSelections,
   onUpdateFinalData,
   onUpdateCustomValues,
   onSubmitAndMoveToQuote,
   onReset,
-  isLoading = false
+  isLoading = false,
+  glReviewFormUrl
 }: GLReviewComparisonProps) {
   const [localSelections, setLocalSelections] = useState<GLReviewComparisonSelections>({})
   const [localCustomValues, setLocalCustomValues] = useState<GLReviewCustomValues>({})
   const [showFinalReviewModal, setShowFinalReviewModal] = useState(false)
+  const [isPolling, setIsPolling] = useState(false)
+  const [lastPolled, setLastPolled] = useState<Date | null>(null)
+  const [glFormLinkCopied, setGlFormLinkCopied] = useState(false)
 
   const { aiReviewData, teamReviewData, teamReviewSubmittedAt, teamReviewSubmittedBy, comparisonCompletedAt, customValues } = comparisonData
 
@@ -601,6 +612,42 @@ export function GLReviewComparison({
       setLocalCustomValues(customValues)
     }
   }, [teamReviewData, aiReviewData, localSelections, customValues, localCustomValues])
+
+  // Poll for team review from Supabase
+  useEffect(() => {
+    // Don't poll if we already have team review data or if polling callback isn't provided
+    if (teamReviewData || !onPollForTeamReview) return
+
+    // Poll immediately on mount
+    const pollNow = async () => {
+      setIsPolling(true)
+      try {
+        await onPollForTeamReview()
+        setLastPolled(new Date())
+      } catch (error) {
+        console.error("Error polling for team review:", error)
+      } finally {
+        setIsPolling(false)
+      }
+    }
+
+    pollNow()
+
+    // Set up interval polling every 10 seconds
+    const interval = setInterval(async () => {
+      setIsPolling(true)
+      try {
+        await onPollForTeamReview()
+        setLastPolled(new Date())
+      } catch (error) {
+        console.error("Error polling for team review:", error)
+      } finally {
+        setIsPolling(false)
+      }
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [teamReviewData, onPollForTeamReview])
 
   // Handle selection change
   const handleSelectionChange = useCallback((field: keyof GLReviewFormData, source: ComparisonFieldSource) => {
@@ -739,6 +786,15 @@ export function GLReviewComparison({
     )
   }
 
+  // Copy form URL to clipboard
+  const handleCopyFormUrl = useCallback(() => {
+    if (glReviewFormUrl) {
+      navigator.clipboard.writeText(glReviewFormUrl)
+      setGlFormLinkCopied(true)
+      setTimeout(() => setGlFormLinkCopied(false), 2000)
+    }
+  }, [glReviewFormUrl])
+
   // Waiting for team member review
   if (!teamReviewData) {
     return (
@@ -759,24 +815,102 @@ export function GLReviewComparison({
             Once submitted, you&apos;ll be able to compare it with the AI review.
           </p>
 
+          {/* Polling status indicator */}
+          {onPollForTeamReview && (
+            <div className="mb-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              {isPolling ? (
+                <>
+                  <RotateCw className="w-4 h-4 animate-spin text-[#407B9D]" />
+                  <span>Checking for team review...</span>
+                </>
+              ) : lastPolled ? (
+                <>
+                  <Clock className="w-4 h-4 text-gray-400" />
+                  <span>
+                    Last checked: {lastPolled.toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      second: "2-digit"
+                    })}
+                  </span>
+                </>
+              ) : null}
+            </div>
+          )}
+
+          {/* Google Form Link - share with team member */}
+          {glReviewFormUrl && (
+            <div className="mb-6 p-4 bg-white rounded-lg border border-[#407B9D]/30 text-left">
+              <h5 className="text-sm font-medium text-[#463939] mb-2 flex items-center gap-2">
+                <ExternalLink className="w-4 h-4 text-[#407B9D]" />
+                GL Review Form for Team Member
+              </h5>
+              <p className="text-xs text-muted-foreground mb-3">
+                Share this link with the assigned team member. The deal ID is pre-filled.
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 p-2 bg-gray-100 rounded text-xs font-mono text-gray-700 truncate">
+                  {glReviewFormUrl}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopyFormUrl}
+                  className={`shrink-0 ${glFormLinkCopied ? "text-green-600 border-green-300" : "text-[#407B9D] border-[#407B9D]/30"}`}
+                >
+                  {glFormLinkCopied ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-1" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <ClipboardCopy className="w-4 h-4 mr-1" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+                <a
+                  href={glReviewFormUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0"
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-[#407B9D] border-[#407B9D]/30 hover:bg-[#407B9D]/10"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-1" />
+                    Open Form
+                  </Button>
+                </a>
+              </div>
+            </div>
+          )}
+
           {/* For testing - simulate team submit */}
-          <Button
-            onClick={onSimulateTeamSubmit}
-            disabled={isLoading}
-            className="bg-[#407B9D] hover:bg-[#366a88] text-white"
-          >
-            {isLoading ? (
-              <>
-                <RotateCw className="w-4 h-4 mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                <User className="w-4 h-4 mr-2" />
-                Simulate Team Submit (Testing)
-              </>
-            )}
-          </Button>
+          <div className="pt-4 border-t border-gray-200">
+            <p className="text-xs text-muted-foreground mb-2">For testing purposes:</p>
+            <Button
+              onClick={onSimulateTeamSubmit}
+              disabled={isLoading}
+              variant="outline"
+              className="border-amber-300 text-amber-700 hover:bg-amber-50"
+            >
+              {isLoading ? (
+                <>
+                  <RotateCw className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <User className="w-4 h-4 mr-2" />
+                  Simulate Team Submit (Testing)
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     )

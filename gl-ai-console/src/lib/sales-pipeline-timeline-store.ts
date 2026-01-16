@@ -48,11 +48,29 @@ import {
   markInternalReviewSentSupabase,
   resetInternalReviewSupabase
 } from "./supabase/revops-stage-data"
+import {
+  fetchGLReviewByDealIdAndType,
+  fetchAllGLReviewsByDealId,
+  upsertAIGLReview,
+  upsertTeamGLReview,
+  saveFinalGLReview,
+  updateGLReview,
+  confirmAIGLReview,
+  deleteGLReview,
+  deleteAllGLReviewsForDeal,
+  recordQBOAccessConfirmation
+} from "./supabase/revops-gl-reviews"
 import type { RevOpsPipelineFile } from "./supabase/types"
+import type { GLReviewFieldConfidence } from "./sales-pipeline-timeline-types"
 
 // n8n webhook URLs
 const SALES_INTAKE_AI_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/sales-intake-ai"
 const INTERNAL_ASSIGNMENT_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/revops-internal-assignment"
+const GL_REVIEW_AI_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/gl-review-ai"
+
+// Google Form URL for GL Review (team submission)
+const GL_REVIEW_GOOGLE_FORM_BASE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf_PLACEHOLDER/viewform"
+const GL_REVIEW_DEAL_ID_ENTRY = "entry.XXXXXXX" // TODO: Update with actual entry ID from Google Form
 
 const TIMELINE_STORAGE_KEY = "revops-pipeline-timelines"
 const FILES_STORAGE_KEY = "revops-pipeline-files" // Kept for backward compatibility migration
@@ -1726,7 +1744,97 @@ export async function resetInternalReview(
 // ============================================
 
 /**
- * Auto-fill GL Review form with test data
+ * Get the Google Form URL for team GL Review with pre-filled deal ID
+ */
+export function getGLReviewFormUrl(dealId: string): string {
+  return `${GL_REVIEW_GOOGLE_FORM_BASE_URL}?usp=pp_url&${GL_REVIEW_DEAL_ID_ENTRY}=${dealId}`
+}
+
+/**
+ * Record QBO access confirmation and trigger AI GL Review via n8n webhook
+ * This is called when the user confirms they have authorized the client in QBO MCP dashboard
+ */
+export async function triggerAIGLReview(
+  dealId: string,
+  qboClientName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Record the QBO access confirmation in Supabase
+    await recordQBOAccessConfirmation(dealId, qboClientName)
+
+    // Trigger the n8n workflow to fetch QBO data and perform AI analysis
+    const response = await fetch(GL_REVIEW_AI_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        deal_id: dealId,
+        qbo_client_name: qboClientName,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("n8n GL Review AI webhook error:", errorText)
+      return { success: false, error: `Webhook failed: ${response.status}` }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error triggering AI GL Review:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to trigger AI GL Review",
+    }
+  }
+}
+
+/**
+ * Load GL Review data from Supabase into local state
+ * Called when the timeline is loaded or when polling for AI review completion
+ */
+export async function loadGLReviewFromSupabase(dealId: string): Promise<SalesPipelineTimelineState | null> {
+  try {
+    const aiReview = await fetchGLReviewByDealIdAndType(dealId, "ai")
+
+    if (!aiReview) return null
+
+    const timelines = getAllTimelines()
+    const existing = timelines[dealId]
+
+    if (!existing) return null
+
+    // Update local state with Supabase data
+    existing.stages["gl-review"].data = {
+      formData: aiReview.formData,
+      isAutoFilled: aiReview.isAutoFilled,
+      autoFilledAt: aiReview.autoFilledAt,
+      confirmedAt: aiReview.confirmedAt,
+      fieldConfidence: aiReview.fieldConfidence,
+    }
+
+    // Update status based on data
+    if (aiReview.isConfirmed) {
+      existing.stages["gl-review"].status = "completed"
+      existing.stages["gl-review"].completedAt = aiReview.confirmedAt
+    } else if (aiReview.formData) {
+      existing.stages["gl-review"].status = "in_progress"
+    }
+
+    existing.updatedAt = new Date().toISOString()
+    saveAllTimelines(timelines)
+
+    return existing
+  } catch (error) {
+    console.error("Error loading GL Review from Supabase:", error)
+    return null
+  }
+}
+
+/**
+ * Auto-fill GL Review form with test data (legacy function for testing)
+ * In production, use triggerAIGLReview instead
  */
 export async function autoFillGLReview(
   dealId: string
@@ -1792,7 +1900,8 @@ export async function updateGLReviewForm(
  * Confirm GL Review form (complete the stage)
  */
 export async function confirmGLReview(
-  dealId: string
+  dealId: string,
+  confirmedBy: string = "User"
 ): Promise<SalesPipelineTimelineState | null> {
   const timelines = getAllTimelines()
   const existing = timelines[dealId]
@@ -1818,6 +1927,14 @@ export async function confirmGLReview(
 
   // Update deal's automation stage
   await updateDealAutomationStage(dealId, "gl-review-comparison")
+
+  // Also save confirmation to Supabase
+  try {
+    await confirmAIGLReview(dealId, confirmedBy)
+  } catch (error) {
+    console.error("Error confirming AI GL Review in Supabase:", error)
+    // Don't fail the operation if Supabase fails - local state is already updated
+  }
 
   return existing
 }
@@ -1856,8 +1973,43 @@ export async function resetGLReview(
 // ============================================
 
 /**
+ * Poll for team GL review from Supabase (called from frontend at intervals)
+ * Returns the updated state if team review is found, null otherwise
+ */
+export async function pollForTeamGLReview(dealId: string): Promise<SalesPipelineTimelineState | null> {
+  try {
+    const teamReview = await fetchGLReviewByDealIdAndType(dealId, "team")
+
+    if (!teamReview) return null
+
+    const timelines = getAllTimelines()
+    const existing = timelines[dealId]
+
+    if (!existing) return null
+
+    // Only update if we don't already have team review data
+    if (existing.stages["gl-review-comparison"].data.teamReviewData) {
+      return existing
+    }
+
+    // Update local state with team review from Supabase
+    existing.stages["gl-review-comparison"].data.teamReviewData = teamReview.formData
+    existing.stages["gl-review-comparison"].data.teamReviewSubmittedAt = teamReview.createdAt
+    existing.stages["gl-review-comparison"].data.teamReviewSubmittedBy = teamReview.submittedBy || "Team Member"
+
+    existing.updatedAt = new Date().toISOString()
+    saveAllTimelines(timelines)
+
+    return existing
+  } catch (error) {
+    console.error("Error polling for team GL review:", error)
+    return null
+  }
+}
+
+/**
  * Simulate team member submitting their GL review (for testing)
- * In production, this would be called when the team member submits their review
+ * In production, this would be called when the team member submits their review via Google Form
  */
 export async function submitTeamGLReview(
   dealId: string,
@@ -1870,7 +2022,7 @@ export async function submitTeamGLReview(
 
   const now = new Date().toISOString()
 
-  // Use test data for simulation - in production this would come from team's actual input
+  // Use test data for simulation - in production this would come from team's actual input via Google Form
   const teamReviewData = createTestTeamGLReviewFormData()
 
   // If we have AI data, pre-fill some fields from it (email, company, lead name)
@@ -1887,6 +2039,13 @@ export async function submitTeamGLReview(
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
+
+  // Also save to Supabase for testing
+  try {
+    await upsertTeamGLReview(dealId, teamReviewData, submittedBy || "Team Member")
+  } catch (error) {
+    console.error("Error saving team GL review to Supabase:", error)
+  }
 
   return existing
 }
@@ -1961,7 +2120,8 @@ export async function updateCustomValues(
  * Complete the comparison and move to Create Quote stage
  */
 export async function submitComparisonAndMoveToQuote(
-  dealId: string
+  dealId: string,
+  confirmedBy: string = "User"
 ): Promise<SalesPipelineTimelineState | null> {
   const timelines = getAllTimelines()
   const existing = timelines[dealId]
@@ -1985,6 +2145,23 @@ export async function submitComparisonAndMoveToQuote(
 
   // Update deal's automation stage
   await updateDealAutomationStage(dealId, "create-quote")
+
+  // Save the final review to Supabase
+  const comparisonData = existing.stages["gl-review-comparison"].data
+  if (comparisonData.finalReviewData && comparisonData.fieldSelections) {
+    try {
+      await saveFinalGLReview(
+        dealId,
+        comparisonData.finalReviewData,
+        comparisonData.fieldSelections,
+        comparisonData.customValues || {},
+        confirmedBy
+      )
+    } catch (error) {
+      console.error("Error saving final GL review to Supabase:", error)
+      // Don't fail the operation if Supabase fails - local state is already updated
+    }
+  }
 
   return existing
 }

@@ -450,6 +450,98 @@ export interface Database {
           updated_at?: string
         }
       }
+      revops_gl_reviews: {
+        Row: {
+          id: string
+          deal_id: string
+          review_type: 'ai' | 'team' | 'final'
+          email: string | null
+          company_name: string | null
+          lead_name: string | null
+          accounts: Json
+          ecommerce: Json
+          revenue_coa_allocations: string | null
+          coa_revenue_categories: string | null
+          active_classes: string | null
+          catchup_required: string | null
+          catchup_date_range: string | null
+          additional_notes: string | null
+          field_confidence: Json
+          qbo_client_name: string | null
+          qbo_access_confirmed_at: string | null
+          is_auto_filled: boolean
+          auto_filled_at: string | null
+          submitted_by: string | null
+          google_form_response_id: string | null
+          field_selections: Json
+          custom_values: Json
+          is_confirmed: boolean
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          deal_id: string
+          review_type: 'ai' | 'team' | 'final'
+          email?: string | null
+          company_name?: string | null
+          lead_name?: string | null
+          accounts?: Json
+          ecommerce?: Json
+          revenue_coa_allocations?: string | null
+          coa_revenue_categories?: string | null
+          active_classes?: string | null
+          catchup_required?: string | null
+          catchup_date_range?: string | null
+          additional_notes?: string | null
+          field_confidence?: Json
+          qbo_client_name?: string | null
+          qbo_access_confirmed_at?: string | null
+          is_auto_filled?: boolean
+          auto_filled_at?: string | null
+          submitted_by?: string | null
+          google_form_response_id?: string | null
+          field_selections?: Json
+          custom_values?: Json
+          is_confirmed?: boolean
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          deal_id?: string
+          review_type?: 'ai' | 'team' | 'final'
+          email?: string | null
+          company_name?: string | null
+          lead_name?: string | null
+          accounts?: Json
+          ecommerce?: Json
+          revenue_coa_allocations?: string | null
+          coa_revenue_categories?: string | null
+          active_classes?: string | null
+          catchup_required?: string | null
+          catchup_date_range?: string | null
+          additional_notes?: string | null
+          field_confidence?: Json
+          qbo_client_name?: string | null
+          qbo_access_confirmed_at?: string | null
+          is_auto_filled?: boolean
+          auto_filled_at?: string | null
+          submitted_by?: string | null
+          google_form_response_id?: string | null
+          field_selections?: Json
+          custom_values?: Json
+          is_confirmed?: boolean
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
     Views: {}
@@ -501,6 +593,45 @@ export type RevOpsSalesIntakeUpdate = Database['public']['Tables']['revops_sales
 export type RevOpsFollowUpEmail = Database['public']['Tables']['revops_follow_up_emails']['Row']
 export type RevOpsFollowUpEmailInsert = Database['public']['Tables']['revops_follow_up_emails']['Insert']
 export type RevOpsFollowUpEmailUpdate = Database['public']['Tables']['revops_follow_up_emails']['Update']
+
+// RevOps GL Review types
+export type RevOpsGLReview = Database['public']['Tables']['revops_gl_reviews']['Row']
+export type RevOpsGLReviewInsert = Database['public']['Tables']['revops_gl_reviews']['Insert']
+export type RevOpsGLReviewUpdate = Database['public']['Tables']['revops_gl_reviews']['Update']
+
+// GL Review type discriminator
+export type GLReviewType = 'ai' | 'team' | 'final'
+
+// GL Review account structure for JSONB field
+export interface GLReviewAccount {
+  name: string
+  transactionCount: number
+  type?: 'Bank' | 'Credit Card' | 'Long Term Liability'
+  category?: '<20' | '20-100' | '>100'
+}
+
+// GL Review ecommerce structure for JSONB field
+export interface GLReviewEcommerce {
+  amazon?: boolean
+  shopify?: boolean
+  square?: boolean
+  etsy?: boolean
+  ebay?: boolean
+  woocommerce?: boolean
+  stripe?: boolean
+  paypal?: boolean
+  other?: string
+}
+
+// GL Review field confidence structure for JSONB field
+export interface GLReviewFieldConfidence {
+  [fieldName: string]: 'high' | 'medium' | 'low'
+}
+
+// GL Review field selections for final review (which source was used)
+export interface GLReviewFieldSelections {
+  [fieldName: string]: 'ai' | 'team' | 'custom'
+}
 
 // RevOps Pipeline Stage Data types (key-value storage for stage data)
 export interface RevOpsPipelineStageData {

@@ -8,13 +8,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select } from "@/components/ui/select"
 import {
   GLReviewFormData,
-  GLReviewFieldConfidence,
-  ConfidenceLevel,
   TransactionCount,
   ECommerceAccountCount,
   FinancialAccount
 } from "@/lib/sales-pipeline-timeline-types"
-import { CheckCircle2, Eye, Pencil, RotateCw, Sparkles, Plus, Trash2 } from "lucide-react"
+import { CheckCircle2, Eye, Pencil, RotateCw, Sparkles, Plus, Trash2, ExternalLink, Square, CheckSquare } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -26,51 +24,15 @@ interface GLReviewFormProps {
   formData: GLReviewFormData | null
   isAutoFilled: boolean
   isConfirmed: boolean
-  fieldConfidence: GLReviewFieldConfidence | null
+  // Company name and lead name from deal data (for display)
+  companyName: string
+  leadName: string
   onAutoFill: () => void
+  onTriggerAI?: (qboClientName: string) => Promise<{ success: boolean; error?: string }>
   onFormChange: (data: GLReviewFormData) => void
   onConfirm: () => void
   onReset: () => void
   isLoading?: boolean
-}
-
-// Confidence indicator component
-function ConfidenceIndicator({ level }: { level: ConfidenceLevel }) {
-  const config = {
-    high: {
-      color: "bg-green-500",
-      textColor: "text-green-700",
-      bgColor: "bg-green-50",
-      borderColor: "border-green-200",
-      label: "High"
-    },
-    medium: {
-      color: "bg-yellow-500",
-      textColor: "text-yellow-700",
-      bgColor: "bg-yellow-50",
-      borderColor: "border-yellow-200",
-      label: "Medium"
-    },
-    low: {
-      color: "bg-red-500",
-      textColor: "text-red-700",
-      bgColor: "bg-red-50",
-      borderColor: "border-red-200",
-      label: "Low"
-    }
-  }
-
-  const { color, textColor, bgColor, borderColor, label } = config[level]
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${bgColor} ${textColor} border ${borderColor}`}
-      title={`AI Confidence: ${label}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full ${color}`} />
-      {label}
-    </span>
-  )
 }
 
 // Form field options
@@ -128,8 +90,10 @@ export function GLReviewForm({
   formData,
   isAutoFilled,
   isConfirmed,
-  fieldConfidence,
+  companyName,
+  leadName,
   onAutoFill,
+  onTriggerAI,
   onFormChange,
   onConfirm,
   onReset,
@@ -140,16 +104,17 @@ export function GLReviewForm({
   const [isEditing, setIsEditing] = useState(false)
   const [visibleAccounts, setVisibleAccounts] = useState(5)
 
-  // Determine if we should show confidence indicators
-  const showConfidence = isAutoFilled && !isConfirmed && !isEditing && fieldConfidence !== null
+  // QBO MCP Authorization state
+  const [qboMcpAuthorized, setQboMcpAuthorized] = useState(false)
+  const [qboClientName, setQboClientName] = useState("")
+  const [isTriggering, setIsTriggering] = useState(false)
+  const [triggerError, setTriggerError] = useState<string | null>(null)
 
-  // Helper to render label with optional confidence indicator
-  const renderLabel = (htmlFor: string, text: string, fieldName: keyof GLReviewFormData, required = false) => {
-    const confidence = showConfidence ? fieldConfidence?.[fieldName] : null
+  // Helper to render label
+  const renderLabel = (htmlFor: string, text: string, required = false) => {
     return (
       <Label htmlFor={htmlFor} className="flex items-center gap-2 flex-wrap">
         <span>{text}{required && <span className="text-red-500">*</span>}</span>
-        {confidence && <ConfidenceIndicator level={confidence} />}
       </Label>
     )
   }
@@ -209,42 +174,146 @@ export function GLReviewForm({
     return options.find(o => o.value === value)?.label || value || "-"
   }
 
-  // If no form data and not confirmed, show auto-fill button
+  // Handle triggering AI GL Review via n8n
+  const handleTriggerAI = async () => {
+    if (!onTriggerAI || !qboClientName.trim()) return
+
+    setIsTriggering(true)
+    setTriggerError(null)
+
+    const result = await onTriggerAI(qboClientName.trim())
+
+    setIsTriggering(false)
+
+    if (!result.success) {
+      setTriggerError(result.error || "Failed to trigger AI GL Review")
+    }
+  }
+
+  // If no form data and not confirmed, show QBO authorization and auto-fill UI
   if (!formData && !isConfirmed) {
     return (
-      <div className="mt-4 p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-        <div className="text-center">
-          <Sparkles className="w-12 h-12 mx-auto text-[#407B9D] mb-3" />
-          <h4
-            className="text-lg font-medium text-[#463939] mb-2"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            General Ledger Review Form
-          </h4>
-          <p
-            className="text-sm text-muted-foreground mb-4"
-            style={{ fontFamily: "var(--font-body)" }}
-          >
-            AI will analyze the client&apos;s general ledger and auto-fill the GL Review form.
-            You can review and adjust before confirming.
+      <div className="mt-4 space-y-4">
+        {/* QBO MCP Authorization Section */}
+        <div className="p-4 border border-amber-200 bg-amber-50 rounded-lg">
+          <h5 className="font-medium text-amber-800 mb-2" style={{ fontFamily: "var(--font-heading)" }}>
+            Step 1: Authorize QBO Access in MCP Dashboard
+          </h5>
+          <p className="text-sm text-amber-700 mb-3" style={{ fontFamily: "var(--font-body)" }}>
+            The client has shared QBO access with us. Now authorize their account
+            in our QBO MCP dashboard so we can fetch their data.
           </p>
-          <Button
-            onClick={onAutoFill}
-            disabled={isLoading}
-            className="bg-[#407B9D] hover:bg-[#366a88] text-white"
+          <a
+            href="https://qbo-mcp.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-[#407B9D] hover:underline mb-4"
           >
-            {isLoading ? (
-              <>
-                <RotateCw className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Auto-Fill with AI
-              </>
+            <ExternalLink className="w-4 h-4" />
+            Open QBO MCP Dashboard
+          </a>
+
+          <div className="mt-4 space-y-3">
+            <div
+              className="flex items-start gap-3 cursor-pointer"
+              onClick={() => setQboMcpAuthorized(!qboMcpAuthorized)}
+            >
+              {qboMcpAuthorized ? (
+                <CheckSquare className="w-5 h-5 text-[#407B9D] mt-0.5 flex-shrink-0" />
+              ) : (
+                <Square className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+              )}
+              <label className="text-sm cursor-pointer select-none">
+                I have authorized this client&apos;s QBO account in the MCP dashboard
+              </label>
+            </div>
+
+            {qboMcpAuthorized && (
+              <div className="ml-8 space-y-2">
+                <Label htmlFor="qboClientName" className="text-sm">
+                  Exact QBO Client Name (as shown in MCP dashboard)
+                </Label>
+                <Input
+                  id="qboClientName"
+                  value={qboClientName}
+                  onChange={(e) => setQboClientName(e.target.value)}
+                  placeholder="e.g., Acme Technologies Inc"
+                  className="border-gray-300 focus:border-[#407B9D] focus:ring-[#407B9D]"
+                />
+              </div>
             )}
-          </Button>
+          </div>
+        </div>
+
+        {/* Auto-Fill Section */}
+        <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+          <div className="text-center">
+            <Sparkles className="w-12 h-12 mx-auto text-[#407B9D] mb-3" />
+            <h4
+              className="text-lg font-medium text-[#463939] mb-2"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              Step 2: Generate GL Review
+            </h4>
+            <p
+              className="text-sm text-muted-foreground mb-4"
+              style={{ fontFamily: "var(--font-body)" }}
+            >
+              Analyze the client&apos;s QuickBooks data and auto-fill the GL Review form.
+              You can review and adjust before confirming.
+            </p>
+
+            {triggerError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {triggerError}
+              </div>
+            )}
+
+            {/* Show real trigger button if onTriggerAI is provided, otherwise fall back to test data */}
+            {onTriggerAI ? (
+              <Button
+                onClick={handleTriggerAI}
+                disabled={!qboMcpAuthorized || !qboClientName.trim() || isTriggering || isLoading}
+                className="bg-[#407B9D] hover:bg-[#366a88] text-white disabled:opacity-50"
+              >
+                {isTriggering || isLoading ? (
+                  <>
+                    <RotateCw className="w-4 h-4 mr-2 animate-spin" />
+                    Analyzing QBO Data...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Auto-Fill from QBO
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button
+                onClick={onAutoFill}
+                disabled={isLoading}
+                className="bg-[#407B9D] hover:bg-[#366a88] text-white"
+              >
+                {isLoading ? (
+                  <>
+                    <RotateCw className="w-4 h-4 mr-2 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Auto-Fill (Test Data)
+                  </>
+                )}
+              </Button>
+            )}
+
+            {!qboMcpAuthorized && onTriggerAI && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Complete Step 1 above to enable auto-fill
+              </p>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -303,18 +372,14 @@ export function GLReviewForm({
                 <h5 className="font-medium text-[#463939] border-b pb-2" style={{ fontFamily: "var(--font-heading)" }}>
                   Basic Information
                 </h5>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Email:</span>
-                    <span className="ml-2 font-medium">{localData.email || "-"}</span>
-                  </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Company Name:</span>
-                    <span className="ml-2 font-medium">{localData.companyName || "-"}</span>
+                    <span className="ml-2 font-medium">{companyName || "-"}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Lead Name:</span>
-                    <span className="ml-2 font-medium">{localData.leadName || "-"}</span>
+                    <span className="ml-2 font-medium">{leadName || "-"}</span>
                   </div>
                 </div>
               </div>
@@ -427,70 +492,41 @@ export function GLReviewForm({
   return (
     <div className="mt-4 p-4 border border-[#407B9D]/30 rounded-lg bg-white">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <h4
-            className="text-lg font-medium text-[#463939]"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            GrowthLab General Ledger Review
-          </h4>
-          {isAutoFilled && !isConfirmed && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#407B9D]/10 text-[#407B9D] border border-[#407B9D]/30">
-              <Sparkles className="w-3 h-3 mr-1" />
-              AI-Populated
-            </span>
-          )}
-        </div>
+        <h4
+          className="text-lg font-medium text-[#463939]"
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
+          GrowthLab General Ledger Review
+        </h4>
       </div>
 
       <div className="space-y-6">
-        {/* Basic Information */}
+        {/* Basic Information - Read-only from deal */}
         <div className="space-y-4">
           <h5 className="font-medium text-[#463939] border-b pb-2" style={{ fontFamily: "var(--font-heading)" }}>
             Basic Information
           </h5>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              {renderLabel("email", "Email", "email", true)}
-              <Input
-                id="email"
-                type="email"
-                value={localData.email}
-                onChange={(e) => handleFieldChange("email", e.target.value)}
-                className="border-gray-300 focus:border-[#407B9D] focus:ring-[#407B9D]"
-              />
+              <Label className="text-sm text-muted-foreground">Company Name</Label>
+              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 text-sm">
+                {companyName || "-"}
+              </div>
             </div>
             <div className="space-y-2">
-              {renderLabel("companyName", "Company Name", "companyName", true)}
-              <Input
-                id="companyName"
-                value={localData.companyName}
-                onChange={(e) => handleFieldChange("companyName", e.target.value)}
-                className="border-gray-300 focus:border-[#407B9D] focus:ring-[#407B9D]"
-              />
-            </div>
-            <div className="space-y-2">
-              {renderLabel("leadName", "Lead Name", "leadName", true)}
-              <Input
-                id="leadName"
-                value={localData.leadName}
-                onChange={(e) => handleFieldChange("leadName", e.target.value)}
-                className="border-gray-300 focus:border-[#407B9D] focus:ring-[#407B9D]"
-              />
+              <Label className="text-sm text-muted-foreground">Lead Name</Label>
+              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 text-sm">
+                {leadName || "-"}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Financial Accounts */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between border-b pb-2">
-            <h5 className="font-medium text-[#463939]" style={{ fontFamily: "var(--font-heading)" }}>
-              Financial Accounts (Bank Accounts, Credit Cards, Loans)
-            </h5>
-            {showConfidence && fieldConfidence?.accounts && (
-              <ConfidenceIndicator level={fieldConfidence.accounts} />
-            )}
-          </div>
+          <h5 className="font-medium text-[#463939] border-b pb-2" style={{ fontFamily: "var(--font-heading)" }}>
+            Financial Accounts (Bank Accounts, Credit Cards, Loans)
+          </h5>
 
           <div className="space-y-3">
             {localData.accounts.slice(0, visibleAccounts).map((account, index) => (
@@ -558,14 +594,9 @@ export function GLReviewForm({
 
         {/* eCommerce */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between border-b pb-2">
-            <h5 className="font-medium text-[#463939]" style={{ fontFamily: "var(--font-heading)" }}>
-              eCommerce (Check all that apply)
-            </h5>
-            {showConfidence && fieldConfidence?.ecommerce && (
-              <ConfidenceIndicator level={fieldConfidence.ecommerce} />
-            )}
-          </div>
+          <h5 className="font-medium text-[#463939] border-b pb-2" style={{ fontFamily: "var(--font-heading)" }}>
+            eCommerce (Check all that apply)
+          </h5>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {ECOMMERCE_PLATFORMS.map(platform => (
@@ -596,7 +627,7 @@ export function GLReviewForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              {renderLabel("revenueCoaAllocations", "Revenue COA Allocations (2 Included)", "revenueCoaAllocations", true)}
+              {renderLabel("revenueCoaAllocations", "Revenue COA Allocations (2 Included)", true)}
               <Select
                 id="revenueCoaAllocations"
                 value={localData.revenueCoaAllocations}
@@ -610,7 +641,7 @@ export function GLReviewForm({
               </Select>
             </div>
             <div className="space-y-2">
-              {renderLabel("activeClasses", "# of Active Classes", "activeClasses", true)}
+              {renderLabel("activeClasses", "# of Active Classes", true)}
               <Select
                 id="activeClasses"
                 value={localData.activeClasses}
@@ -626,7 +657,7 @@ export function GLReviewForm({
           </div>
 
           <div className="space-y-2">
-            {renderLabel("coaRevenueCategories", "List the customer's COA Revenue Categories", "coaRevenueCategories", true)}
+            {renderLabel("coaRevenueCategories", "List the customer's COA Revenue Categories", true)}
             <Textarea
               id="coaRevenueCategories"
               value={localData.coaRevenueCategories}
@@ -646,7 +677,7 @@ export function GLReviewForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              {renderLabel("catchupRequired", "Is Catchup Bookkeeping required?", "catchupRequired", true)}
+              {renderLabel("catchupRequired", "Is Catchup Bookkeeping required?", true)}
               <Select
                 id="catchupRequired"
                 value={localData.catchupRequired}
@@ -662,7 +693,7 @@ export function GLReviewForm({
 
             {localData.catchupRequired === "yes" && (
               <div className="space-y-2">
-                {renderLabel("catchupDateRange", "What is the Catchup Bookkeeping date range?", "catchupDateRange")}
+                {renderLabel("catchupDateRange", "What is the Catchup Bookkeeping date range?")}
                 <Input
                   id="catchupDateRange"
                   value={localData.catchupDateRange}
@@ -681,7 +712,7 @@ export function GLReviewForm({
             Additional Notes
           </h5>
           <div className="space-y-2">
-            {renderLabel("additionalNotes", "Additional Notes", "additionalNotes")}
+            {renderLabel("additionalNotes", "Additional Notes")}
             <Textarea
               id="additionalNotes"
               value={localData.additionalNotes}

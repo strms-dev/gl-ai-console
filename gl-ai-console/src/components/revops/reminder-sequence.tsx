@@ -44,6 +44,7 @@ interface ReminderSequenceProps {
   accessReceivedAt: string | null
   contactName: string
   contactEmail: string
+  hsDealUrl: string | null
   onEnroll: () => Promise<void>
   onUnenroll: () => Promise<void>
   onAccessReceived: () => Promise<void>
@@ -114,6 +115,7 @@ export function ReminderSequence({
   accessReceivedAt,
   contactName,
   contactEmail,
+  hsDealUrl,
   onEnroll,
   onUnenroll,
   onAccessReceived,
@@ -133,10 +135,10 @@ export function ReminderSequence({
   const displayName = contactName || "Unknown Contact"
   const displayEmail = contactEmail || ""
 
-  // Handle enroll button click - open HubSpot sequence, then show confirmation dialog
+  // Handle enroll button click - open HubSpot deal, then show confirmation dialog
   const handleEnrollClick = () => {
-    if (sequenceUrl) {
-      window.open(sequenceUrl, "_blank")
+    if (hsDealUrl) {
+      window.open(hsDealUrl, "_blank")
     }
     setActiveDialog("enroll")
   }
@@ -636,7 +638,7 @@ export function ReminderSequence({
               <DialogHeader>
                 <DialogTitle>Confirm Enrollment</DialogTitle>
                 <DialogDescription>
-                  The {getSequenceName(platform)} sequence has opened in HubSpot.
+                  The HubSpot deal has opened. Enroll the contact in the {getSequenceName(platform)} sequence from there.
                 </DialogDescription>
               </DialogHeader>
 
@@ -649,7 +651,7 @@ export function ReminderSequence({
                     className="mt-0.5"
                   />
                   <label htmlFor="confirm-enroll" className="text-sm cursor-pointer">
-                    I have enrolled <strong>{displayName}</strong> in the {getSequenceName(platform)} sequence in HubSpot
+                    I have enrolled <strong>{displayName}</strong> in the {getSequenceName(platform)} sequence from HubSpot
                   </label>
                 </div>
               </div>
