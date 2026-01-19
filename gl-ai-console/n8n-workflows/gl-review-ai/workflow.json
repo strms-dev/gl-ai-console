@@ -301,6 +301,10 @@
             {
               "fieldId": "is_confirmed",
               "fieldValue": "={{ $json.supabase_data.is_confirmed }}"
+            },
+            {
+              "fieldId": "submitted_by",
+              "fieldValue": "n8n automation"
             }
           ]
         }

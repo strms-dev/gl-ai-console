@@ -24,9 +24,6 @@ interface GLReviewFormProps {
   formData: GLReviewFormData | null
   isAutoFilled: boolean
   isConfirmed: boolean
-  // Company name and lead name from deal data (for display)
-  companyName: string
-  leadName: string
   onAutoFill: () => void
   onTriggerAI?: (qboClientName: string) => Promise<{ success: boolean; error?: string }>
   onFormChange: (data: GLReviewFormData) => void
@@ -90,8 +87,6 @@ export function GLReviewForm({
   formData,
   isAutoFilled,
   isConfirmed,
-  companyName,
-  leadName,
   onAutoFill,
   onTriggerAI,
   onFormChange,
@@ -151,6 +146,17 @@ export function GLReviewForm({
     newAccounts[index] = {
       ...newAccounts[index],
       [field]: value
+    }
+    handleFieldChange("accounts", newAccounts)
+  }
+
+  const clearAccount = (index: number) => {
+    if (!localData) return
+
+    const newAccounts = [...localData.accounts]
+    newAccounts[index] = {
+      name: "",
+      transactionCount: ""
     }
     handleFieldChange("accounts", newAccounts)
   }
@@ -367,23 +373,6 @@ export function GLReviewForm({
             </DialogHeader>
 
             <div className="space-y-6 py-4">
-              {/* Basic Information */}
-              <div className="space-y-3">
-                <h5 className="font-medium text-[#463939] border-b pb-2" style={{ fontFamily: "var(--font-heading)" }}>
-                  Basic Information
-                </h5>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Company Name:</span>
-                    <span className="ml-2 font-medium">{companyName || "-"}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Lead Name:</span>
-                    <span className="ml-2 font-medium">{leadName || "-"}</span>
-                  </div>
-                </div>
-              </div>
-
               {/* Financial Accounts */}
               <div className="space-y-3">
                 <h5 className="font-medium text-[#463939] border-b pb-2" style={{ fontFamily: "var(--font-heading)" }}>
@@ -501,27 +490,6 @@ export function GLReviewForm({
       </div>
 
       <div className="space-y-6">
-        {/* Basic Information - Read-only from deal */}
-        <div className="space-y-4">
-          <h5 className="font-medium text-[#463939] border-b pb-2" style={{ fontFamily: "var(--font-heading)" }}>
-            Basic Information
-          </h5>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Company Name</Label>
-              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 text-sm">
-                {companyName || "-"}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Lead Name</Label>
-              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 text-sm">
-                {leadName || "-"}
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Financial Accounts */}
         <div className="space-y-4">
           <h5 className="font-medium text-[#463939] border-b pb-2" style={{ fontFamily: "var(--font-heading)" }}>
@@ -563,11 +531,11 @@ export function GLReviewForm({
                   </Select>
                 </div>
                 <div className="md:col-span-1 flex items-center justify-center">
-                  {account.name && (
+                  {(account.name || account.transactionCount) && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleAccountChange(index, "name", "")}
+                      onClick={() => clearAccount(index)}
                       className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
                     >
                       <Trash2 className="w-4 h-4" />

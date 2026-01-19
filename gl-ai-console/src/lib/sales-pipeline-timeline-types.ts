@@ -814,7 +814,11 @@ You have just been granted accounting access to the following general ledger:
 
 - {{platformAndCompany}}
 
-Please submit your General Ledger Review for the above account, and notify Tim when it has been completed.`
+Please submit your General Ledger Review using the link below. This form connects to our automation system to streamline the review process:
+
+{{glReviewFormUrl}}
+
+Once completed, notify Tim that the review has been submitted.`
 }
 
 // Tim Scullion's email for CC

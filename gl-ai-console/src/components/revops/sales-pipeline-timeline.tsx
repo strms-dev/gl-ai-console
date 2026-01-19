@@ -343,6 +343,17 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         console.error('Error loading internal review from Supabase:', error)
       }
 
+      // Load GL review data from Supabase (source of truth)
+      // This handles cases where AI auto-fill completed while component wasn't mounted
+      try {
+        const glReviewState = await loadGLReviewFromSupabase(deal.id)
+        if (glReviewState) {
+          setTimelineState(glReviewState)
+        }
+      } catch (error) {
+        console.error('Error loading GL review from Supabase:', error)
+      }
+
       setIsLoading(false)
     }
     loadState()
@@ -1270,8 +1281,6 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         formData={glReviewData.formData || null}
         isAutoFilled={glReviewData.isAutoFilled || false}
         isConfirmed={isConfirmed}
-        companyName={companyNameFromDeal}
-        leadName={leadNameFromDeal}
         onAutoFill={handleAutoFillGLReview}
         onTriggerAI={handleTriggerAIGLReview}
         onFormChange={handleGLReviewFormChange}

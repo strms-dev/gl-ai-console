@@ -69,8 +69,8 @@ const INTERNAL_ASSIGNMENT_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webh
 const GL_REVIEW_AI_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/gl-review-ai"
 
 // Google Form URL for GL Review (team submission)
-const GL_REVIEW_GOOGLE_FORM_BASE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf_PLACEHOLDER/viewform"
-const GL_REVIEW_DEAL_ID_ENTRY = "entry.XXXXXXX" // TODO: Update with actual entry ID from Google Form
+const GL_REVIEW_GOOGLE_FORM_BASE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf0aJg1rDnJ6zyaqMfnkifB8GuzWq2PqE9dDKbsbmOntFif0A/viewform"
+const GL_REVIEW_DEAL_ID_ENTRY = "entry.1417856888"
 
 const TIMELINE_STORAGE_KEY = "revops-pipeline-timelines"
 const FILES_STORAGE_KEY = "revops-pipeline-files" // Kept for backward compatibility migration
@@ -1796,30 +1796,69 @@ export async function triggerAIGLReview(
  */
 export async function loadGLReviewFromSupabase(dealId: string): Promise<SalesPipelineTimelineState | null> {
   try {
-    const aiReview = await fetchGLReviewByDealIdAndType(dealId, "ai")
-
-    if (!aiReview) return null
+    // Fetch all GL reviews (AI, team, final) from Supabase
+    const allReviews = await fetchAllGLReviewsByDealId(dealId)
 
     const timelines = getAllTimelines()
     const existing = timelines[dealId]
 
     if (!existing) return null
 
-    // Update local state with Supabase data
-    existing.stages["gl-review"].data = {
-      formData: aiReview.formData,
-      isAutoFilled: aiReview.isAutoFilled,
-      autoFilledAt: aiReview.autoFilledAt,
-      confirmedAt: aiReview.confirmedAt,
-      fieldConfidence: aiReview.fieldConfidence,
+    const aiReview = allReviews.ai
+    const teamReview = allReviews.team
+    const finalReview = allReviews.final
+
+    // Update GL Review stage with AI review data
+    if (aiReview) {
+      existing.stages["gl-review"].data = {
+        formData: aiReview.formData,
+        isAutoFilled: aiReview.isAutoFilled,
+        autoFilledAt: aiReview.autoFilledAt,
+        confirmedAt: aiReview.confirmedAt,
+        fieldConfidence: aiReview.fieldConfidence,
+      }
+
+      // Update status based on data
+      if (aiReview.isConfirmed) {
+        existing.stages["gl-review"].status = "completed"
+        existing.stages["gl-review"].completedAt = aiReview.confirmedAt
+      } else if (aiReview.formData) {
+        existing.stages["gl-review"].status = "in_progress"
+      }
+
+      // Always populate the comparison stage's AI review data when AI review exists and is confirmed
+      // This is needed when localStorage is cleared
+      if (aiReview.isConfirmed && aiReview.formData) {
+        existing.stages["gl-review-comparison"].data.aiReviewData = aiReview.formData
+        // Only set to in_progress if not already completed
+        if (existing.stages["gl-review-comparison"].status !== "completed") {
+          existing.stages["gl-review-comparison"].status = "in_progress"
+        }
+      }
     }
 
-    // Update status based on data
-    if (aiReview.isConfirmed) {
-      existing.stages["gl-review"].status = "completed"
-      existing.stages["gl-review"].completedAt = aiReview.confirmedAt
-    } else if (aiReview.formData) {
-      existing.stages["gl-review"].status = "in_progress"
+    // Update GL Review Comparison stage with team review data
+    // This must happen BEFORE checking final review, so teamReviewData is available for comparison UI
+    if (teamReview && teamReview.formData) {
+      existing.stages["gl-review-comparison"].data.teamReviewData = teamReview.formData
+      existing.stages["gl-review-comparison"].data.teamReviewSubmittedAt = teamReview.createdAt
+      existing.stages["gl-review-comparison"].data.teamReviewSubmittedBy = teamReview.submittedBy || "Team Member"
+    }
+
+    // Update GL Review Comparison stage with final review data
+    if (finalReview) {
+      existing.stages["gl-review-comparison"].data.finalReviewData = finalReview.formData
+      existing.stages["gl-review-comparison"].data.fieldSelections = finalReview.fieldSelections
+      existing.stages["gl-review-comparison"].data.customValues = finalReview.customValues
+      existing.stages["gl-review-comparison"].data.comparisonCompletedAt = finalReview.confirmedAt
+      existing.stages["gl-review-comparison"].status = "completed"
+      existing.stages["gl-review-comparison"].completedAt = finalReview.confirmedAt
+
+      // Also move to create-quote if comparison is done
+      if (existing.stages["create-quote"].status === "pending") {
+        existing.stages["create-quote"].status = "in_progress"
+        existing.currentStage = "create-quote"
+      }
     }
 
     existing.updatedAt = new Date().toISOString()
@@ -1873,6 +1912,7 @@ export async function autoFillGLReview(
 
 /**
  * Update GL Review form data (for user edits)
+ * Saves to both localStorage and Supabase
  */
 export async function updateGLReviewForm(
   dealId: string,
@@ -1892,6 +1932,15 @@ export async function updateGLReviewForm(
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
+
+  // Also update in Supabase if the review exists there
+  try {
+    await updateGLReview(dealId, 'ai', formData)
+  } catch (error) {
+    // Ignore error if no review exists yet in Supabase
+    // This can happen if form is edited before auto-fill completes
+    console.log('Could not update GL review in Supabase (may not exist yet):', error)
+  }
 
   return existing
 }
@@ -1941,6 +1990,7 @@ export async function confirmGLReview(
 
 /**
  * Reset GL Review form (clear data and go back to in_progress)
+ * Also deletes the AI review from Supabase
  */
 export async function resetGLReview(
   dealId: string
@@ -1951,6 +2001,14 @@ export async function resetGLReview(
   if (!existing) return null
 
   const now = new Date().toISOString()
+
+  // Delete the AI review from Supabase
+  try {
+    await deleteGLReview(dealId, 'ai')
+  } catch (error) {
+    console.error('Error deleting AI GL review from Supabase:', error)
+    // Continue with local reset even if Supabase delete fails
+  }
 
   existing.stages["gl-review"].data = {
     formData: null,
@@ -2179,13 +2237,23 @@ export async function resetGLReviewComparison(
 
   const now = new Date().toISOString()
 
-  // Keep the AI review data but reset everything else
+  // Only delete the final review from Supabase (keep AI and team reviews)
+  try {
+    await deleteGLReview(dealId, 'final')
+  } catch (error) {
+    console.error('Error deleting final GL review from Supabase:', error)
+  }
+
+  // Keep the AI and team review data, only reset the final/comparison data
   const aiReviewData = existing.stages["gl-review-comparison"].data.aiReviewData
+  const teamReviewData = existing.stages["gl-review-comparison"].data.teamReviewData
+  const teamReviewSubmittedAt = existing.stages["gl-review-comparison"].data.teamReviewSubmittedAt
+  const teamReviewSubmittedBy = existing.stages["gl-review-comparison"].data.teamReviewSubmittedBy
 
   existing.stages["gl-review-comparison"].data = {
-    teamReviewData: null,
-    teamReviewSubmittedAt: null,
-    teamReviewSubmittedBy: null,
+    teamReviewData: teamReviewData,
+    teamReviewSubmittedAt: teamReviewSubmittedAt,
+    teamReviewSubmittedBy: teamReviewSubmittedBy,
     aiReviewData: aiReviewData,
     finalReviewData: null,
     fieldSelections: null,

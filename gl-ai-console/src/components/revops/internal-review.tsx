@@ -25,9 +25,7 @@ import {
   X,
   Settings,
   Loader2,
-  Mail,
-  ExternalLink,
-  ClipboardCopy
+  Mail
 } from "lucide-react"
 import { getGLReviewFormUrl } from "@/lib/sales-pipeline-timeline-store"
 import {
@@ -54,6 +52,7 @@ export function InternalReview({
   reviewData,
   salesIntakeData,
   accessPlatform,
+  dealId,
   onInitialize,
   onUpdate,
   onSend,
@@ -68,7 +67,6 @@ export function InternalReview({
   const [isSending, setIsSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [qboAccessConfirmed, setQboAccessConfirmed] = useState(false)
-  const [glFormLinkCopied, setGlFormLinkCopied] = useState(false)
 
   // Available recipients loaded from Supabase
   const [availableRecipients, setAvailableRecipients] = useState<ManagedRecipient[]>([])
@@ -113,7 +111,10 @@ export function InternalReview({
       const companyName = salesIntakeData.companyName || "Unknown Company"
 
       const subject = template.subject.replace(/\{\{companyName\}\}/g, companyName)
-      const body = template.bodyTemplate.replace(/\{\{platformAndCompany\}\}/g, getPlatformAndCompany())
+      const glFormUrl = getGLReviewFormUrl(dealId)
+      const body = template.bodyTemplate
+        .replace(/\{\{platformAndCompany\}\}/g, getPlatformAndCompany())
+        .replace(/\{\{glReviewFormUrl\}\}/g, glFormUrl)
 
       // Initialize with empty recipients and CC Tim enabled by default
       onInitialize([], true, subject, body)
@@ -509,53 +510,6 @@ export function InternalReview({
           </div>
         </div>
       )}
-
-      {/* GL Review Google Form Link */}
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <h5 className="text-sm font-medium text-blue-800 mb-2">
-          GL Review Form for Team
-        </h5>
-        <p className="text-xs text-blue-700 mb-3">
-          Share this link with the assigned team member to submit their GL Review.
-          The deal ID is pre-filled in the form.
-        </p>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 bg-white rounded border border-blue-200 p-2 text-xs font-mono text-gray-600 truncate">
-            {getGLReviewFormUrl(dealId)}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              navigator.clipboard.writeText(getGLReviewFormUrl(dealId))
-              setGlFormLinkCopied(true)
-              setTimeout(() => setGlFormLinkCopied(false), 2000)
-            }}
-            className="h-8 text-xs text-blue-700 border-blue-300 hover:bg-blue-100"
-          >
-            {glFormLinkCopied ? (
-              <>
-                <CheckCircle2 className="w-3 h-3 mr-1" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <ClipboardCopy className="w-3 h-3 mr-1" />
-                Copy
-              </>
-            )}
-          </Button>
-          <a
-            href={getGLReviewFormUrl(dealId)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center h-8 px-3 text-xs text-blue-700 border border-blue-300 rounded-md hover:bg-blue-100"
-          >
-            <ExternalLink className="w-3 h-3 mr-1" />
-            Open
-          </a>
-        </div>
-      </div>
 
       {/* QBO Access Confirmation Checkbox */}
       <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">

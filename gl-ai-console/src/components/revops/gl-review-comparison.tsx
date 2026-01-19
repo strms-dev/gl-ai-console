@@ -482,11 +482,11 @@ function ComparisonRow({
     )
   }
 
-  // Determine if we have a selection (either explicit or default for matching values)
-  const hasSelection = selection !== null || !isDifferent
+  // Determine if we have an explicit selection
+  const hasSelection = selection !== null
 
-  // For matching values, default to "ai" if no explicit selection
-  const effectiveSelection = selection || (isDifferent ? null : "ai")
+  // No auto-selection - user must explicitly choose for all fields
+  const effectiveSelection = selection
 
   return (
     <div className={`py-4 border-b border-gray-100 last:border-b-0 ${isDifferent ? "bg-amber-50/30 -mx-4 px-4" : ""}`}>
@@ -591,27 +591,13 @@ export function GLReviewComparison({
 
   const { aiReviewData, teamReviewData, teamReviewSubmittedAt, teamReviewSubmittedBy, comparisonCompletedAt, customValues } = comparisonData
 
-  // Initialize selections and custom values when team review comes in
+  // Initialize custom values from persisted data (but NOT selections - user must choose)
   useEffect(() => {
-    if (teamReviewData && aiReviewData && Object.keys(localSelections).length === 0) {
-      const initialSelections: GLReviewComparisonSelections = {}
-      const fields = Object.keys(aiReviewData) as (keyof GLReviewFormData)[]
-
-      fields.forEach(field => {
-        if (valuesAreDifferent(aiReviewData[field], teamReviewData[field])) {
-          // Default to team selection for different values
-          initialSelections[field] = "team"
-        }
-      })
-
-      setLocalSelections(initialSelections)
-    }
-
     // Load custom values from persisted data
     if (customValues && Object.keys(localCustomValues).length === 0) {
       setLocalCustomValues(customValues)
     }
-  }, [teamReviewData, aiReviewData, localSelections, customValues, localCustomValues])
+  }, [customValues, localCustomValues])
 
   // Poll for team review from Supabase
   useEffect(() => {
@@ -708,15 +694,23 @@ export function GLReviewComparison({
     return fields.filter(field => valuesAreDifferent(aiReviewData[field], teamReviewData[field])).length
   }, [aiReviewData, teamReviewData])
 
-  // Check if all differences have selections
-  const allDifferencesResolved = useCallback(() => {
+  // Check if all fields have selections (user must select for every field)
+  const allFieldsResolved = useCallback(() => {
     if (!aiReviewData || !teamReviewData) return false
     const fields = Object.keys(aiReviewData) as (keyof GLReviewFormData)[]
-    const differentFields = fields.filter(field => valuesAreDifferent(aiReviewData[field], teamReviewData[field]))
-    return differentFields.every(field => localSelections[field] !== undefined && localSelections[field] !== null)
+    return fields.every(field => localSelections[field] !== undefined && localSelections[field] !== null)
   }, [aiReviewData, teamReviewData, localSelections])
 
-  // If completed, show simple completed state
+  // Copy form URL to clipboard - must be defined before any early returns
+  const handleCopyFormUrl = useCallback(() => {
+    if (glReviewFormUrl) {
+      navigator.clipboard.writeText(glReviewFormUrl)
+      setGlFormLinkCopied(true)
+      setTimeout(() => setGlFormLinkCopied(false), 2000)
+    }
+  }, [glReviewFormUrl])
+
+  // If completed, show simple completed state with option to reset and re-select
   if (comparisonCompletedAt) {
     return (
       <div className="mt-4 p-4 border border-[#C8E4BB] rounded-lg bg-[#C8E4BB]/10">
@@ -730,15 +724,26 @@ export function GLReviewComparison({
               GL Review Comparison Completed
             </h4>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFinalReviewModal(true)}
-            className="text-[#407B9D] border-[#407B9D] hover:bg-[#407B9D]/10"
-          >
-            <Eye className="w-4 h-4 mr-1" />
-            View Final Review
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFinalReviewModal(true)}
+              className="text-[#407B9D] border-[#407B9D] hover:bg-[#407B9D]/10"
+            >
+              <Eye className="w-4 h-4 mr-1" />
+              View Final Review
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onReset}
+              className="text-amber-600 border-amber-300 hover:bg-amber-50"
+            >
+              <RotateCw className="w-4 h-4 mr-1" />
+              Re-select Values
+            </Button>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
           The deal has been moved to Create Quote stage.
@@ -785,15 +790,6 @@ export function GLReviewComparison({
       </div>
     )
   }
-
-  // Copy form URL to clipboard
-  const handleCopyFormUrl = useCallback(() => {
-    if (glReviewFormUrl) {
-      navigator.clipboard.writeText(glReviewFormUrl)
-      setGlFormLinkCopied(true)
-      setTimeout(() => setGlFormLinkCopied(false), 2000)
-    }
-  }, [glReviewFormUrl])
 
   // Waiting for team member review
   if (!teamReviewData) {
@@ -986,17 +982,10 @@ export function GLReviewComparison({
       )}
 
       {/* Action buttons */}
-      <div className="flex items-center justify-between pt-4 mt-4 border-t">
-        <Button
-          variant="outline"
-          onClick={onReset}
-          className="text-red-600 border-red-300 hover:bg-red-50"
-        >
-          Reset
-        </Button>
+      <div className="flex items-center justify-end pt-4 mt-4 border-t">
         <Button
           onClick={onSubmitAndMoveToQuote}
-          disabled={differenceCount > 0 && !allDifferencesResolved()}
+          disabled={!allFieldsResolved()}
           className="bg-[#5A8A4A] hover:bg-[#4a7a3a] text-white"
         >
           <ArrowRight className="w-4 h-4 mr-2" />
@@ -1004,9 +993,9 @@ export function GLReviewComparison({
         </Button>
       </div>
 
-      {differenceCount > 0 && !allDifferencesResolved() && (
+      {!allFieldsResolved() && (
         <p className="text-sm text-amber-600 mt-2 text-right">
-          Please select a value for all differences before submitting.
+          Please select a value for all fields before submitting.
         </p>
       )}
     </div>
