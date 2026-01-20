@@ -374,12 +374,30 @@ export interface QuoteLineItem {
   isCustom: boolean
 }
 
+// Pricing Breakdown Item for structured display
+export interface PricingBreakdownItem {
+  category: string        // e.g., "Cadence Base", "401k Plan", "Financial Accounts"
+  description: string     // e.g., "Monthly x Priority (1.0)", "401k Administration"
+  amount: number          // e.g., 100, 25, 150
+  formula?: string        // Optional: e.g., "3 accounts x $50"
+}
+
 // Create Quote Stage Data
 export interface CreateQuoteStageData {
-  // Accounting pricing (auto-calculated placeholder)
+  // Accounting pricing (auto-calculated from Sales Intake + GL Review)
   accountingMonthlyPrice: number | null
   accountingPriceCalculatedAt: string | null
-  accountingPriceBreakdown: string | null  // Human-readable breakdown
+  accountingPriceBreakdown: string | null  // Human-readable breakdown (text)
+  accountingPriceBreakdownData: PricingBreakdownItem[] | null  // Structured breakdown for UI
+
+  // Pricing metadata
+  accountingMethod: string | null  // cash, accrual, modified-cash
+  recommendedCadence: string | null  // weekly, biweekly, monthly, quarterly
+  appliedMultiplier: number | null  // 1.0 or 1.25
+  priorityMultiplier: number | null  // 1.0 or 1.2
+
+  // Cleanup estimate (one-time fee if catchup required)
+  cleanupEstimate: number | null
 
   // Quote line items (accounting + additional services)
   lineItems: QuoteLineItem[]
@@ -391,7 +409,6 @@ export interface CreateQuoteStageData {
   hubspotSynced: boolean
   hubspotSyncedAt: string | null
   hubspotQuoteLink: string | null  // Link to the quote in HubSpot
-  hubspotQuotePdfUrl: string | null  // Direct link to download quote PDF
 
   // Completion
   quoteConfirmedAt: string | null
@@ -1038,7 +1055,6 @@ export function createInitialTimelineState(dealId: string): SalesPipelineTimelin
           hubspotSynced: false,
           hubspotSyncedAt: null,
           hubspotQuoteLink: null,
-          hubspotQuotePdfUrl: null,
           quoteConfirmedAt: null
         }
       },
@@ -1230,5 +1246,27 @@ export function createTestTeamGLReviewFormData(): GLReviewFormData {
     catchupRequired: "yes",
     catchupDateRange: "October 2023 - Present",  // Different date range
     additionalNotes: "Client has 2 Shopify stores (US and Canada). Amazon FBA account discovered with ~50 orders/month. Wells Fargo LOC was used for equipment financing in 2023. Need to set up proper class tracking for the 5 departments."
+  }
+}
+
+// Blank GL Review form data - used for manual bypass when user doesn't want to wait for team review
+export function createBlankGLReviewFormData(): GLReviewFormData {
+  return {
+    accounts: Array(20).fill(null).map(() => ({ name: "", transactionCount: "" as TransactionCount })),
+    ecommerce: {
+      amazon: "",
+      shopify: "",
+      square: "",
+      etsy: "",
+      ebay: "",
+      woocommerce: "",
+      other: ""
+    },
+    revenueCoaAllocations: "",
+    coaRevenueCategories: "",
+    activeClasses: "",
+    catchupRequired: "",
+    catchupDateRange: "",
+    additionalNotes: ""
   }
 }

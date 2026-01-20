@@ -358,3 +358,212 @@ export async function resetInternalReviewSupabase(
 ): Promise<void> {
   await deleteStageData(dealId, INTERNAL_REVIEW_STAGE_ID)
 }
+
+// ============================================
+// Create Quote Specific Functions
+// ============================================
+
+export interface PricingBreakdownItem {
+  category: string
+  description: string
+  amount: number
+  formula?: string
+}
+
+export interface QuoteLineItem {
+  id: string
+  service: string
+  description: string
+  monthlyPrice: number
+  isCustom: boolean
+}
+
+export interface CreateQuoteSupabaseData {
+  accountingMonthlyPrice: number | null
+  accountingPriceCalculatedAt: string | null
+  accountingPriceBreakdown: string | null
+  accountingPriceBreakdownData: PricingBreakdownItem[] | null
+  accountingMethod: string | null
+  recommendedCadence: string | null
+  appliedMultiplier: number | null
+  priorityMultiplier: number | null
+  cleanupEstimate: number | null
+  lineItems: QuoteLineItem[]
+  isEdited: boolean
+  hubspotSynced: boolean
+  hubspotSyncedAt: string | null
+  hubspotQuoteLink: string | null
+  quoteConfirmedAt: string | null
+}
+
+const CREATE_QUOTE_STAGE_ID = 'create-quote'
+
+/**
+ * Get create quote data for a deal
+ */
+export async function getCreateQuoteData(
+  dealId: string
+): Promise<CreateQuoteSupabaseData | null> {
+  const data = await getStageData(dealId, CREATE_QUOTE_STAGE_ID)
+
+  // If no data exists, return null
+  if (Object.keys(data).length === 0) {
+    return null
+  }
+
+  return {
+    accountingMonthlyPrice: (data.accounting_monthly_price as number) ?? null,
+    accountingPriceCalculatedAt: (data.accounting_price_calculated_at as string) ?? null,
+    accountingPriceBreakdown: (data.accounting_price_breakdown as string) ?? null,
+    accountingPriceBreakdownData: (data.accounting_price_breakdown_data as PricingBreakdownItem[]) ?? null,
+    accountingMethod: (data.accounting_method as string) ?? null,
+    recommendedCadence: (data.recommended_cadence as string) ?? null,
+    appliedMultiplier: (data.applied_multiplier as number) ?? null,
+    priorityMultiplier: (data.priority_multiplier as number) ?? null,
+    cleanupEstimate: (data.cleanup_estimate as number) ?? null,
+    lineItems: (data.line_items as QuoteLineItem[]) ?? [],
+    isEdited: (data.is_edited as boolean) ?? false,
+    hubspotSynced: (data.hubspot_synced as boolean) ?? false,
+    hubspotSyncedAt: (data.hubspot_synced_at as string) ?? null,
+    hubspotQuoteLink: (data.hubspot_quote_link as string) ?? null,
+    quoteConfirmedAt: (data.quote_confirmed_at as string) ?? null,
+  }
+}
+
+/**
+ * Save all create quote data for a deal
+ */
+export async function saveCreateQuoteData(
+  dealId: string,
+  quoteData: CreateQuoteSupabaseData
+): Promise<void> {
+  await setStageDataBatch(dealId, CREATE_QUOTE_STAGE_ID, {
+    accounting_monthly_price: quoteData.accountingMonthlyPrice,
+    accounting_price_calculated_at: quoteData.accountingPriceCalculatedAt,
+    accounting_price_breakdown: quoteData.accountingPriceBreakdown,
+    accounting_price_breakdown_data: quoteData.accountingPriceBreakdownData,
+    accounting_method: quoteData.accountingMethod,
+    recommended_cadence: quoteData.recommendedCadence,
+    applied_multiplier: quoteData.appliedMultiplier,
+    priority_multiplier: quoteData.priorityMultiplier,
+    cleanup_estimate: quoteData.cleanupEstimate,
+    line_items: quoteData.lineItems,
+    is_edited: quoteData.isEdited,
+    hubspot_synced: quoteData.hubspotSynced,
+    hubspot_synced_at: quoteData.hubspotSyncedAt,
+    hubspot_quote_link: quoteData.hubspotQuoteLink,
+    quote_confirmed_at: quoteData.quoteConfirmedAt,
+  })
+}
+
+/**
+ * Add a line item to the quote
+ */
+export async function addLineItemSupabase(
+  dealId: string,
+  lineItem: QuoteLineItem
+): Promise<QuoteLineItem[]> {
+  // Get current line items
+  const currentData = await getCreateQuoteData(dealId)
+  const lineItems = currentData?.lineItems ?? []
+
+  // Add new item
+  lineItems.push(lineItem)
+
+  // Save updated array
+  await setStageDataBatch(dealId, CREATE_QUOTE_STAGE_ID, {
+    line_items: lineItems,
+    is_edited: true,
+  })
+
+  return lineItems
+}
+
+/**
+ * Update a line item in the quote
+ */
+export async function updateLineItemSupabase(
+  dealId: string,
+  lineItemId: string,
+  updates: Partial<QuoteLineItem>
+): Promise<QuoteLineItem[] | null> {
+  // Get current line items
+  const currentData = await getCreateQuoteData(dealId)
+  if (!currentData) return null
+
+  const lineItems = currentData.lineItems
+  const index = lineItems.findIndex(item => item.id === lineItemId)
+
+  if (index === -1) return null
+
+  // Update the item
+  lineItems[index] = {
+    ...lineItems[index],
+    ...updates,
+  }
+
+  // Save updated array
+  await setStageDataBatch(dealId, CREATE_QUOTE_STAGE_ID, {
+    line_items: lineItems,
+    is_edited: true,
+  })
+
+  return lineItems
+}
+
+/**
+ * Remove a line item from the quote
+ */
+export async function removeLineItemSupabase(
+  dealId: string,
+  lineItemId: string
+): Promise<QuoteLineItem[]> {
+  // Get current line items
+  const currentData = await getCreateQuoteData(dealId)
+  const lineItems = currentData?.lineItems ?? []
+
+  // Filter out the item
+  const updatedLineItems = lineItems.filter(item => item.id !== lineItemId)
+
+  // Save updated array
+  await setStageDataBatch(dealId, CREATE_QUOTE_STAGE_ID, {
+    line_items: updatedLineItems,
+    is_edited: true,
+  })
+
+  return updatedLineItems
+}
+
+/**
+ * Update HubSpot sync status after pushing quote
+ */
+export async function updateHubspotSyncSupabase(
+  dealId: string,
+  quoteLink: string | null
+): Promise<void> {
+  const now = new Date().toISOString()
+  await setStageDataBatch(dealId, CREATE_QUOTE_STAGE_ID, {
+    hubspot_synced: true,
+    hubspot_synced_at: now,
+    hubspot_quote_link: quoteLink,
+  })
+}
+
+/**
+ * Mark quote as confirmed
+ */
+export async function markQuoteConfirmedSupabase(
+  dealId: string
+): Promise<void> {
+  const now = new Date().toISOString()
+  await setStageDataValue(dealId, CREATE_QUOTE_STAGE_ID, 'quote_confirmed_at', now)
+}
+
+/**
+ * Reset create quote data
+ */
+export async function resetCreateQuoteSupabase(
+  dealId: string
+): Promise<void> {
+  await deleteStageData(dealId, CREATE_QUOTE_STAGE_ID)
+}

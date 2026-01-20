@@ -702,12 +702,13 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     }
   }, [deal.id, refreshState])
 
-  // GL Review Comparison Handlers
-  const handleSimulateTeamSubmit = useCallback(async () => {
+  // GL Review Comparison Handlers - Bypass mode creates blank team review so user can select AI values
+  const handleBypassTeamReview = useCallback(async () => {
     setIsComparisonLoading(true)
-    // Simulate delay for team submitting their review
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    await submitTeamGLReview(deal.id, "Lori Chambless")
+    // Short delay for UI feedback
+    await new Promise(resolve => setTimeout(resolve, 500))
+    // Pass bypassMode: true to create blank team review data
+    await submitTeamGLReview(deal.id, undefined, true)
     await refreshState()
     setIsComparisonLoading(false)
   }, [deal.id, refreshState])
@@ -1303,7 +1304,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       <GLReviewComparison
         comparisonData={comparisonData}
         dealId={deal.id}
-        onSimulateTeamSubmit={handleSimulateTeamSubmit}
+        onBypassTeamReview={handleBypassTeamReview}
         onPollForTeamReview={handlePollForTeamReview}
         onUpdateSelections={handleUpdateComparisonSelections}
         onUpdateFinalData={handleUpdateFinalReviewData}

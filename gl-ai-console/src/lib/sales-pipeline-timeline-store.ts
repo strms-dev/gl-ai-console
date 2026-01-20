@@ -13,7 +13,8 @@ import {
   createInitialTimelineState,
   createTestGLReviewFormData,
   createTestGLReviewFieldConfidence,
-  createTestTeamGLReviewFormData
+  createTestTeamGLReviewFormData,
+  createBlankGLReviewFormData
 } from "./sales-pipeline-timeline-types"
 import { updatePipelineDeal } from "./revops-pipeline-store"
 import {
@@ -46,7 +47,14 @@ import {
   initializeInternalReviewSupabase,
   updateInternalReviewSupabase,
   markInternalReviewSentSupabase,
-  resetInternalReviewSupabase
+  resetInternalReviewSupabase,
+  getCreateQuoteData,
+  saveCreateQuoteData,
+  addLineItemSupabase,
+  updateLineItemSupabase,
+  removeLineItemSupabase,
+  updateHubspotSyncSupabase,
+  markQuoteConfirmedSupabase
 } from "./supabase/revops-stage-data"
 import {
   fetchGLReviewByDealIdAndType,
@@ -62,6 +70,11 @@ import {
 } from "./supabase/revops-gl-reviews"
 import type { RevOpsPipelineFile } from "./supabase/types"
 import type { GLReviewFieldConfidence } from "./sales-pipeline-timeline-types"
+import {
+  calculateAccountingPrice,
+  buildPricingInput,
+  formatPricingBreakdown
+} from "./pricing-calculator"
 
 // n8n webhook URLs
 const SALES_INTAKE_AI_WEBHOOK_URL = "https://n8n.srv1055749.hstgr.cloud/webhook/sales-intake-ai"
@@ -388,7 +401,6 @@ export async function getOrCreateTimelineState(dealId: string): Promise<SalesPip
           hubspotSynced: false,
           hubspotSyncedAt: null,
           hubspotQuoteLink: null,
-          hubspotQuotePdfUrl: null,
           quoteConfirmedAt: null
         }
       }
@@ -398,7 +410,6 @@ export async function getOrCreateTimelineState(dealId: string): Promise<SalesPip
     // Migrate existing create-quote stage to add new HubSpot fields if missing
     if (existing.stages["create-quote"] && existing.stages["create-quote"].data.hubspotQuoteLink === undefined) {
       existing.stages["create-quote"].data.hubspotQuoteLink = null
-      existing.stages["create-quote"].data.hubspotQuotePdfUrl = null
       needsSave = true
     }
 
@@ -2066,12 +2077,14 @@ export async function pollForTeamGLReview(dealId: string): Promise<SalesPipeline
 }
 
 /**
- * Simulate team member submitting their GL review (for testing)
+ * Submit team member GL Review (or bypass with blank data)
  * In production, this would be called when the team member submits their review via Google Form
+ * When bypassMode is true, creates blank team review data so user can select AI values directly
  */
 export async function submitTeamGLReview(
   dealId: string,
-  submittedBy?: string
+  submittedBy?: string,
+  bypassMode: boolean = false
 ): Promise<SalesPipelineTimelineState | null> {
   const timelines = getAllTimelines()
   const existing = timelines[dealId]
@@ -2080,10 +2093,13 @@ export async function submitTeamGLReview(
 
   const now = new Date().toISOString()
 
-  // Use test data for simulation - in production this would come from team's actual input via Google Form
-  const teamReviewData = createTestTeamGLReviewFormData()
+  // Use blank data for bypass mode, test data for simulation
+  const teamReviewData = bypassMode
+    ? createBlankGLReviewFormData()
+    : createTestTeamGLReviewFormData()
 
-  // If we have AI data, pre-fill some fields from it (email, company, lead name)
+  // If we have AI data, pre-fill basic identity fields (email, company, lead name)
+  // These are always copied since they're identifying info, not review data
   const aiData = existing.stages["gl-review-comparison"].data.aiReviewData
   if (aiData) {
     teamReviewData.email = aiData.email
@@ -2093,16 +2109,20 @@ export async function submitTeamGLReview(
 
   existing.stages["gl-review-comparison"].data.teamReviewData = teamReviewData
   existing.stages["gl-review-comparison"].data.teamReviewSubmittedAt = now
-  existing.stages["gl-review-comparison"].data.teamReviewSubmittedBy = submittedBy || "Team Member"
+  existing.stages["gl-review-comparison"].data.teamReviewSubmittedBy = bypassMode
+    ? "Manual Bypass"
+    : (submittedBy || "Team Member")
 
   existing.updatedAt = now
   saveAllTimelines(timelines)
 
-  // Also save to Supabase for testing
-  try {
-    await upsertTeamGLReview(dealId, teamReviewData, submittedBy || "Team Member")
-  } catch (error) {
-    console.error("Error saving team GL review to Supabase:", error)
+  // Also save to Supabase for testing (skip in bypass mode to avoid polluting real data)
+  if (!bypassMode) {
+    try {
+      await upsertTeamGLReview(dealId, teamReviewData, submittedBy || "Team Member")
+    } catch (error) {
+      console.error("Error saving team GL review to Supabase:", error)
+    }
   }
 
   return existing
@@ -2221,6 +2241,28 @@ export async function submitComparisonAndMoveToQuote(
     }
   }
 
+  // Trigger n8n workflow to move HubSpot deal to "SQL - Create Quote" stage
+  try {
+    const response = await fetch("https://n8n.srv1055749.hstgr.cloud/webhook/move-to-create-quote", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ deal_id: dealId }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error("Error moving HubSpot deal to Create Quote:", errorData)
+    } else {
+      const result = await response.json()
+      console.log("HubSpot deal moved to Create Quote:", result)
+    }
+  } catch (error) {
+    console.error("Error calling n8n webhook to move HubSpot deal:", error)
+    // Don't fail the operation if n8n webhook fails - local state is already updated
+  }
+
   return existing
 }
 
@@ -2275,50 +2317,8 @@ export async function resetGLReviewComparison(
 // ============================================
 
 /**
- * Placeholder pricing calculator - returns a mock price based on GL Review data
- * In production, this would be replaced with actual pricing logic
- */
-function calculatePlaceholderPrice(finalReviewData: GLReviewFormData | null): {
-  price: number
-  breakdown: string
-} {
-  if (!finalReviewData) {
-    return { price: 0, breakdown: "No review data available" }
-  }
-
-  // Count filled accounts
-  const accountCount = finalReviewData.accounts.filter(a => a.name.trim() !== "").length
-
-  // Count eCommerce platforms
-  const ecommerceCount = Object.values(finalReviewData.ecommerce).filter(v => v && v !== "").length
-
-  // Base price calculation (placeholder logic)
-  let basePrice = 500
-  basePrice += accountCount * 50  // $50 per account
-  basePrice += ecommerceCount * 100  // $100 per eCommerce platform
-
-  // Adjust for catchup bookkeeping
-  if (finalReviewData.catchupRequired === "yes") {
-    basePrice += 200
-  }
-
-  // Adjust for revenue allocations
-  if (finalReviewData.revenueCoaAllocations === ">5") {
-    basePrice += 150
-  } else if (finalReviewData.revenueCoaAllocations === "3-5") {
-    basePrice += 75
-  }
-
-  const breakdown = `Base: $500 + Accounts (${accountCount} × $50) + eCommerce (${ecommerceCount} × $100)` +
-    (finalReviewData.catchupRequired === "yes" ? " + Catchup: $200" : "") +
-    (finalReviewData.revenueCoaAllocations === ">5" ? " + Custom COA: $150" :
-     finalReviewData.revenueCoaAllocations === "3-5" ? " + COA Allocations: $75" : "")
-
-  return { price: basePrice, breakdown }
-}
-
-/**
- * Initialize create quote stage with calculated pricing
+ * Initialize create quote stage with calculated pricing using the full pricing calculator.
+ * Fetches data from both Sales Intake (Supabase) and GL Review (timeline state).
  */
 export async function initializeCreateQuote(
   dealId: string
@@ -2330,32 +2330,109 @@ export async function initializeCreateQuote(
 
   const now = new Date().toISOString()
 
-  // Get the final review data from comparison stage
+  // Get the final review data from comparison stage (GL Review)
   const finalReviewData = existing.stages["gl-review-comparison"].data.finalReviewData
 
-  // Calculate placeholder price
-  const { price, breakdown } = calculatePlaceholderPrice(finalReviewData)
+  // Fetch sales intake data from Supabase
+  let salesIntakeData: SalesIntakeFormData | null = null
+  try {
+    const salesIntakeResult = await fetchSalesIntakeByDealId(dealId)
+    if (salesIntakeResult) {
+      // Transform Supabase data to SalesIntakeFormData format
+      salesIntakeData = {
+        companyName: salesIntakeResult.company_name || "",
+        contactName: salesIntakeResult.contact_name || "",
+        emailAddress: salesIntakeResult.email_address || "",
+        entityType: (salesIntakeResult.entity_type as SalesIntakeFormData["entityType"]) || "",
+        hasRestrictedGrants: (salesIntakeResult.has_restricted_grants as SalesIntakeFormData["hasRestrictedGrants"]) || "",
+        usesQboOrXero: (salesIntakeResult.uses_qbo_or_xero as SalesIntakeFormData["usesQboOrXero"]) || "",
+        accountingPlatform: (salesIntakeResult.accounting_platform as SalesIntakeFormData["accountingPlatform"]) || "",
+        accountingBasis: (salesIntakeResult.accounting_basis as SalesIntakeFormData["accountingBasis"]) || "",
+        bookkeepingCadence: (salesIntakeResult.bookkeeping_cadence as SalesIntakeFormData["bookkeepingCadence"]) || "",
+        needsFinancialsBefore15th: (salesIntakeResult.needs_financials_before_15th as SalesIntakeFormData["needsFinancialsBefore15th"]) || "",
+        financialReviewFrequency: (salesIntakeResult.financial_review_frequency as SalesIntakeFormData["financialReviewFrequency"]) || "",
+        payrollProvider: (salesIntakeResult.payroll_provider as SalesIntakeFormData["payrollProvider"]) || "",
+        has401k: (salesIntakeResult.has_401k as SalesIntakeFormData["has401k"]) || "",
+        payrollDepartments: (salesIntakeResult.payroll_departments as SalesIntakeFormData["payrollDepartments"]) || "",
+        employeeCount: (salesIntakeResult.employee_count as SalesIntakeFormData["employeeCount"]) || "",
+        tracksExpensesByEmployee: (salesIntakeResult.tracks_expenses_by_employee as SalesIntakeFormData["tracksExpensesByEmployee"]) || "",
+        expensePlatform: (salesIntakeResult.expense_platform as SalesIntakeFormData["expensePlatform"]) || "",
+        expensePlatformEmployees: (salesIntakeResult.expense_platform_employees as SalesIntakeFormData["expensePlatformEmployees"]) || "",
+        needsBillPaySupport: (salesIntakeResult.needs_bill_pay_support as SalesIntakeFormData["needsBillPaySupport"]) || "",
+        billPayCadence: (salesIntakeResult.bill_pay_cadence as SalesIntakeFormData["billPayCadence"]) || "",
+        billsPerMonth: (salesIntakeResult.bills_per_month as SalesIntakeFormData["billsPerMonth"]) || "",
+        needsInvoicingSupport: (salesIntakeResult.needs_invoicing_support as SalesIntakeFormData["needsInvoicingSupport"]) || "",
+        invoicingCadence: (salesIntakeResult.invoicing_cadence as SalesIntakeFormData["invoicingCadence"]) || "",
+        invoicesPerMonth: (salesIntakeResult.invoices_per_month as SalesIntakeFormData["invoicesPerMonth"]) || "",
+        interestedInCfoReview: (salesIntakeResult.interested_in_cfo_review as SalesIntakeFormData["interestedInCfoReview"]) || "",
+        additionalNotes: salesIntakeResult.additional_notes || "",
+        firefliesVideoLink: salesIntakeResult.fireflies_video_link || ""
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching sales intake data for pricing:", error)
+    // Continue without sales intake data - will use defaults
+  }
+
+  // Build pricing input from both data sources
+  const pricingInput = buildPricingInput(salesIntakeData, finalReviewData)
+
+  // Calculate price using the full pricing calculator
+  const pricingResult = calculateAccountingPrice(pricingInput)
+
+  // Format breakdown as human-readable text for backward compatibility
+  const breakdownText = formatPricingBreakdown(pricingResult)
 
   // Create initial line item for accounting services
   const accountingLineItem: QuoteLineItem = {
     id: `line-${Date.now()}`,
     service: "Monthly Accounting Services",
-    description: "Full-service bookkeeping and accounting",
-    monthlyPrice: price,
+    description: `${pricingResult.accountingMethod} basis, ${pricingResult.cadence} cadence`,
+    monthlyPrice: pricingResult.monthlyPrice,
     isCustom: false
   }
 
-  existing.stages["create-quote"].data = {
-    accountingMonthlyPrice: price,
+  // Build line items array - add cleanup as separate line item if applicable
+  const lineItems: QuoteLineItem[] = [accountingLineItem]
+
+  if (pricingResult.cleanupEstimate && pricingResult.cleanupEstimate > 0) {
+    lineItems.push({
+      id: `line-${Date.now() + 1}`,
+      service: "Cleanup/Catchup Bookkeeping",
+      description: "One-time cleanup fee (estimate)",
+      monthlyPrice: pricingResult.cleanupEstimate,
+      isCustom: false
+    })
+  }
+
+  const quoteData = {
+    accountingMonthlyPrice: pricingResult.monthlyPrice,
     accountingPriceCalculatedAt: now,
-    accountingPriceBreakdown: breakdown,
-    lineItems: [accountingLineItem],
+    accountingPriceBreakdown: breakdownText,
+    accountingPriceBreakdownData: pricingResult.breakdown,
+    accountingMethod: pricingResult.accountingMethod,
+    recommendedCadence: pricingResult.cadence,
+    appliedMultiplier: pricingResult.appliedMultiplier,
+    priorityMultiplier: pricingResult.priorityMultiplier,
+    cleanupEstimate: pricingResult.cleanupEstimate,
+    lineItems,
     isEdited: false,
     hubspotSynced: false,
     hubspotSyncedAt: null,
+    hubspotQuoteLink: null,
     quoteConfirmedAt: null
   }
 
+  // Save to Supabase as source of truth
+  try {
+    await saveCreateQuoteData(dealId, quoteData)
+  } catch (error) {
+    console.error("Error saving create quote data to Supabase:", error)
+    // Continue - will still update localStorage for immediate UI
+  }
+
+  // Update localStorage for immediate UI refresh
+  existing.stages["create-quote"].data = quoteData
   existing.updatedAt = now
   saveAllTimelines(timelines)
 
@@ -2386,6 +2463,15 @@ export async function addQuoteLineItem(
     isCustom: true
   }
 
+  // Save to Supabase first (source of truth)
+  try {
+    await addLineItemSupabase(dealId, newLineItem)
+  } catch (error) {
+    console.error("Error adding line item to Supabase:", error)
+    // Continue - will still update localStorage for immediate UI
+  }
+
+  // Update localStorage for immediate UI refresh
   existing.stages["create-quote"].data.lineItems.push(newLineItem)
   existing.stages["create-quote"].data.isEdited = true
 
@@ -2413,6 +2499,15 @@ export async function updateQuoteLineItem(
   const index = existing.stages["create-quote"].data.lineItems.findIndex(item => item.id === lineItemId)
   if (index === -1) return null
 
+  // Save to Supabase first (source of truth)
+  try {
+    await updateLineItemSupabase(dealId, lineItemId, updates)
+  } catch (error) {
+    console.error("Error updating line item in Supabase:", error)
+    // Continue - will still update localStorage for immediate UI
+  }
+
+  // Update localStorage for immediate UI refresh
   existing.stages["create-quote"].data.lineItems[index] = {
     ...existing.stages["create-quote"].data.lineItems[index],
     ...updates
@@ -2439,6 +2534,15 @@ export async function removeQuoteLineItem(
 
   const now = new Date().toISOString()
 
+  // Save to Supabase first (source of truth)
+  try {
+    await removeLineItemSupabase(dealId, lineItemId)
+  } catch (error) {
+    console.error("Error removing line item from Supabase:", error)
+    // Continue - will still update localStorage for immediate UI
+  }
+
+  // Update localStorage for immediate UI refresh
   existing.stages["create-quote"].data.lineItems =
     existing.stages["create-quote"].data.lineItems.filter(item => item.id !== lineItemId)
   existing.stages["create-quote"].data.isEdited = true
@@ -2451,6 +2555,7 @@ export async function removeQuoteLineItem(
 
 /**
  * Push quote to HubSpot and create quote with link/PDF
+ * Calls n8n workflow which reads line items from Supabase and creates quote in HubSpot
  */
 export async function pushQuoteToHubspot(
   dealId: string
@@ -2460,21 +2565,48 @@ export async function pushQuoteToHubspot(
 
   if (!existing) return null
 
-  const now = new Date().toISOString()
+  try {
+    // n8n workflow now reads line items directly from Supabase
+    // We only need to send the deal_id
+    const response = await fetch("https://n8n.srv1055749.hstgr.cloud/webhook/create-hubspot-quote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        deal_id: dealId
+      })
+    })
 
-  // In production, this would call the HubSpot API
-  // For now, we generate placeholder links
-  const quoteId = `QT-${Date.now()}`
+    const result = await response.json()
 
-  existing.stages["create-quote"].data.hubspotSynced = true
-  existing.stages["create-quote"].data.hubspotSyncedAt = now
-  existing.stages["create-quote"].data.hubspotQuoteLink = `https://app.hubspot.com/quotes/${quoteId}`
-  existing.stages["create-quote"].data.hubspotQuotePdfUrl = `https://app.hubspot.com/quotes/${quoteId}/pdf`
+    if (result.success) {
+      const now = new Date().toISOString()
 
-  existing.updatedAt = now
-  saveAllTimelines(timelines)
+      // Update Supabase with HubSpot sync status (source of truth)
+      // Note: n8n workflow may also update this, but we update here for redundancy
+      try {
+        await updateHubspotSyncSupabase(dealId, result.quote_link)
+      } catch (error) {
+        console.error("Error updating HubSpot sync in Supabase:", error)
+      }
 
-  return existing
+      // Update localStorage for immediate UI refresh
+      const quoteData = existing.stages["create-quote"].data
+      quoteData.hubspotSynced = true
+      quoteData.hubspotSyncedAt = now
+      quoteData.hubspotQuoteLink = result.quote_link
+
+      existing.updatedAt = now
+      saveAllTimelines(timelines)
+
+      return existing
+    } else {
+      console.error("Failed to create HubSpot quote:", result.error)
+      return null
+    }
+  } catch (error) {
+    console.error("Error calling HubSpot quote webhook:", error)
+    return null
+  }
 }
 
 /**
@@ -2490,6 +2622,15 @@ export async function confirmQuoteAndMoveToSent(
 
   const now = new Date().toISOString()
 
+  // Update Supabase first (source of truth)
+  try {
+    await markQuoteConfirmedSupabase(dealId)
+  } catch (error) {
+    console.error("Error marking quote confirmed in Supabase:", error)
+    // Continue - will still update localStorage for immediate UI
+  }
+
+  // Update localStorage for immediate UI refresh
   existing.stages["create-quote"].data.quoteConfirmedAt = now
   existing.stages["create-quote"].status = "completed"
   existing.stages["create-quote"].completedAt = now

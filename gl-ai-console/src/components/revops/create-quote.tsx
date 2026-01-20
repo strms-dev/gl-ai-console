@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   CreateQuoteStageData,
   QuoteLineItem,
-  GLReviewFormData
+  GLReviewFormData,
+  PricingBreakdownItem
 } from "@/lib/sales-pipeline-timeline-types"
 import {
   CheckCircle2,
@@ -20,8 +21,10 @@ import {
   DollarSign,
   ExternalLink,
   RotateCw,
-  FileText,
-  ArrowRight
+  ArrowRight,
+  TrendingUp,
+  Clock,
+  AlertCircle
 } from "lucide-react"
 import {
   Dialog,
@@ -260,7 +263,7 @@ export function CreateQuote({
           <div>
             <p className="text-sm font-medium text-[#407B9D]">Base Accounting Services</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Auto-calculated based on GL Review data
+              Auto-calculated based on Sales Intake &amp; GL Review data
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -276,6 +279,34 @@ export function CreateQuote({
               View Breakdown
             </Button>
           </div>
+        </div>
+
+        {/* Pricing Metadata Pills */}
+        <div className="flex flex-wrap gap-2 mt-3">
+          {quoteData.accountingMethod && (
+            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-white border border-[#407B9D]/30 text-[#407B9D]">
+              <Calculator className="w-3 h-3 mr-1" />
+              {quoteData.accountingMethod} Basis
+            </span>
+          )}
+          {quoteData.recommendedCadence && (
+            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-white border border-[#407B9D]/30 text-[#407B9D]">
+              <Clock className="w-3 h-3 mr-1" />
+              {quoteData.recommendedCadence.charAt(0).toUpperCase() + quoteData.recommendedCadence.slice(1)} Cadence
+            </span>
+          )}
+          {quoteData.priorityMultiplier && quoteData.priorityMultiplier > 1 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-amber-100 border border-amber-300 text-amber-700">
+              <TrendingUp className="w-3 h-3 mr-1" />
+              Priority ({quoteData.priorityMultiplier}x)
+            </span>
+          )}
+          {quoteData.appliedMultiplier && quoteData.appliedMultiplier > 1 && (
+            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-purple-100 border border-purple-300 text-purple-700">
+              <TrendingUp className="w-3 h-3 mr-1" />
+              Accrual Multiplier ({quoteData.appliedMultiplier}x)
+            </span>
+          )}
         </div>
       </div>
 
@@ -315,12 +346,14 @@ export function CreateQuote({
                       <div className="flex items-center gap-1">
                         <span className="text-gray-500">$</span>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
                           value={editServicePrice || ""}
-                          onChange={(e) => setEditServicePrice(e.target.value)}
-                          className="h-8 w-24 text-right"
-                          min="0"
-                          step="0.01"
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, "")
+                            setEditServicePrice(val)
+                          }}
+                          className="h-8 w-24 text-right [appearance:textfield]"
                         />
                       </div>
                     </td>
@@ -443,13 +476,15 @@ export function CreateQuote({
                 <span className="text-gray-500">$</span>
                 <Input
                   id="servicePrice"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={newServicePrice || ""}
-                  onChange={(e) => setNewServicePrice(e.target.value)}
-                  placeholder="0.00"
-                  className="h-8"
-                  min="0"
-                  step="0.01"
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, "")
+                    setNewServicePrice(val)
+                  }}
+                  placeholder="0"
+                  className="h-8 [appearance:textfield]"
                 />
               </div>
             </div>
@@ -500,7 +535,7 @@ export function CreateQuote({
               Step 1: Create Quote in HubSpot
             </h5>
             <p className="text-xs text-muted-foreground mb-3">
-              Push line items to HubSpot to generate the official quote with a shareable link and PDF.
+              Push line items to HubSpot to generate the official quote with a shareable link.
             </p>
             <Button
               onClick={handlePushToHubspot}
@@ -521,7 +556,7 @@ export function CreateQuote({
             </Button>
           </div>
         ) : (
-          // Step 2: HubSpot synced - show link/PDF and confirm button
+          // Step 2: HubSpot synced - show link and confirm button
           <div className="space-y-4">
             {/* HubSpot Quote Details */}
             <div className="p-4 bg-[#C8E4BB]/20 rounded-lg border border-[#C8E4BB]">
@@ -540,15 +575,6 @@ export function CreateQuote({
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   View Quote in HubSpot
-                </a>
-                <a
-                  href={quoteData.hubspotQuotePdfUrl || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Download Quote PDF
                 </a>
               </div>
               {quoteData.hubspotSyncedAt && (
@@ -573,20 +599,103 @@ export function CreateQuote({
 
       {/* Price Breakdown Modal */}
       <Dialog open={showBreakdownModal} onOpenChange={setShowBreakdownModal}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle style={{ fontFamily: "var(--font-heading)" }}>
               Price Calculation Breakdown
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <div className="p-4 bg-gray-50 rounded-lg border">
-              <pre className="whitespace-pre-wrap font-sans text-sm text-[#463939]">
-                {quoteData.accountingPriceBreakdown || "No breakdown available"}
-              </pre>
+            {/* Pricing Metadata Header */}
+            <div className="mb-4 p-3 bg-[#407B9D]/10 rounded-lg border border-[#407B9D]/20">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Accounting Method</p>
+                  <p className="font-medium text-[#463939]">{quoteData.accountingMethod || "Cash"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Cadence</p>
+                  <p className="font-medium text-[#463939]">
+                    {quoteData.recommendedCadence ?
+                      quoteData.recommendedCadence.charAt(0).toUpperCase() + quoteData.recommendedCadence.slice(1) :
+                      "Monthly"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Priority Multiplier</p>
+                  <p className="font-medium text-[#463939]">{quoteData.priorityMultiplier || 1.0}x</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Method Multiplier</p>
+                  <p className="font-medium text-[#463939]">{quoteData.appliedMultiplier || 1.0}x</p>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-3">
-              This is a placeholder calculation. Actual pricing logic can be customized.
+
+            {/* Structured Breakdown Table */}
+            {quoteData.accountingPriceBreakdownData && quoteData.accountingPriceBreakdownData.length > 0 ? (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-medium text-gray-600">Category</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-600">Details</th>
+                      <th className="px-4 py-2 text-right font-medium text-gray-600">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quoteData.accountingPriceBreakdownData.map((item, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="px-4 py-2 font-medium text-[#463939]">{item.category}</td>
+                        <td className="px-4 py-2 text-muted-foreground">
+                          <p>{item.description}</p>
+                          {item.formula && (
+                            <p className="text-xs text-[#407B9D] mt-0.5">{item.formula}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-right font-medium text-[#463939]">
+                          ${item.amount.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="border-t bg-[#407B9D]/10 font-bold">
+                      <td className="px-4 py-3" colSpan={2}>Monthly Total</td>
+                      <td className="px-4 py-3 text-right text-[#407B9D] text-lg">
+                        ${quoteData.accountingMonthlyPrice?.toLocaleString() || 0}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* Fallback to text breakdown */
+              <div className="p-4 bg-gray-50 rounded-lg border">
+                <pre className="whitespace-pre-wrap font-sans text-sm text-[#463939]">
+                  {quoteData.accountingPriceBreakdown || "No breakdown available"}
+                </pre>
+              </div>
+            )}
+
+            {/* Cleanup Estimate */}
+            {quoteData.cleanupEstimate && quoteData.cleanupEstimate > 0 && (
+              <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">Cleanup/Catchup Estimate</p>
+                      <p className="text-xs text-amber-600">One-time fee for historical cleanup</p>
+                    </div>
+                  </div>
+                  <p className="text-lg font-bold text-amber-700">
+                    ${quoteData.cleanupEstimate.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground mt-4">
+              Pricing calculated based on the Sales Pricing Calculator formulas using Sales Intake and GL Review data.
             </p>
           </div>
           <div className="flex justify-end pt-4 border-t">

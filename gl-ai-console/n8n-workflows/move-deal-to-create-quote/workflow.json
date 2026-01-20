@@ -1,0 +1,306 @@
+{
+  "name": "Move RevOps Deal to SQL - Create Quote",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "move-to-create-quote",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "webhook-create-quote",
+      "name": "Receive Deal ID",
+      "webhookId": "move-to-create-quote-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "validate-deal-id-not-empty",
+              "leftValue": "={{ $json.body.deal_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "validate-deal-id-uuid",
+              "leftValue": "={{ $json.body.deal_id }}",
+              "rightValue": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [220, 0],
+      "id": "validate-deal-id",
+      "name": "Validate Deal ID"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "revops_deals",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('Receive Deal ID').item.json.body.deal_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [440, 0],
+      "id": "get-deal-from-supabase",
+      "name": "Get Deal from Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-hs-deal-id-exists",
+              "leftValue": "={{ $json.hs_deal_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, 0],
+      "id": "check-hs-deal-id",
+      "name": "Has HubSpot Deal ID?"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "deal",
+        "operation": "update",
+        "dealId": {
+          "__rl": true,
+          "value": "={{ $('Get Deal from Supabase').item.json.hs_deal_id }}",
+          "mode": "id"
+        },
+        "updateFields": {
+          "stage": "5103514"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [880, 0],
+      "id": "update-hubspot-deal",
+      "name": "Update HubSpot Deal Stage",
+      "credentials": {
+        "hubspotOAuth2Api": {
+          "id": "1ao5IPqi22U8ZzU3",
+          "name": "GL HubSpot OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "revops_deals",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('Receive Deal ID').item.json.body.deal_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "hs_stage",
+              "fieldValue": "SQL - Create Quote"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "id": "update-supabase-stage",
+      "name": "Update Supabase HS Stage",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: \"Deal moved to SQL - Create Quote\", deal_id: $('Receive Deal ID').item.json.body.deal_id, hs_deal_id: $('Get Deal from Supabase').item.json.hs_deal_id }) }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 0],
+      "id": "respond-success",
+      "name": "Respond Success"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: \"Invalid deal_id - must be a valid UUID\" }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [440, 200],
+      "id": "respond-invalid-id",
+      "name": "Respond Invalid ID"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: \"Deal does not have a HubSpot Deal ID - cannot update HubSpot\", deal_id: $('Receive Deal ID').item.json.body.deal_id }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 200],
+      "id": "respond-no-hs-deal",
+      "name": "Respond No HubSpot Deal"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive Deal ID": {
+      "main": [
+        [
+          {
+            "node": "Validate Deal ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Deal ID": {
+      "main": [
+        [
+          {
+            "node": "Get Deal from Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Deal from Supabase": {
+      "main": [
+        [
+          {
+            "node": "Has HubSpot Deal ID?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has HubSpot Deal ID?": {
+      "main": [
+        [
+          {
+            "node": "Update HubSpot Deal Stage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond No HubSpot Deal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update HubSpot Deal Stage": {
+      "main": [
+        [
+          {
+            "node": "Update Supabase HS Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Supabase HS Stage": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1.0.0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "move-to-create-quote",
+  "tags": []
+}

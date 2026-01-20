@@ -43,7 +43,7 @@ import {
 interface GLReviewComparisonProps {
   comparisonData: GLReviewComparisonStageData
   dealId?: string
-  onSimulateTeamSubmit: () => void
+  onBypassTeamReview: () => void
   onPollForTeamReview?: () => Promise<boolean> // Returns true if team review is now available
   onUpdateSelections: (selections: GLReviewComparisonSelections) => void
   onUpdateFinalData: (data: GLReviewFormData) => void
@@ -572,7 +572,7 @@ function ComparisonRow({
 export function GLReviewComparison({
   comparisonData,
   dealId,
-  onSimulateTeamSubmit,
+  onBypassTeamReview,
   onPollForTeamReview,
   onUpdateSelections,
   onUpdateFinalData,
@@ -885,24 +885,28 @@ export function GLReviewComparison({
             </div>
           )}
 
-          {/* For testing - simulate team submit */}
+          {/* Manual Bypass Option */}
           <div className="pt-4 border-t border-gray-200">
-            <p className="text-xs text-muted-foreground mb-2">For testing purposes:</p>
+            <h5 className="text-sm font-medium text-[#463939] mb-2">Manual Bypass</h5>
+            <p className="text-xs text-muted-foreground mb-3">
+              If you don&apos;t want to wait for a team member to submit their review, you can bypass this step.
+              This will set all team review fields to blank, allowing you to select AI values (and edit them if needed) to finalize the review.
+            </p>
             <Button
-              onClick={onSimulateTeamSubmit}
+              onClick={onBypassTeamReview}
               disabled={isLoading}
               variant="outline"
-              className="border-amber-300 text-amber-700 hover:bg-amber-50"
+              className="border-[#407B9D]/50 text-[#407B9D] hover:bg-[#407B9D]/10"
             >
               {isLoading ? (
                 <>
                   <RotateCw className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
+                  Processing...
                 </>
               ) : (
                 <>
-                  <User className="w-4 h-4 mr-2" />
-                  Simulate Team Submit (Testing)
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  Bypass Team Review
                 </>
               )}
             </Button>
