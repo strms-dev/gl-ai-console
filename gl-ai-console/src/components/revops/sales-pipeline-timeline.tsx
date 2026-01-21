@@ -22,7 +22,8 @@ import {
   UserCheck,
   FileSignature,
   Trophy,
-  XCircle
+  XCircle,
+  HelpCircle
 } from "lucide-react"
 import {
   SalesPipelineTimelineState,
@@ -34,8 +35,25 @@ import {
   GLReviewCustomValues,
   QuoteLineItem,
   LostReason,
-  SALES_PIPELINE_STAGES
+  SALES_PIPELINE_STAGES,
+  // Simplified stage data types for pizza tracker
+  SimplifiedQuoteSentStageData,
+  SimplifiedPrepareEAStageData,
+  SimplifiedEAReadyForReviewStageData,
+  SimplifiedEASentStageData,
+  SimplifiedClosedWonStageData,
+  SimplifiedClosedLostStageData
 } from "@/lib/sales-pipeline-timeline-types"
+import {
+  // Simplified stage Supabase functions
+  getSimplifiedStageData,
+  getAllSimplifiedStagesData,
+  confirmSimplifiedStage,
+  confirmClosedLost,
+  confirmClosedWon,
+  type SimplifiedStageSupabaseData
+} from "@/lib/supabase/revops-stage-data"
+import { supabase } from "@/lib/supabase/client"
 import {
   getOrCreateTimelineState,
   uploadDemoTranscript,
@@ -77,6 +95,7 @@ import {
   resetGLReviewComparison,
   // New stage store functions
   initializeCreateQuote,
+  loadCreateQuoteFromSupabase,
   addQuoteLineItem,
   updateQuoteLineItem,
   removeQuoteLineItem,
@@ -116,13 +135,12 @@ import { InternalReview } from "@/components/revops/internal-review"
 import { GLReviewForm } from "@/components/revops/gl-review-form"
 import { GLReviewComparison } from "@/components/revops/gl-review-comparison"
 import { CreateQuote } from "@/components/revops/create-quote"
+// Simplified "Pizza Tracker" components (post-Create Quote stages)
 import { QuoteSent } from "@/components/revops/quote-sent"
-import { QuoteApproved } from "@/components/revops/quote-approved"
 import { PrepareEngagement } from "@/components/revops/prepare-engagement"
-import { EAInternalReview } from "@/components/revops/ea-internal-review"
-import { SendEngagement } from "@/components/revops/send-engagement"
-import { ClosedWon } from "@/components/revops/closed-won"
-import { ClosedLost } from "@/components/revops/closed-lost"
+import { EAReadyForReview } from "@/components/revops/ea-ready-for-review"
+import { EASent } from "@/components/revops/ea-sent"
+import { DealOutcome } from "@/components/revops/deal-outcome"
 import { PipelineDeal, getPipelineDealById } from "@/lib/revops-pipeline-store"
 import { FileUpload } from "@/components/leads/file-upload"
 import { getFileTypeById, UploadedFile } from "@/lib/file-types"
@@ -143,6 +161,7 @@ interface TimelineEvent {
     manual?: { label: string }
   }
   isCollapsed?: boolean
+  isSkipped?: boolean // Added for stages that were auto-completed
 }
 
 // Status color mapping
@@ -224,7 +243,8 @@ const getStageIcon = (iconName: string) => {
     "user-check": UserCheck,
     "file-signature": FileSignature,
     "trophy": Trophy,
-    "x-circle": XCircle
+    "x-circle": XCircle,
+    "help-circle": HelpCircle
   }
   return iconMap[iconName] || Circle
 }
@@ -246,6 +266,10 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   const [isComparisonLoading, setIsComparisonLoading] = useState(false)
   // Reminder sequence loading state
   const [isProcessingAccess, setIsProcessingAccess] = useState(false)
+
+  // Simplified stage data (pizza tracker stages)
+  const [simplifiedStagesData, setSimplifiedStagesData] = useState<Record<string, SimplifiedStageSupabaseData>>({})
+  const [isSimplifiedStageLoading, setIsSimplifiedStageLoading] = useState(false)
 
   // Load timeline state
   useEffect(() => {
@@ -354,9 +378,61 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         console.error('Error loading GL review from Supabase:', error)
       }
 
+      // Load create quote data from Supabase (source of truth)
+      // This ensures quote data persists across page refreshes and localStorage clears
+      try {
+        const quoteState = await loadCreateQuoteFromSupabase(deal.id)
+        if (quoteState) {
+          setTimelineState(quoteState)
+        }
+      } catch (error) {
+        console.error('Error loading create quote from Supabase:', error)
+      }
+
+      // Load simplified stages data from Supabase (pizza tracker stages)
+      try {
+        const simplifiedData = await getAllSimplifiedStagesData(deal.id)
+        setSimplifiedStagesData(simplifiedData)
+      } catch (error) {
+        console.error('Error loading simplified stages from Supabase:', error)
+      }
+
       setIsLoading(false)
     }
     loadState()
+  }, [deal.id])
+
+  // Supabase Realtime subscription for HubSpot auto-sync
+  // Listens for changes to simplified stage data and refreshes UI
+  useEffect(() => {
+    // Subscribe to changes in revops_pipeline_stage_data table for this deal
+    const channel = supabase
+      .channel(`revops-stages-${deal.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'revops_pipeline_stage_data',
+          filter: `deal_id=eq.${deal.id}`
+        },
+        async (payload) => {
+          console.log('Realtime stage change detected:', payload)
+          // Refresh simplified stages data when a change is detected
+          try {
+            const updatedData = await getAllSimplifiedStagesData(deal.id)
+            setSimplifiedStagesData(updatedData)
+          } catch (error) {
+            console.error('Error refreshing simplified stages:', error)
+          }
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [deal.id])
 
   // Refresh timeline state and deal data
@@ -399,6 +475,16 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       }
     } catch (error) {
       console.error('Error loading GL review in refreshState:', error)
+    }
+
+    // Load create quote data from Supabase to ensure it's up to date
+    try {
+      const quoteState = await loadCreateQuoteFromSupabase(deal.id)
+      if (quoteState) {
+        state = quoteState
+      }
+    } catch (error) {
+      console.error('Error loading create quote in refreshState:', error)
     }
 
     setTimelineState(state)
@@ -920,23 +1006,76 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     )
   }
 
+  // Simplified stages use Supabase data for status (pizza tracker stages)
+  const SIMPLIFIED_STAGE_IDS = [
+    "quote-sent",
+    "prepare-engagement",
+    "internal-engagement-review",
+    "send-engagement",
+    "closed-won",
+    "closed-lost"
+  ]
+
   // Build timeline events from stage configuration
-  const events: TimelineEvent[] = SALES_PIPELINE_STAGES.map(stageConfig => {
-    const stageData = timelineState.stages[stageConfig.id as SalesPipelineStageId]
-    return {
-      id: stageConfig.id,
-      type: stageConfig.id,
-      title: stageConfig.title,
-      description: stageConfig.description,
-      status: stageData?.status || "pending",
-      icon: stageConfig.icon,
-      automationLevel: "fully-automated" as const,
-      actions: {
-        manual: { label: "Upload Demo Transcript" }
-      },
-      isCollapsed: collapsedItems.has(stageConfig.id)
-    }
-  })
+  // Filter out closed-lost since we'll show a combined deal-outcome stage
+  const events: TimelineEvent[] = SALES_PIPELINE_STAGES
+    .filter(stageConfig => stageConfig.id !== "closed-lost") // Exclude closed-lost, handled in deal-outcome
+    .map(stageConfig => {
+      const stageData = timelineState.stages[stageConfig.id as SalesPipelineStageId]
+
+      // Special handling for deal-outcome (combined closed-won/closed-lost)
+      if (stageConfig.id === "closed-won") {
+        const wonData = simplifiedStagesData["closed-won"]
+        const lostData = simplifiedStagesData["closed-lost"]
+
+        const isWon = !!wonData?.confirmedAt
+        const isLost = !!lostData?.confirmedAt
+
+        return {
+          id: "deal-outcome",
+          type: "deal-outcome",
+          title: isWon ? "Closed Won" : isLost ? "Closed Lost" : "Deal Outcome",
+          description: isWon
+            ? "Deal has been successfully closed."
+            : isLost
+            ? "Deal has been marked as lost."
+            : "Record the final outcome of the deal.",
+          status: (isWon || isLost ? "completed" : "pending") as SalesPipelineStageStatus,
+          icon: isWon ? "trophy" : isLost ? "x-circle" : "help-circle",
+          automationLevel: "fully-automated" as const,
+          actions: {
+            manual: { label: "Record Outcome" }
+          },
+          isCollapsed: collapsedItems.has("deal-outcome") || collapsedItems.has("closed-won")
+        }
+      }
+
+      // For simplified stages, derive status from Supabase data (confirmedAt)
+      let status = stageData?.status || "pending"
+      let isSkipped = false
+      if (SIMPLIFIED_STAGE_IDS.includes(stageConfig.id)) {
+        const simplifiedData = simplifiedStagesData[stageConfig.id as keyof typeof simplifiedStagesData]
+        if (simplifiedData?.confirmedAt) {
+          status = "completed"
+          isSkipped = (simplifiedData as SimplifiedStageSupabaseData).isSkipped || false
+        }
+      }
+
+      return {
+        id: stageConfig.id,
+        type: stageConfig.id,
+        title: stageConfig.title,
+        description: stageConfig.description,
+        status,
+        icon: stageConfig.icon,
+        automationLevel: "fully-automated" as const,
+        actions: {
+          manual: { label: "Upload Demo Transcript" }
+        },
+        isCollapsed: collapsedItems.has(stageConfig.id),
+        isSkipped // Add skipped flag to event
+      }
+    })
 
   // Calculate progress stats
   const totalStages = events.length
@@ -1018,7 +1157,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
                 <div className={cn(
                   "p-4 border-2 rounded-lg bg-background transition-all duration-300",
                   event.status === "completed" && event.isCollapsed ? "border-border bg-[#C8E4BB]/20" :
-                  event.status === "skipped" ? "border-border bg-gray-50/50 opacity-60" :
+                  event.status === "skipped" || event.isSkipped ? "border-border bg-gray-50/50 opacity-75" :
                   "border-border"
                 )}>
                   {/* Header */}
@@ -1026,7 +1165,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
                     <div className="flex items-center space-x-2">
                       <h3 className={cn(
                         "text-lg font-medium",
-                        event.status === "skipped" ? "line-through text-gray-500" : "text-foreground"
+                        event.status === "skipped" || event.isSkipped ? "text-gray-500" : "text-foreground"
                       )} style={{ fontFamily: "var(--font-heading)" }}>
                         {event.title}
                       </h3>
@@ -1040,11 +1179,17 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
                       </Button>
                     </div>
                     <div className="flex items-center gap-2">
+                      {/* Skipped indicator */}
+                      {event.isSkipped && event.status === "completed" && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200 italic">
+                          Skipped
+                        </span>
+                      )}
                       <span className={cn(
                         "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                        getStatusColor(event.status)
+                        event.isSkipped ? "bg-gray-100 text-gray-400 border border-gray-200" : getStatusColor(event.status)
                       )}>
-                        {getStatusIcon(event.status)} {getStatusLabel(event.status)}
+                        {getStatusIcon(event.status)} {event.isSkipped ? "Auto-Completed" : getStatusLabel(event.status)}
                       </span>
                       {/* Completion Date Icon with Tooltip */}
                       {event.status === "completed" && stageData?.completedAt && (
@@ -1072,9 +1217,9 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
                     <>
                       <p className={cn(
                         "text-sm mb-3",
-                        event.status === "skipped" ? "text-gray-500" : "text-muted-foreground"
+                        event.status === "skipped" || event.isSkipped ? "text-gray-400 italic" : "text-muted-foreground"
                       )} style={{ fontFamily: "var(--font-body)" }}>
-                        {event.description}
+                        {event.isSkipped ? "Deal moved past this stage" : event.description}
                       </p>
 
                       {/* Action Zone - Demo Call specific - use FileUpload component */}
@@ -1101,13 +1246,13 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
                       {/* Action Zone - Create Quote specific */}
                       {event.id === "create-quote" && renderCreateQuoteActions()}
 
-                      {/* Action Zone - Quote Sent specific */}
+                      {/* Action Zone - Quote Sent specific (simplified) */}
                       {event.id === "quote-sent" && renderQuoteSentActions()}
 
-                      {/* Action Zone - Quote Approved specific */}
-                      {event.id === "quote-approved" && renderQuoteApprovedActions()}
+                      {/* NOTE: quote-approved stage REMOVED - merged into quote-sent flow */}
+                      {/* Confirming quote-sent implies approval, Quote Declined goes to closed-lost */}
 
-                      {/* Action Zone - Prepare Engagement specific */}
+                      {/* Action Zone - Prepare Engagement specific (simplified) */}
                       {event.id === "prepare-engagement" && renderPrepareEngagementActions()}
 
                       {/* Action Zone - Internal Engagement Review specific */}
@@ -1116,11 +1261,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
                       {/* Action Zone - Send Engagement specific */}
                       {event.id === "send-engagement" && renderSendEngagementActions()}
 
-                      {/* Action Zone - Closed Won specific */}
-                      {event.id === "closed-won" && renderClosedWonActions()}
-
-                      {/* Action Zone - Closed Lost specific */}
-                      {event.id === "closed-lost" && renderClosedLostActions()}
+                      {/* Action Zone - Deal Outcome (combined Closed Won / Closed Lost) */}
+                      {event.id === "deal-outcome" && renderDealOutcomeActions()}
                     </>
                   )}
                 </div>
@@ -1343,169 +1485,250 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     )
   }
 
+  // ============================================
+  // SIMPLIFIED STAGE RENDER FUNCTIONS (Pizza Tracker)
+  // These stages use simple confirmation + HubSpot sync
+  // ============================================
+
+  // Quote Approved stage is REMOVED - merged into Quote Sent flow
+  // This stub prevents runtime errors for any existing references
+  function renderQuoteApprovedActions() {
+    return null
+  }
+
   function renderQuoteSentActions() {
-    const quoteSentStage = timelineState?.stages["quote-sent"]
-    if (!quoteSentStage) return null
-
-    const emailData = quoteSentStage.data
-    if (!emailData) return null
-
-    const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
-    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
-    const contactEmail = timelineState?.stages["sales-intake"]?.data?.formData?.emailAddress || ""
-    const totalMonthly = quoteLineItems.reduce((sum, item) => sum + (item.monthlyPrice || 0), 0)
     const hubspotQuoteLink = timelineState?.stages["create-quote"]?.data?.hubspotQuoteLink || null
+    const stageData = simplifiedStagesData["quote-sent"] || {
+      confirmedAt: null,
+      confirmedBy: null,
+      hubspotSyncedAt: null,
+      isAutoSynced: false
+    }
+
+    const simplifiedStageData: SimplifiedQuoteSentStageData = {
+      ...stageData,
+      hubspotQuoteLink
+    }
 
     return (
       <QuoteSent
-        emailData={emailData}
-        quoteLineItems={quoteLineItems}
-        companyName={companyName}
-        contactEmail={contactEmail}
-        totalMonthly={totalMonthly}
+        stageData={simplifiedStageData}
         hubspotQuoteLink={hubspotQuoteLink}
-        onInitialize={handleInitializeQuoteSentEmail}
-        onUpdate={handleUpdateQuoteSentEmail}
-        onSendViaHubspot={handleSendQuoteViaHubspot}
-        onEnrollInSequence={handleEnrollQuoteInSequence}
-        onUnenrollFromSequence={handleUnenrollQuoteFromSequence}
-        onRecordResponse={handleRecordQuoteResponse}
-      />
-    )
-  }
-
-  function renderQuoteApprovedActions() {
-    const quoteApprovedStage = timelineState?.stages["quote-approved"]
-    if (!quoteApprovedStage) return null
-
-    const approvalData = quoteApprovedStage.data
-    if (!approvalData) return null
-
-    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
-    const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
-    const totalMonthly = quoteLineItems.reduce((sum, item) => sum + item.monthlyPrice, 0)
-
-    return (
-      <QuoteApproved
-        approvalData={approvalData}
-        companyName={companyName}
-        totalMonthly={totalMonthly}
-        onUpdateNotes={handleUpdateQuoteApprovalNotes}
-        onSendAcknowledgment={handleSendQuoteAcknowledgment}
-        onMoveToEngagement={handleMoveToEngagement}
+        onConfirm={handleConfirmQuoteSent}
+        onQuoteDeclined={handleQuoteDeclined}
       />
     )
   }
 
   function renderPrepareEngagementActions() {
-    const prepareEngagementStage = timelineState?.stages["prepare-engagement"]
-    if (!prepareEngagementStage) return null
+    const stageData = simplifiedStagesData["prepare-engagement"] || {
+      confirmedAt: null,
+      confirmedBy: null,
+      hubspotSyncedAt: null,
+      isAutoSynced: false
+    }
 
-    const engagementData = prepareEngagementStage.data
-    if (!engagementData) return null
-
-    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+    const simplifiedStageData: SimplifiedPrepareEAStageData = {
+      ...stageData
+    }
 
     return (
       <PrepareEngagement
-        engagementData={engagementData}
-        companyName={companyName}
-        onStartGeneration={handleStartWalkthroughGeneration}
-        onCompleteGeneration={handleCompleteWalkthroughGeneration}
-        onUpdateWalkthrough={handleUpdateWalkthroughText}
-        onConfirmWalkthrough={handleConfirmWalkthrough}
+        stageData={simplifiedStageData}
+        onConfirm={handleConfirmPrepareEngagement}
       />
     )
   }
 
   function renderInternalEngagementReviewActions() {
-    const reviewStage = timelineState?.stages["internal-engagement-review"]
-    if (!reviewStage) return null
+    const stageData = simplifiedStagesData["internal-engagement-review"] || {
+      confirmedAt: null,
+      confirmedBy: null,
+      hubspotSyncedAt: null,
+      isAutoSynced: false
+    }
 
-    const reviewData = reviewStage.data
-    if (!reviewData) return null
-
-    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
-    const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
-    const totalMonthly = quoteLineItems.reduce((sum, item) => sum + item.monthlyPrice, 0)
-    const walkthroughText = timelineState?.stages["prepare-engagement"]?.data?.walkthroughText || ""
+    const simplifiedStageData: SimplifiedEAReadyForReviewStageData = {
+      ...stageData
+    }
 
     return (
-      <EAInternalReview
-        reviewData={reviewData}
-        companyName={companyName}
-        totalMonthly={totalMonthly}
-        walkthroughText={walkthroughText}
-        onInitialize={handleInitializeEAInternalReview}
-        onUpdateEmail={handleUpdateEAInternalReviewEmail}
-        onSendReview={handleSendEAInternalReview}
-        onMarkReadyToSend={handleMarkEAReadyToSend}
+      <EAReadyForReview
+        stageData={simplifiedStageData}
+        onConfirm={handleConfirmEAReadyForReview}
       />
     )
   }
 
   function renderSendEngagementActions() {
-    const sendEngagementStage = timelineState?.stages["send-engagement"]
-    if (!sendEngagementStage) return null
+    const stageData = simplifiedStagesData["send-engagement"] || {
+      confirmedAt: null,
+      confirmedBy: null,
+      hubspotSyncedAt: null,
+      isAutoSynced: false
+    }
 
-    const engagementData = sendEngagementStage.data
-    if (!engagementData) return null
+    const simplifiedStageData: SimplifiedEASentStageData = {
+      ...stageData
+    }
 
-    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
-    const contactName = timelineState?.stages["sales-intake"]?.data?.formData?.contactName || ""
-    const contactEmail = timelineState?.stages["sales-intake"]?.data?.formData?.emailAddress || ""
+    return (
+      <EASent
+        stageData={simplifiedStageData}
+        onConfirm={handleConfirmEASent}
+      />
+    )
+  }
+
+  function renderDealOutcomeActions() {
     const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
-    const totalMonthly = quoteLineItems.reduce((sum, item) => sum + item.monthlyPrice, 0)
+    const totalMonthly = quoteLineItems.reduce((sum, item) => sum + (item.monthlyPrice || 0), 0)
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+
+    // Get closed won data
+    const wonStageData = simplifiedStagesData["closed-won"] || {
+      confirmedAt: null,
+      confirmedBy: null,
+      hubspotSyncedAt: null,
+      isAutoSynced: false,
+      isSkipped: false,
+      skippedReason: null
+    }
+
+    const closedWonData: SimplifiedClosedWonStageData = {
+      ...wonStageData,
+      finalDealValue: totalMonthly
+    }
+
+    // Get closed lost data
+    const lostStageData = simplifiedStagesData["closed-lost"] as SimplifiedClosedLostStageData | undefined
+
+    const closedLostData: SimplifiedClosedLostStageData = {
+      confirmedAt: lostStageData?.confirmedAt || null,
+      confirmedBy: lostStageData?.confirmedBy || null,
+      hubspotSyncedAt: lostStageData?.hubspotSyncedAt || null,
+      isAutoSynced: lostStageData?.isAutoSynced || false,
+      isSkipped: lostStageData?.isSkipped || false,
+      skippedReason: lostStageData?.skippedReason || null,
+      lostReason: lostStageData?.lostReason || null,
+      lostReasonDetails: lostStageData?.lostReasonDetails || "",
+      lostFromStage: lostStageData?.lostFromStage || null
+    }
 
     return (
-      <SendEngagement
-        engagementData={engagementData}
+      <DealOutcome
+        closedWonData={closedWonData}
+        closedLostData={closedLostData}
         companyName={companyName}
-        contactName={contactName}
-        contactEmail={contactEmail}
-        totalMonthly={totalMonthly}
-        onInitializeEmail={handleInitializeEngagementEmail}
-        onUpdateEmail={handleUpdateEngagementEmail}
-        onSendViaHubspot={handleSendViaHubspotAndCloseWon}
+        onConfirmWon={handleConfirmClosedWon}
+        onConfirmLost={handleConfirmClosedLost}
       />
     )
   }
 
-  function renderClosedWonActions() {
-    const closedWonStage = timelineState?.stages["closed-won"]
-    if (!closedWonStage) return null
+  // ============================================
+  // SIMPLIFIED STAGE HANDLERS
+  // ============================================
 
-    const wonData = closedWonStage.data
-    if (!wonData) return null
-
-    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
-
-    return (
-      <ClosedWon
-        wonData={wonData}
-        companyName={companyName}
-        onUpdateNotes={handleUpdateClosingNotes}
-        onSyncToHubspot={handleSyncClosedWonToHubspot}
-      />
-    )
+  async function handleConfirmQuoteSent() {
+    setIsSimplifiedStageLoading(true)
+    try {
+      await confirmSimplifiedStage(deal.id, "quote-sent")
+      const updatedData = await getAllSimplifiedStagesData(deal.id)
+      setSimplifiedStagesData(updatedData)
+      await refreshState()
+    } catch (error) {
+      console.error("Error confirming quote sent:", error)
+    } finally {
+      setIsSimplifiedStageLoading(false)
+    }
   }
 
-  function renderClosedLostActions() {
-    const closedLostStage = timelineState?.stages["closed-lost"]
-    if (!closedLostStage) return null
+  async function handleQuoteDeclined() {
+    // Go directly to closed lost
+    setIsSimplifiedStageLoading(true)
+    try {
+      await confirmClosedLost(deal.id, "declined", "Quote was declined by prospect", "quote-sent")
+      const updatedData = await getAllSimplifiedStagesData(deal.id)
+      setSimplifiedStagesData(updatedData)
+      await refreshState()
+    } catch (error) {
+      console.error("Error marking quote declined:", error)
+    } finally {
+      setIsSimplifiedStageLoading(false)
+    }
+  }
 
-    const lostData = closedLostStage.data
-    if (!lostData) return null
+  async function handleConfirmPrepareEngagement() {
+    setIsSimplifiedStageLoading(true)
+    try {
+      await confirmSimplifiedStage(deal.id, "prepare-engagement")
+      const updatedData = await getAllSimplifiedStagesData(deal.id)
+      setSimplifiedStagesData(updatedData)
+      await refreshState()
+    } catch (error) {
+      console.error("Error confirming prepare engagement:", error)
+    } finally {
+      setIsSimplifiedStageLoading(false)
+    }
+  }
 
-    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+  async function handleConfirmEAReadyForReview() {
+    setIsSimplifiedStageLoading(true)
+    try {
+      await confirmSimplifiedStage(deal.id, "internal-engagement-review")
+      const updatedData = await getAllSimplifiedStagesData(deal.id)
+      setSimplifiedStagesData(updatedData)
+      await refreshState()
+    } catch (error) {
+      console.error("Error confirming EA ready for review:", error)
+    } finally {
+      setIsSimplifiedStageLoading(false)
+    }
+  }
 
-    return (
-      <ClosedLost
-        lostData={lostData}
-        companyName={companyName}
-        onUpdateDetails={handleMarkDealAsLost}
-        onSyncToHubspot={handleSyncClosedLostToHubspot}
-      />
-    )
+  async function handleConfirmEASent() {
+    setIsSimplifiedStageLoading(true)
+    try {
+      await confirmSimplifiedStage(deal.id, "send-engagement")
+      const updatedData = await getAllSimplifiedStagesData(deal.id)
+      setSimplifiedStagesData(updatedData)
+      await refreshState()
+    } catch (error) {
+      console.error("Error confirming EA sent:", error)
+    } finally {
+      setIsSimplifiedStageLoading(false)
+    }
+  }
+
+  async function handleConfirmClosedWon() {
+    setIsSimplifiedStageLoading(true)
+    try {
+      const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
+      const totalMonthly = quoteLineItems.reduce((sum, item) => sum + (item.monthlyPrice || 0), 0)
+      await confirmClosedWon(deal.id, totalMonthly)
+      const updatedData = await getAllSimplifiedStagesData(deal.id)
+      setSimplifiedStagesData(updatedData)
+      await refreshState()
+    } catch (error) {
+      console.error("Error confirming closed won:", error)
+    } finally {
+      setIsSimplifiedStageLoading(false)
+    }
+  }
+
+  async function handleConfirmClosedLost(reason: LostReason, details: string) {
+    setIsSimplifiedStageLoading(true)
+    try {
+      const currentStage = timelineState?.currentStage || "quote-sent"
+      await confirmClosedLost(deal.id, reason, details, currentStage)
+      const updatedData = await getAllSimplifiedStagesData(deal.id)
+      setSimplifiedStagesData(updatedData)
+      await refreshState()
+    } catch (error) {
+      console.error("Error confirming closed lost:", error)
+    } finally {
+      setIsSimplifiedStageLoading(false)
+    }
   }
 }

@@ -305,6 +305,7 @@ export interface GLReviewFormData {
   // Catchup Bookkeeping (required)
   catchupRequired: "yes" | "no" | ""
   catchupDateRange: string
+  catchupMonths: string  // Number of months for cleanup estimate (can be auto-calculated or manual)
 
   // Additional Notes
   additionalNotes: string
@@ -370,8 +371,9 @@ export interface QuoteLineItem {
   id: string
   service: string
   description: string
-  monthlyPrice: number
+  monthlyPrice: number  // For one-time items, this is the one-time price
   isCustom: boolean
+  isOneTime?: boolean   // True for one-time fees (e.g., cleanup), false/undefined for recurring
 }
 
 // Pricing Breakdown Item for structured display
@@ -525,6 +527,64 @@ export interface ClosedLostStageData {
   // HubSpot sync (placeholder)
   hubspotSynced: boolean
   hubspotSyncedAt: string | null
+}
+
+// ============================================
+// SIMPLIFIED STAGE DATA (for pizza tracker stages)
+// These stages only need confirmation timestamps
+// ============================================
+
+// Base simplified stage data - just tracks confirmation
+export interface SimplifiedStageData {
+  // Manual confirmation
+  confirmedAt: string | null
+  confirmedBy: string | null
+
+  // HubSpot auto-sync (when implemented)
+  hubspotSyncedAt: string | null
+  isAutoSynced: boolean
+
+  // Skipped status - for stages that were auto-completed because deal moved past them
+  isSkipped: boolean
+  skippedReason: string | null
+}
+
+// Simplified Quote Sent Stage Data - replaces complex QuoteSentStageData
+export interface SimplifiedQuoteSentStageData extends SimplifiedStageData {
+  // Keep reference to quote link from Create Quote
+  hubspotQuoteLink: string | null
+}
+
+// Simplified Prepare EA Stage Data - no additional fields needed
+export type SimplifiedPrepareEAStageData = SimplifiedStageData
+
+// Simplified EA Ready for Review Stage Data - no additional fields needed
+export type SimplifiedEAReadyForReviewStageData = SimplifiedStageData
+
+// Simplified EA Sent Stage Data - no additional fields needed
+export type SimplifiedEASentStageData = SimplifiedStageData
+
+// Simplified Closed Won Stage Data - keeps deal value display
+export interface SimplifiedClosedWonStageData extends SimplifiedStageData {
+  // Inherit deal value from Create Quote for display
+  finalDealValue: number | null
+}
+
+// Simplified Closed Lost Stage Data - keeps lost reason for tracking
+export interface SimplifiedClosedLostStageData extends SimplifiedStageData {
+  lostReason: LostReason | null
+  lostReasonDetails: string
+  lostFromStage: SalesPipelineStageId | null
+}
+
+// HubSpot stage name mapping for reminders
+export const HUBSPOT_STAGE_NAMES: Record<string, string> = {
+  "quote-sent": "SQO - Quote Sent",
+  "prepare-engagement": "Prepare EA",
+  "ea-ready-for-review": "EA Ready for Review",
+  "ea-sent": "EA Sent",
+  "closed-won": "Closed Won",
+  "closed-lost": "Closed Lost"
 }
 
 // Full Timeline State for a Deal
@@ -696,52 +756,51 @@ export const SALES_PIPELINE_STAGES: StageConfig[] = [
     icon: "calculator",
     actions: {}
   },
+  // ============================================
+  // SIMPLIFIED STAGES (Pizza Tracker)
+  // These stages auto-sync from HubSpot with manual fallback
+  // ============================================
   {
     id: "quote-sent",
-    title: "Quote Sent",
-    description: "The quote has been sent to the prospect. Follow-up reminders will be sent automatically every 3 business days until a response is received.",
+    title: "SQO - Quote Sent",
+    description: "Confirm that the quote has been sent to the prospect via HubSpot.",
     icon: "send",
     actions: {}
   },
-  {
-    id: "quote-approved",
-    title: "Quote Approved",
-    description: "The prospect has approved the quote. Prepare the engagement agreement in Ignition to proceed.",
-    icon: "check-circle",
-    actions: {}
-  },
+  // NOTE: quote-approved stage is REMOVED - merged into quote-sent flow
+  // Confirming quote-sent implies approval, Quote Declined goes to closed-lost
   {
     id: "prepare-engagement",
-    title: "Prepare Engagement Walkthrough",
-    description: "Generate an AI-powered engagement walkthrough document that outlines the services, pricing, and terms for the customer.",
+    title: "Prepare EA",
+    description: "Confirm that the Engagement Agreement has been prepared in Ignition.",
     icon: "file-text",
     actions: {}
   },
   {
     id: "internal-engagement-review",
-    title: "EA Internal Review",
-    description: "Send the engagement walkthrough to the internal team for review before sending to the customer.",
+    title: "EA Ready for Review",
+    description: "Confirm that the internal team has reviewed the Engagement Agreement.",
     icon: "user-check",
     actions: {}
   },
   {
     id: "send-engagement",
-    title: "Send Engagement",
-    description: "Send the finalized engagement agreement to the customer via Ignition. Follow-up reminders will be sent automatically until signed.",
+    title: "EA Sent",
+    description: "Confirm that the Engagement Agreement has been sent to the client.",
     icon: "file-signature",
     actions: {}
   },
   {
     id: "closed-won",
     title: "Closed Won",
-    description: "Congratulations! The deal has been successfully closed. The engagement is signed and the customer is ready for onboarding.",
+    description: "Congratulations! The deal has been successfully closed.",
     icon: "trophy",
     actions: {}
   },
   {
     id: "closed-lost",
     title: "Closed Lost",
-    description: "The deal has been marked as lost. Record the reason and any learnings for future reference.",
+    description: "The deal has been marked as lost. Record the reason for future reference.",
     icon: "x-circle",
     actions: {}
   }
@@ -1167,6 +1226,7 @@ export function createEmptyGLReviewFormData(): GLReviewFormData {
     activeClasses: "",
     catchupRequired: "",
     catchupDateRange: "",
+    catchupMonths: "",
     additionalNotes: ""
   }
 }
@@ -1196,6 +1256,7 @@ export function createTestGLReviewFormData(): GLReviewFormData {
     activeClasses: "4",
     catchupRequired: "yes",
     catchupDateRange: "January 2024 - Present",
+    catchupMonths: "12",
     additionalNotes: "Client has multiple Shopify stores for different product lines. Square is used for in-person events. Need to review bank feed rules for categorization accuracy."
   }
 }
@@ -1245,6 +1306,7 @@ export function createTestTeamGLReviewFormData(): GLReviewFormData {
     activeClasses: "5",  // Different from AI (4)
     catchupRequired: "yes",
     catchupDateRange: "October 2023 - Present",  // Different date range
+    catchupMonths: "15",  // Different from AI (12)
     additionalNotes: "Client has 2 Shopify stores (US and Canada). Amazon FBA account discovered with ~50 orders/month. Wells Fargo LOC was used for equipment financing in 2023. Need to set up proper class tracking for the 5 departments."
   }
 }
@@ -1267,6 +1329,7 @@ export function createBlankGLReviewFormData(): GLReviewFormData {
     activeClasses: "",
     catchupRequired: "",
     catchupDateRange: "",
+    catchupMonths: "",
     additionalNotes: ""
   }
 }

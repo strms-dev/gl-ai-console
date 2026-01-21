@@ -567,3 +567,292 @@ export async function resetCreateQuoteSupabase(
 ): Promise<void> {
   await deleteStageData(dealId, CREATE_QUOTE_STAGE_ID)
 }
+
+// ============================================
+// Simplified Stage Data Functions (Pizza Tracker)
+// These stages only store confirmation timestamps
+// ============================================
+
+export type SimplifiedStageId =
+  | 'quote-sent'
+  | 'prepare-engagement'
+  | 'internal-engagement-review'  // EA Ready for Review
+  | 'send-engagement'             // EA Sent
+  | 'closed-won'
+  | 'closed-lost'
+
+export interface SimplifiedStageSupabaseData {
+  confirmedAt: string | null
+  confirmedBy: string | null
+  hubspotSyncedAt: string | null
+  isAutoSynced: boolean
+  isSkipped: boolean
+  skippedReason: string | null
+}
+
+export interface ClosedLostSupabaseData extends SimplifiedStageSupabaseData {
+  // Note: inherits isSkipped, skippedReason from SimplifiedStageSupabaseData
+  lostReason: string | null
+  lostReasonDetails: string
+  lostFromStage: string | null
+}
+
+export interface ClosedWonSupabaseData extends SimplifiedStageSupabaseData {
+  // Note: inherits isSkipped, skippedReason from SimplifiedStageSupabaseData
+  finalDealValue: number | null
+}
+
+/**
+ * Get simplified stage data for a deal
+ */
+export async function getSimplifiedStageData(
+  dealId: string,
+  stageId: SimplifiedStageId
+): Promise<SimplifiedStageSupabaseData> {
+  const data = await getStageData(dealId, stageId)
+
+  return {
+    confirmedAt: (data.confirmed_at as string) || null,
+    confirmedBy: (data.confirmed_by as string) || null,
+    hubspotSyncedAt: (data.hubspot_synced_at as string) || null,
+    isAutoSynced: (data.is_auto_synced as boolean) || false,
+    isSkipped: (data.is_skipped as boolean) || false,
+    skippedReason: (data.skipped_reason as string) || null,
+  }
+}
+
+/**
+ * Get all simplified stages data for a deal (for initial load)
+ */
+export async function getAllSimplifiedStagesData(
+  dealId: string
+): Promise<Record<SimplifiedStageId, SimplifiedStageSupabaseData>> {
+  const stages: SimplifiedStageId[] = [
+    'quote-sent',
+    'prepare-engagement',
+    'internal-engagement-review',
+    'send-engagement',
+    'closed-won',
+    'closed-lost'
+  ]
+
+  const results: Record<string, SimplifiedStageSupabaseData> = {}
+
+  // Fetch all stages in parallel
+  const promises = stages.map(async (stageId) => {
+    const data = await getSimplifiedStageData(dealId, stageId)
+    return { stageId, data }
+  })
+
+  const responses = await Promise.all(promises)
+  for (const { stageId, data } of responses) {
+    results[stageId] = data
+  }
+
+  return results as Record<SimplifiedStageId, SimplifiedStageSupabaseData>
+}
+
+// Order of simplified stages for auto-complete logic
+// Note: closed-won and closed-lost are terminal outcomes, not in this order
+const SIMPLIFIED_STAGE_ORDER: SimplifiedStageId[] = [
+  'quote-sent',
+  'prepare-engagement',
+  'internal-engagement-review',
+  'send-engagement',
+]
+
+/**
+ * Auto-complete all prior stages when a later stage is confirmed
+ * This marks skipped stages as completed with a "skipped" indicator
+ */
+export async function autoCompletePriorStages(
+  dealId: string,
+  confirmedStageId: SimplifiedStageId,
+  syncedAt: string
+): Promise<void> {
+  // Handle terminal stages (closed-won/closed-lost) - auto-complete all stages in order
+  if (confirmedStageId === 'closed-won' || confirmedStageId === 'closed-lost') {
+    for (const stageId of SIMPLIFIED_STAGE_ORDER) {
+      const existing = await getSimplifiedStageData(dealId, stageId)
+      if (!existing.confirmedAt) {
+        await setStageDataBatch(dealId, stageId, {
+          confirmed_at: syncedAt,
+          confirmed_by: 'system',
+          is_auto_synced: true,
+          is_skipped: true,
+          skipped_reason: 'Deal moved past this stage',
+        })
+      }
+    }
+    return
+  }
+
+  // For non-terminal stages, find the index and complete all prior stages
+  const stageIndex = SIMPLIFIED_STAGE_ORDER.indexOf(confirmedStageId)
+  if (stageIndex <= 0) return // No prior stages to skip
+
+  const priorStages = SIMPLIFIED_STAGE_ORDER.slice(0, stageIndex)
+
+  for (const stageId of priorStages) {
+    const existing = await getSimplifiedStageData(dealId, stageId)
+    if (!existing.confirmedAt) {
+      await setStageDataBatch(dealId, stageId, {
+        confirmed_at: syncedAt,
+        confirmed_by: 'system',
+        is_auto_synced: true,
+        is_skipped: true,
+        skipped_reason: 'Deal moved past this stage',
+      })
+    }
+  }
+}
+
+/**
+ * Confirm a simplified stage (manual confirmation)
+ * Also auto-completes any prior stages that weren't completed
+ */
+export async function confirmSimplifiedStage(
+  dealId: string,
+  stageId: SimplifiedStageId,
+  confirmedBy?: string
+): Promise<void> {
+  const now = new Date().toISOString()
+
+  // First, auto-complete any prior stages that weren't completed
+  await autoCompletePriorStages(dealId, stageId, now)
+
+  // Then confirm this stage
+  await setStageDataBatch(dealId, stageId, {
+    confirmed_at: now,
+    confirmed_by: confirmedBy || null,
+    is_auto_synced: false,
+    is_skipped: false,
+    skipped_reason: null,
+  })
+}
+
+/**
+ * Mark stage as synced from HubSpot (auto-sync)
+ * Also auto-completes any prior stages that weren't completed
+ */
+export async function markStageHubspotSynced(
+  dealId: string,
+  stageId: SimplifiedStageId,
+  syncedAt: string
+): Promise<void> {
+  // First, auto-complete any prior stages that weren't completed
+  await autoCompletePriorStages(dealId, stageId, syncedAt)
+
+  // Then mark this stage as synced
+  await setStageDataBatch(dealId, stageId, {
+    confirmed_at: syncedAt,
+    hubspot_synced_at: syncedAt,
+    is_auto_synced: true,
+    is_skipped: false,
+    skipped_reason: null,
+  })
+}
+
+/**
+ * Get closed lost data
+ */
+export async function getClosedLostData(
+  dealId: string
+): Promise<ClosedLostSupabaseData> {
+  const data = await getStageData(dealId, 'closed-lost')
+
+  return {
+    confirmedAt: (data.confirmed_at as string) || null,
+    confirmedBy: (data.confirmed_by as string) || null,
+    hubspotSyncedAt: (data.hubspot_synced_at as string) || null,
+    isAutoSynced: (data.is_auto_synced as boolean) || false,
+    isSkipped: (data.is_skipped as boolean) || false,
+    skippedReason: (data.skipped_reason as string) || null,
+    lostReason: (data.lost_reason as string) || null,
+    lostReasonDetails: (data.lost_reason_details as string) || '',
+    lostFromStage: (data.lost_from_stage as string) || null,
+  }
+}
+
+/**
+ * Confirm closed lost with reason
+ * Also auto-completes any prior stages that weren't completed
+ */
+export async function confirmClosedLost(
+  dealId: string,
+  lostReason: string,
+  lostReasonDetails: string,
+  lostFromStage: string,
+  confirmedBy?: string
+): Promise<void> {
+  const now = new Date().toISOString()
+
+  // First, auto-complete any prior stages that weren't completed
+  await autoCompletePriorStages(dealId, 'closed-lost', now)
+
+  // Then confirm closed lost
+  await setStageDataBatch(dealId, 'closed-lost', {
+    confirmed_at: now,
+    confirmed_by: confirmedBy || null,
+    is_auto_synced: false,
+    is_skipped: false,
+    skipped_reason: null,
+    lost_reason: lostReason,
+    lost_reason_details: lostReasonDetails,
+    lost_from_stage: lostFromStage,
+  })
+}
+
+/**
+ * Get closed won data
+ */
+export async function getClosedWonData(
+  dealId: string
+): Promise<ClosedWonSupabaseData> {
+  const data = await getStageData(dealId, 'closed-won')
+
+  return {
+    confirmedAt: (data.confirmed_at as string) || null,
+    confirmedBy: (data.confirmed_by as string) || null,
+    hubspotSyncedAt: (data.hubspot_synced_at as string) || null,
+    isAutoSynced: (data.is_auto_synced as boolean) || false,
+    isSkipped: (data.is_skipped as boolean) || false,
+    skippedReason: (data.skipped_reason as string) || null,
+    finalDealValue: (data.final_deal_value as number) || null,
+  }
+}
+
+/**
+ * Confirm closed won with deal value
+ * Also auto-completes any prior stages that weren't completed
+ */
+export async function confirmClosedWon(
+  dealId: string,
+  finalDealValue: number | null,
+  confirmedBy?: string
+): Promise<void> {
+  const now = new Date().toISOString()
+
+  // First, auto-complete any prior stages that weren't completed
+  await autoCompletePriorStages(dealId, 'closed-won', now)
+
+  // Then confirm closed won
+  await setStageDataBatch(dealId, 'closed-won', {
+    confirmed_at: now,
+    confirmed_by: confirmedBy || null,
+    is_auto_synced: false,
+    is_skipped: false,
+    skipped_reason: null,
+    final_deal_value: finalDealValue,
+  })
+}
+
+/**
+ * Reset a simplified stage
+ */
+export async function resetSimplifiedStage(
+  dealId: string,
+  stageId: SimplifiedStageId
+): Promise<void> {
+  await deleteStageData(dealId, stageId)
+}

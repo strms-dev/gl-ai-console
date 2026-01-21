@@ -19,6 +19,7 @@ This is the **GrowthLab AI Console** - a Next.js 15 application that provides AI
 - Development server automatically handles port conflicts and will use next available port
 - **IMPORTANT**: User always handles running the development server in their own terminal - NEVER start npm run dev or any development server commands
 - **IMPORTANT**: NEVER run `npm run build` as a background task - it hangs indefinitely and returns "running" status forever. Only run builds in foreground if explicitly requested by the user.
+- **IMPORTANT**: When running `npm run build`, use a 60 second (60000ms) timeout. Builds can hang on this codebase and should be interrupted after 1 minute if not responding.
 - Only make code adjustments, do not run terminal commands unless specifically requested
 
 ### File Structure
