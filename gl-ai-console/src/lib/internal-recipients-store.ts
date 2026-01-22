@@ -14,6 +14,15 @@ export interface ManagedRecipient {
   createdAt: string
 }
 
+// Database row type (snake_case)
+interface TeamMemberRow {
+  id: string
+  name: string
+  email: string
+  is_active: boolean
+  created_at: string
+}
+
 // Get all managed recipients from Supabase
 export async function getManagedRecipients(): Promise<ManagedRecipient[]> {
   const { data, error } = await supabase
@@ -26,7 +35,7 @@ export async function getManagedRecipients(): Promise<ManagedRecipient[]> {
     return []
   }
 
-  return (data || []).map(row => ({
+  return ((data || []) as TeamMemberRow[]).map(row => ({
     id: row.id,
     name: row.name,
     email: row.email,
@@ -48,7 +57,7 @@ export async function getActiveRecipients(): Promise<ManagedRecipient[]> {
     return []
   }
 
-  return (data || []).map(row => ({
+  return ((data || []) as TeamMemberRow[]).map(row => ({
     id: row.id,
     name: row.name,
     email: row.email,
@@ -74,12 +83,13 @@ export async function addManagedRecipient(name: string, email: string): Promise<
     return null
   }
 
+  const row = data as TeamMemberRow
   return {
-    id: data.id,
-    name: data.name,
-    email: data.email,
-    isActive: data.is_active,
-    createdAt: data.created_at
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    isActive: row.is_active,
+    createdAt: row.created_at
   }
 }
 
@@ -108,12 +118,13 @@ export async function updateManagedRecipient(
     return null
   }
 
+  const row = data as TeamMemberRow
   return {
-    id: data.id,
-    name: data.name,
-    email: data.email,
-    isActive: data.is_active,
-    createdAt: data.created_at
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    isActive: row.is_active,
+    createdAt: row.created_at
   }
 }
 
@@ -147,7 +158,8 @@ export async function toggleRecipientActive(id: string): Promise<ManagedRecipien
   }
 
   // Toggle the active status
-  return updateManagedRecipient(id, { isActive: !current.is_active })
+  const row = current as { is_active: boolean }
+  return updateManagedRecipient(id, { isActive: !row.is_active })
 }
 
 // Check if email already exists in the pool
