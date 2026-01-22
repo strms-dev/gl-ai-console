@@ -1505,7 +1505,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
     const glReviewData = timelineState?.stages["gl-review-comparison"]?.data?.finalReviewData ||
                          timelineState?.stages["gl-review"]?.data?.formData || null
-    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.companyName
 
     return (
       <CreateQuote
@@ -1624,7 +1624,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   function renderDealOutcomeActions() {
     const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
     const totalMonthly = quoteLineItems.reduce((sum, item) => sum + (item.monthlyPrice || 0), 0)
-    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.company
+    const companyName = timelineState?.stages["sales-intake"]?.data?.formData?.companyName || deal.companyName
 
     // Get closed won data
     const wonStageData = simplifiedStagesData["closed-won"] || {
