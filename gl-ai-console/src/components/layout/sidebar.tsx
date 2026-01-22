@@ -5,12 +5,13 @@ import { usePathname } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Wrench, RotateCw, Home, Code, AlertCircle, Users, Clock, Folder, ChevronDown, ChevronRight, User, UserX, LucideIcon, Filter } from "lucide-react"
+import { Wrench, RotateCw, Home, Code, AlertCircle, Users, Clock, Folder, ChevronDown, ChevronRight, User, UserX, LucideIcon, Filter, Megaphone, PenTool } from "lucide-react"
 import { useState, useEffect } from "react"
 
 const departments = [
   { name: "STRMS", href: "/strms/home", icon: "strms", active: true },
   { name: "RevOps", href: "/revops/home", icon: "revops", active: true },
+  { name: "Marketing", href: "/marketing/home", icon: "marketing", active: true },
 ]
 
 interface NavigationItem {
@@ -39,6 +40,9 @@ const departmentNavigation: Record<string, NavigationItem[]> = {
     { name: "Sales Funnel", href: "/revops/sales-funnel", icon: "funnel" },
     { name: "Sales Pipeline", href: "/revops/sales-pipeline", icon: "rotate-cw" },
   ],
+  marketing: [
+    { name: "Content Engine", href: "/marketing/content-engine", icon: "pen-tool" },
+  ],
 }
 
 // Icon mapping function
@@ -57,6 +61,7 @@ const getIconComponent = (iconName: string): LucideIcon => {
     'chevron-down': ChevronDown,
     'chevron-right': ChevronRight,
     'funnel': Filter,
+    'pen-tool': PenTool,
   }
   return iconMap[iconName] || RotateCw
 }
@@ -76,6 +81,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   const getCurrentDepartment = () => {
     if (pathname.startsWith('/strms')) return 'strms'
     if (pathname.startsWith('/revops')) return 'revops'
+    if (pathname.startsWith('/marketing')) return 'marketing'
     return null
   }
 
@@ -249,13 +255,17 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                       "flex items-center justify-center",
                       isCollapsed ? "w-6 h-6" : "w-6 h-6 mr-3"
                     )}>
-                      <Image
-                        src={dept.icon === 'strms' ? '/strms-logo-square.png' : '/tim-cxr-logo.png'}
-                        alt={dept.name}
-                        width={24}
-                        height={24}
-                        className="object-contain"
-                      />
+                      {dept.icon === 'marketing' ? (
+                        <Megaphone className="w-5 h-5" />
+                      ) : (
+                        <Image
+                          src={dept.icon === 'strms' ? '/strms-logo-square.png' : '/tim-cxr-logo.png'}
+                          alt={dept.name}
+                          width={24}
+                          height={24}
+                          className="object-contain"
+                        />
+                      )}
                     </div>
                     {!isCollapsed && dept.name}
                   </Link>
