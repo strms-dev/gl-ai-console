@@ -445,9 +445,10 @@ export function EAInternalReview({
       <ManageTeamModal
         isOpen={showManageTeamModal}
         onClose={() => setShowManageTeamModal(false)}
-        onRecipientsUpdated={() => {
+        onRecipientsUpdated={async () => {
           // Refresh recipients
-          const activeRecipients = getActiveRecipients()
+          const activeRecipients = await getActiveRecipients()
+          setAvailableRecipients(activeRecipients)
           const stillActiveSelected = selectedRecipients.filter(
             sr => activeRecipients.some(ar => ar.email === sr.email)
           )
