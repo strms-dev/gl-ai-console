@@ -87,36 +87,50 @@ export function EAInternalReview({
   const [emailSubject, setEmailSubject] = useState("")
   const [emailBody, setEmailBody] = useState("")
   const [selectedRecipients, setSelectedRecipients] = useState<{ name: string; email: string }[]>([])
+  const [availableRecipients, setAvailableRecipients] = useState<{ name: string; email: string }[]>([])
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [showManageTeamModal, setShowManageTeamModal] = useState(false)
 
   // Use ref to track if we've already initialized
   const hasInitialized = useRef(false)
 
+  // Load available recipients on mount
+  useEffect(() => {
+    const loadRecipients = async () => {
+      const recipients = await getActiveRecipients()
+      setAvailableRecipients(recipients)
+    }
+    loadRecipients()
+  }, [])
+
   // Initialize email template when component mounts
   useEffect(() => {
-    if (!reviewData.emailBody && walkthroughText && !hasInitialized.current) {
-      hasInitialized.current = true
+    const initializeEmail = async () => {
+      if (!reviewData.emailBody && walkthroughText && !hasInitialized.current) {
+        hasInitialized.current = true
 
-      console.log("Initializing EA Internal Review email")
+        console.log("Initializing EA Internal Review email")
 
-      // Generate email template
-      const { subject, body } = generateInternalReviewEmail(
-        companyName,
-        totalMonthly,
-        walkthroughText
-      )
+        // Generate email template
+        const { subject, body } = generateInternalReviewEmail(
+          companyName,
+          totalMonthly,
+          walkthroughText
+        )
 
-      setEmailSubject(subject)
-      setEmailBody(body)
+        setEmailSubject(subject)
+        setEmailBody(body)
 
-      // Get default recipients
-      const activeRecipients = getActiveRecipients()
-      setSelectedRecipients(activeRecipients)
+        // Get default recipients (async)
+        const activeRecipients = await getActiveRecipients()
+        setSelectedRecipients(activeRecipients)
 
-      // Initialize in store
-      onInitialize(activeRecipients)
+        // Initialize in store
+        onInitialize(activeRecipients)
+      }
     }
+
+    initializeEmail()
 
     // Reset the flag if email body is cleared
     if (!reviewData.emailBody) {
@@ -269,7 +283,7 @@ export function EAInternalReview({
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {getActiveRecipients().map((recipient) => {
+                {availableRecipients.map((recipient) => {
                   const isSelected = selectedRecipients.some(r => r.email === recipient.email)
                   return (
                     <button
@@ -286,7 +300,7 @@ export function EAInternalReview({
                     </button>
                   )
                 })}
-                {getActiveRecipients().length === 0 && (
+                {availableRecipients.length === 0 && (
                   <p className="text-xs text-muted-foreground italic">
                     No team members configured.
                   </p>
