@@ -338,7 +338,7 @@ export function estimateCatchupMonths(dateRange: string): number {
 
   // Try to find year-month patterns
   const datePatterns = dateRange.match(/(\d{4}[-/]\d{1,2})/g) || []
-  if (datePatterns.length >= 2) {
+  if (datePatterns.length >= 2 && datePatterns[0] && datePatterns[1]) {
     const start = new Date(datePatterns[0])
     const end = new Date(datePatterns[1])
     if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
