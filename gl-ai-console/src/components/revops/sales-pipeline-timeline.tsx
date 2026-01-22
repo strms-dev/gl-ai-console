@@ -893,8 +893,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   }, [deal.id, refreshState])
 
   // Quote Sent Handlers
-  const handleInitializeQuoteSentEmail = useCallback(async (subject: string, body: string) => {
-    await initializeQuoteSentEmail(deal.id, subject, body)
+  const handleInitializeQuoteSentEmail = useCallback(async (recipientEmail: string) => {
+    await initializeQuoteSentEmail(deal.id, recipientEmail)
     await refreshState()
   }, [deal.id, refreshState])
 
