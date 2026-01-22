@@ -445,10 +445,16 @@ export function GLReviewForm({
                     <span className="ml-2 font-medium">{getDisplayValue(YES_NO_OPTIONS, localData.catchupRequired)}</span>
                   </div>
                   {localData.catchupRequired === "yes" && (
-                    <div>
-                      <span className="text-muted-foreground">Date Range:</span>
-                      <span className="ml-2 font-medium">{localData.catchupDateRange || "-"}</span>
-                    </div>
+                    <>
+                      <div>
+                        <span className="text-muted-foreground">Date Range:</span>
+                        <span className="ml-2 font-medium">{localData.catchupDateRange || "-"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Number of Months:</span>
+                        <span className="ml-2 font-medium">{localData.catchupMonths || "-"}</span>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -672,6 +678,24 @@ export function GLReviewForm({
               </div>
             )}
           </div>
+
+          {localData.catchupRequired === "yes" && (
+            <div className="space-y-2">
+              {renderLabel("catchupMonths", "Number of Months", true)}
+              <Input
+                id="catchupMonths"
+                type="number"
+                min="1"
+                value={localData.catchupMonths || ""}
+                onChange={(e) => handleFieldChange("catchupMonths", e.target.value)}
+                placeholder="e.g., 12"
+                className="border-gray-300 focus:border-[#407B9D] focus:ring-[#407B9D] max-w-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter the number of months that need cleanup (used for pricing calculation).
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Additional Notes */}

@@ -2,27 +2,27 @@
 
 import { SimplifiedStageCard } from "./simplified-stage-card"
 import {
-  SimplifiedPrepareEAStageData,
+  SimplifiedEAReadyForReviewStageData,
   HUBSPOT_STAGE_NAMES
 } from "@/lib/sales-pipeline-timeline-types"
 
-interface PrepareEngagementProps {
-  stageData: SimplifiedPrepareEAStageData
+interface EAReadyForReviewProps {
+  stageData: SimplifiedEAReadyForReviewStageData
   onConfirm: () => void
   onReset?: () => void
 }
 
-export function PrepareEngagement({
+export function EAReadyForReview({
   stageData,
   onConfirm,
   onReset
-}: PrepareEngagementProps) {
+}: EAReadyForReviewProps) {
   return (
     <SimplifiedStageCard
-      stageTitle="Prepare EA"
-      hubspotStageName={HUBSPOT_STAGE_NAMES["prepare-engagement"]}
-      description="Confirm that the Engagement Agreement has been prepared in Ignition."
-      confirmButtonLabel="Confirm EA Prepared"
+      stageTitle="EA Ready for Review"
+      hubspotStageName={HUBSPOT_STAGE_NAMES["ea-ready-for-review"]}
+      description="Confirm that the internal team has reviewed the Engagement Agreement."
+      confirmButtonLabel="Confirm Review Complete"
       isConfirmed={!!stageData.confirmedAt}
       confirmedAt={stageData.confirmedAt || undefined}
       isAutoSynced={stageData.isAutoSynced}

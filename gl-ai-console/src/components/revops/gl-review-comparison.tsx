@@ -80,6 +80,7 @@ const FIELD_LABELS: Record<keyof GLReviewFormData, string> = {
   activeClasses: "Active Classes",
   catchupRequired: "Catchup Bookkeeping Required",
   catchupDateRange: "Catchup Date Range",
+  catchupMonths: "Number of Months",
   additionalNotes: "Additional Notes"
 }
 
@@ -91,6 +92,7 @@ const EDITABLE_FIELDS: (keyof GLReviewFormData)[] = [
   "coaRevenueCategories",
   "activeClasses",
   "catchupDateRange",
+  "catchupMonths",
   "additionalNotes",
   "revenueCoaAllocations",
   "catchupRequired",

@@ -16,6 +16,7 @@ function formDataToDbColumns(formData: GLReviewFormData): Partial<RevOpsGLReview
     active_classes: formData.activeClasses || null,
     catchup_required: formData.catchupRequired || null,
     catchup_date_range: formData.catchupDateRange || null,
+    catchup_months: formData.catchupMonths || null,
     additional_notes: formData.additionalNotes || null,
   }
 }
@@ -32,6 +33,7 @@ function dbRowToFormData(row: {
   active_classes: string | null
   catchup_required: string | null
   catchup_date_range: string | null
+  catchup_months: string | null
   additional_notes: string | null
 }): GLReviewFormData {
   // Parse accounts from JSONB
@@ -57,6 +59,7 @@ function dbRowToFormData(row: {
     activeClasses: (row.active_classes || '') as GLReviewFormData['activeClasses'],
     catchupRequired: (row.catchup_required || '') as GLReviewFormData['catchupRequired'],
     catchupDateRange: row.catchup_date_range || '',
+    catchupMonths: row.catchup_months || '',
     additionalNotes: row.additional_notes || '',
   }
 }

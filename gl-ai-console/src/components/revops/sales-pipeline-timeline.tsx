@@ -51,6 +51,7 @@ import {
   confirmSimplifiedStage,
   confirmClosedLost,
   confirmClosedWon,
+  resetSimplifiedStage,
   type SimplifiedStageSupabaseData
 } from "@/lib/supabase/revops-stage-data"
 import { supabase } from "@/lib/supabase/client"
@@ -128,6 +129,7 @@ import {
   updateLostReasonDetails,
   markClosedLostSyncedToHubspot
 } from "@/lib/sales-pipeline-timeline-store"
+import { updatePipelineDeal } from "@/lib/revops-pipeline-store"
 import { SalesIntakeForm } from "@/components/revops/sales-intake-form"
 import { FollowUpEmail } from "@/components/revops/follow-up-email"
 import { ReminderSequence } from "@/components/revops/reminder-sequence"
@@ -283,16 +285,26 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       let firstPendingStageId: string | null = null
 
       // Find the first stage that is not completed
+      // Note: closed-won and closed-lost are rendered as synthetic "deal-outcome" stage
       for (const stageConfig of SALES_PIPELINE_STAGES) {
+        // Skip closed-lost as it's part of deal-outcome
+        if (stageConfig.id === "closed-lost") continue
+
         const stageData = state.stages[stageConfig.id as SalesPipelineStageId]
         if (!firstPendingStageId && stageData?.status !== "completed") {
-          firstPendingStageId = stageConfig.id
+          // Map closed-won to deal-outcome
+          firstPendingStageId = stageConfig.id === "closed-won" ? "deal-outcome" : stageConfig.id
         }
       }
 
       // Collapse all stages except the first pending one
       for (const stageConfig of SALES_PIPELINE_STAGES) {
-        if (stageConfig.id !== firstPendingStageId) {
+        // Map closed-won and closed-lost to deal-outcome (synthetic ID)
+        if (stageConfig.id === "closed-won" || stageConfig.id === "closed-lost") {
+          if (firstPendingStageId !== "deal-outcome") {
+            collapsed.add("deal-outcome")
+          }
+        } else if (stageConfig.id !== firstPendingStageId) {
           collapsed.add(stageConfig.id)
         }
       }
@@ -521,12 +533,22 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
   // Toggle collapse for a stage - only one stage can be expanded at a time
   const toggleCollapse = (id: string) => {
     setCollapsedItems(prev => {
-      const isCurrentlyCollapsed = prev.has(id)
+      // Handle deal-outcome as a synthetic ID that maps to closed-won/closed-lost
+      const isDealOutcome = id === "deal-outcome"
+      const isCurrentlyCollapsed = isDealOutcome
+        ? (prev.has("deal-outcome") || prev.has("closed-won"))
+        : prev.has(id)
+
       // If expanding this stage, collapse all others
       if (isCurrentlyCollapsed) {
         const newSet = new Set<string>()
         for (const stageConfig of SALES_PIPELINE_STAGES) {
-          if (stageConfig.id !== id) {
+          // Map closed-won and closed-lost to deal-outcome (synthetic ID)
+          if (stageConfig.id === "closed-won" || stageConfig.id === "closed-lost") {
+            if (id !== "deal-outcome") {
+              newSet.add("deal-outcome")
+            }
+          } else if (stageConfig.id !== id) {
             newSet.add(stageConfig.id)
           }
         }
@@ -534,7 +556,11 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       } else {
         // If collapsing, add it to collapsed set
         const newSet = new Set(prev)
-        newSet.add(id)
+        if (isDealOutcome) {
+          newSet.add("deal-outcome")
+        } else {
+          newSet.add(id)
+        }
         return newSet
       }
     })
@@ -1128,6 +1154,19 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         const stageData = timelineState.stages[event.id as SalesPipelineStageId]
         const StageIcon = getStageIcon(event.icon)
 
+        // Get completion date from appropriate source:
+        // - For deal-outcome: check closed-won or closed-lost confirmedAt
+        // - For simplified stages (quote-sent through send-engagement): use simplifiedStagesData confirmedAt
+        // - For regular stages: use stageData completedAt
+        let completedAt: string | null = null
+        if (event.id === "deal-outcome") {
+          completedAt = simplifiedStagesData["closed-won"]?.confirmedAt || simplifiedStagesData["closed-lost"]?.confirmedAt || null
+        } else if (SIMPLIFIED_STAGE_IDS.includes(event.id)) {
+          completedAt = simplifiedStagesData[event.id]?.confirmedAt || null
+        } else {
+          completedAt = stageData?.completedAt || null
+        }
+
         return (
           <div key={event.id} className="relative transition-all duration-300">
             {/* Connector Line */}
@@ -1192,12 +1231,12 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
                         {getStatusIcon(event.status)} {event.isSkipped ? "Auto-Completed" : getStatusLabel(event.status)}
                       </span>
                       {/* Completion Date Icon with Tooltip */}
-                      {event.status === "completed" && stageData?.completedAt && (
+                      {event.status === "completed" && completedAt && (
                         <div className="group relative">
                           <Calendar className="w-4 h-4 text-gray-400 cursor-help" />
                           <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-50 w-max max-w-xs">
                             <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-lg">
-                              Completed: {new Date(stageData.completedAt).toLocaleString('en-US', {
+                              Completed: {new Date(completedAt).toLocaleString('en-US', {
                                 month: 'short',
                                 day: 'numeric',
                                 year: 'numeric',
@@ -1516,6 +1555,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         hubspotQuoteLink={hubspotQuoteLink}
         onConfirm={handleConfirmQuoteSent}
         onQuoteDeclined={handleQuoteDeclined}
+        onReset={() => handleResetStage("quote-sent")}
       />
     )
   }
@@ -1536,6 +1576,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       <PrepareEngagement
         stageData={simplifiedStageData}
         onConfirm={handleConfirmPrepareEngagement}
+        onReset={() => handleResetStage("prepare-engagement")}
       />
     )
   }
@@ -1556,6 +1597,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       <EAReadyForReview
         stageData={simplifiedStageData}
         onConfirm={handleConfirmEAReadyForReview}
+        onReset={() => handleResetStage("internal-engagement-review")}
       />
     )
   }
@@ -1576,6 +1618,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       <EASent
         stageData={simplifiedStageData}
         onConfirm={handleConfirmEASent}
+        onReset={() => handleResetStage("send-engagement")}
       />
     )
   }
@@ -1622,6 +1665,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
         companyName={companyName}
         onConfirmWon={handleConfirmClosedWon}
         onConfirmLost={handleConfirmClosedLost}
+        onResetWon={() => handleResetStage("closed-won")}
+        onResetLost={() => handleResetStage("closed-lost")}
       />
     )
   }
@@ -1634,6 +1679,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     setIsSimplifiedStageLoading(true)
     try {
       await confirmSimplifiedStage(deal.id, "quote-sent")
+      // Update automation stage to next pending stage
+      await updatePipelineDeal(deal.id, { stage: "Prepare Engagement Walkthrough" })
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1649,6 +1696,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     setIsSimplifiedStageLoading(true)
     try {
       await confirmClosedLost(deal.id, "declined", "Quote was declined by prospect", "quote-sent")
+      // Update automation stage to Closed Lost
+      await updatePipelineDeal(deal.id, { stage: "Closed Lost" })
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1663,6 +1712,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     setIsSimplifiedStageLoading(true)
     try {
       await confirmSimplifiedStage(deal.id, "prepare-engagement")
+      // Update automation stage to next pending stage
+      await updatePipelineDeal(deal.id, { stage: "EA Internal Review" })
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1677,6 +1728,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     setIsSimplifiedStageLoading(true)
     try {
       await confirmSimplifiedStage(deal.id, "internal-engagement-review")
+      // Update automation stage to next pending stage
+      await updatePipelineDeal(deal.id, { stage: "Send Engagement" })
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1691,6 +1744,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     setIsSimplifiedStageLoading(true)
     try {
       await confirmSimplifiedStage(deal.id, "send-engagement")
+      // Update automation stage to Deal Outcome (Closed Won pending)
+      await updatePipelineDeal(deal.id, { stage: "Closed Won" })
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1707,6 +1762,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
       const totalMonthly = quoteLineItems.reduce((sum, item) => sum + (item.monthlyPrice || 0), 0)
       await confirmClosedWon(deal.id, totalMonthly)
+      // Update automation stage to Closed Won
+      await updatePipelineDeal(deal.id, { stage: "Closed Won" })
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1722,11 +1779,44 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     try {
       const currentStage = timelineState?.currentStage || "quote-sent"
       await confirmClosedLost(deal.id, reason, details, currentStage)
+      // Update automation stage to Closed Lost
+      await updatePipelineDeal(deal.id, { stage: "Closed Lost" })
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
     } catch (error) {
       console.error("Error confirming closed lost:", error)
+    } finally {
+      setIsSimplifiedStageLoading(false)
+    }
+  }
+
+  // RESET HANDLERS
+  // ============================================
+  // Mapping of stage IDs to their display names for automation stage update
+  const STAGE_DISPLAY_NAMES: Record<string, string> = {
+    "quote-sent": "Quote Sent",
+    "prepare-engagement": "Prepare Engagement Walkthrough",
+    "internal-engagement-review": "EA Internal Review",
+    "send-engagement": "Send Engagement",
+    "closed-won": "Closed Won",
+    "closed-lost": "Closed Lost",
+  }
+
+  async function handleResetStage(stageId: string) {
+    setIsSimplifiedStageLoading(true)
+    try {
+      await resetSimplifiedStage(deal.id, stageId as "quote-sent" | "prepare-engagement" | "internal-engagement-review" | "send-engagement" | "closed-won" | "closed-lost")
+      // Update automation stage to the reset stage (so it becomes the current pending stage)
+      const displayName = STAGE_DISPLAY_NAMES[stageId]
+      if (displayName) {
+        await updatePipelineDeal(deal.id, { stage: displayName })
+      }
+      const updatedData = await getAllSimplifiedStagesData(deal.id)
+      setSimplifiedStagesData(updatedData)
+      await refreshState()
+    } catch (error) {
+      console.error(`Error resetting stage ${stageId}:`, error)
     } finally {
       setIsSimplifiedStageLoading(false)
     }

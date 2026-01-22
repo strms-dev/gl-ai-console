@@ -54,7 +54,8 @@ import {
   updateLineItemSupabase,
   removeLineItemSupabase,
   updateHubspotSyncSupabase,
-  markQuoteConfirmedSupabase
+  markQuoteConfirmedSupabase,
+  getAllSimplifiedStagesData
 } from "./supabase/revops-stage-data"
 import {
   fetchGLReviewByDealIdAndType,
@@ -261,11 +262,292 @@ function saveAllTimelines(timelines: Record<string, SalesPipelineTimelineState>)
 }
 
 /**
+ * Rebuild timeline state from Supabase data
+ * This is used when localStorage is empty but Supabase has data
+ */
+async function rebuildTimelineStateFromSupabase(dealId: string): Promise<SalesPipelineTimelineState | null> {
+  console.log(`[rebuildTimelineStateFromSupabase] Rebuilding state for deal ${dealId} from Supabase`)
+
+  // Start with initial state
+  const state = createInitialTimelineState(dealId)
+
+  // Track stage completion for determining current stage
+  const stageOrder: SalesPipelineStageId[] = [
+    "demo-call",
+    "sales-intake",
+    "follow-up-email",
+    "reminder-sequence",
+    "internal-review",
+    "gl-review",
+    "gl-review-comparison",
+    "create-quote",
+    "quote-sent",
+    "prepare-engagement",
+    "internal-engagement-review",
+    "send-engagement",
+    "closed-won",
+    "closed-lost"
+  ]
+
+  let hasAnyData = false
+  let currentStage: SalesPipelineStageId = "demo-call"
+
+  try {
+    // 1. Fetch Sales Intake data
+    const salesIntakeData = await fetchSalesIntakeByDealId(dealId)
+    if (salesIntakeData) {
+      hasAnyData = true
+      state.stages["sales-intake"].data = {
+        formData: salesIntakeData.formData,
+        isAutoFilled: salesIntakeData.isAutoFilled,
+        autoFilledAt: salesIntakeData.autoFilledAt,
+        confirmedAt: salesIntakeData.confirmedAt,
+        fieldConfidence: salesIntakeData.fieldConfidence
+      }
+      if (salesIntakeData.isConfirmed && salesIntakeData.confirmedAt) {
+        state.stages["sales-intake"].status = "completed"
+        state.stages["sales-intake"].completedAt = salesIntakeData.confirmedAt
+        // Demo call must be completed if sales intake is confirmed
+        state.stages["demo-call"].status = "completed"
+        state.stages["demo-call"].completedAt = salesIntakeData.autoFilledAt || salesIntakeData.confirmedAt
+        currentStage = "follow-up-email"
+      } else if (salesIntakeData.formData) {
+        state.stages["demo-call"].status = "completed"
+        state.stages["sales-intake"].status = "in_progress"
+        currentStage = "sales-intake"
+      }
+    }
+
+    // 2. Fetch Follow-Up Email data
+    const followUpData = await fetchFollowUpEmailByDealId(dealId)
+    if (followUpData) {
+      hasAnyData = true
+      state.stages["follow-up-email"].data = {
+        templateType: followUpData.template_type as "warm" | "cold" | null,
+        toEmail: followUpData.to_email || "",
+        ccEmail: followUpData.cc_email || "",
+        emailSubject: followUpData.email_subject || "",
+        emailBody: followUpData.email_body || "",
+        isEdited: followUpData.is_edited || false,
+        sentAt: followUpData.sent_at,
+        hubspotDealMoved: followUpData.hubspot_deal_moved || false,
+        hubspotDealMovedAt: followUpData.hubspot_deal_moved_at
+      }
+      if (followUpData.sent_at) {
+        state.stages["follow-up-email"].status = "completed"
+        state.stages["follow-up-email"].completedAt = followUpData.sent_at
+        currentStage = "reminder-sequence"
+      }
+    }
+
+    // 3. Fetch Reminder Sequence data
+    const reminderData = await getReminderSequenceData(dealId)
+    if (reminderData.enrolled_at || reminderData.access_received_at || reminderData.status !== "not_enrolled") {
+      hasAnyData = true
+      state.stages["reminder-sequence"].data = {
+        status: reminderData.status as "not_enrolled" | "enrolled" | "unenrolled" | "access_received",
+        platform: reminderData.platform,
+        enrolledAt: reminderData.enrolled_at,
+        unenrolledAt: reminderData.unenrolled_at,
+        accessReceivedAt: reminderData.access_received_at
+      }
+      if (reminderData.access_received_at) {
+        state.stages["reminder-sequence"].status = "completed"
+        state.stages["reminder-sequence"].completedAt = reminderData.access_received_at
+        currentStage = "internal-review"
+      } else if (reminderData.status !== "not_enrolled") {
+        state.stages["reminder-sequence"].status = "in_progress"
+        currentStage = "reminder-sequence"
+      }
+    }
+
+    // 4. Fetch Internal Review data
+    const internalReviewData = await getInternalReviewData(dealId)
+    if (internalReviewData.sent_at || internalReviewData.email_body) {
+      hasAnyData = true
+      const recipientsArray = internalReviewData.recipients ? JSON.parse(JSON.stringify(internalReviewData.recipients)) : []
+      state.stages["internal-review"].data = {
+        recipients: Array.isArray(recipientsArray) ? recipientsArray : [],
+        ccTimEnabled: true,
+        emailSubject: internalReviewData.email_subject || "",
+        emailBody: internalReviewData.email_body || "",
+        isEdited: internalReviewData.is_edited || false,
+        sentAt: internalReviewData.sent_at,
+        reviewAssignedTo: internalReviewData.assigned_to,
+        reviewCompletedAt: internalReviewData.completed_at,
+        reviewNotes: internalReviewData.review_notes
+      }
+      if (internalReviewData.sent_at) {
+        state.stages["internal-review"].status = "completed"
+        state.stages["internal-review"].completedAt = internalReviewData.sent_at
+        currentStage = "gl-review"
+      }
+    }
+
+    // 5. Fetch GL Review data
+    const glReviews = await fetchAllGLReviewsByDealId(dealId)
+    const aiReview = glReviews.find(r => r.review_type === "ai")
+    const teamReview = glReviews.find(r => r.review_type === "team")
+    const finalReview = glReviews.find(r => r.review_type === "final")
+
+    if (aiReview) {
+      hasAnyData = true
+      state.stages["gl-review"].data = {
+        formData: aiReview.form_data as GLReviewFormData | null,
+        isAutoFilled: true,
+        autoFilledAt: aiReview.created_at,
+        confirmedAt: aiReview.confirmed_at,
+        fieldConfidence: aiReview.field_confidence as GLReviewFieldConfidence | null
+      }
+      if (aiReview.confirmed_at) {
+        state.stages["gl-review"].status = "completed"
+        state.stages["gl-review"].completedAt = aiReview.confirmed_at
+        currentStage = "gl-review-comparison"
+      }
+    }
+
+    if (teamReview || finalReview) {
+      hasAnyData = true
+      state.stages["gl-review-comparison"].data = {
+        teamReviewData: teamReview ? (teamReview.form_data as GLReviewFormData) : null,
+        teamReviewSubmittedAt: teamReview?.created_at || null,
+        teamReviewSubmittedBy: teamReview?.submitted_by || null,
+        aiReviewData: aiReview ? (aiReview.form_data as GLReviewFormData) : null,
+        finalReviewData: finalReview ? (finalReview.form_data as GLReviewFormData) : null,
+        fieldSelections: finalReview?.field_selections as GLReviewComparisonSelections | null,
+        customValues: finalReview?.custom_values as GLReviewCustomValues | null,
+        comparisonCompletedAt: finalReview?.confirmed_at || null,
+        movedToCreateQuoteAt: finalReview?.confirmed_at || null
+      }
+      if (finalReview?.confirmed_at) {
+        state.stages["gl-review-comparison"].status = "completed"
+        state.stages["gl-review-comparison"].completedAt = finalReview.confirmed_at
+        currentStage = "create-quote"
+      }
+    }
+
+    // 6. Fetch Create Quote data
+    const quoteData = await getCreateQuoteData(dealId)
+    if (quoteData.line_items || quoteData.quote_confirmed_at) {
+      hasAnyData = true
+      const lineItemsArray = quoteData.line_items ? JSON.parse(JSON.stringify(quoteData.line_items)) : []
+      state.stages["create-quote"].data = {
+        accountingMonthlyPrice: quoteData.accounting_monthly_price,
+        accountingPriceCalculatedAt: quoteData.accounting_price_calculated_at,
+        accountingPriceBreakdown: quoteData.accounting_price_breakdown,
+        lineItems: Array.isArray(lineItemsArray) ? lineItemsArray : [],
+        isEdited: quoteData.is_edited || false,
+        hubspotSynced: quoteData.hubspot_synced || false,
+        hubspotSyncedAt: quoteData.hubspot_synced_at,
+        hubspotQuoteLink: quoteData.hubspot_quote_link,
+        quoteConfirmedAt: quoteData.quote_confirmed_at
+      }
+      if (quoteData.quote_confirmed_at) {
+        state.stages["create-quote"].status = "completed"
+        state.stages["create-quote"].completedAt = quoteData.quote_confirmed_at
+        currentStage = "quote-sent"
+      }
+    }
+
+    // 7. Fetch Simplified Stages data (quote-sent through closed-won/lost)
+    const simplifiedStagesData = await getAllSimplifiedStagesData(dealId)
+
+    // Quote Sent
+    if (simplifiedStagesData["quote-sent"]?.confirmedAt) {
+      hasAnyData = true
+      state.stages["quote-sent"].status = "completed"
+      state.stages["quote-sent"].completedAt = simplifiedStagesData["quote-sent"].confirmedAt
+      currentStage = "prepare-engagement"
+    }
+
+    // Prepare Engagement
+    if (simplifiedStagesData["prepare-engagement"]?.confirmedAt) {
+      hasAnyData = true
+      state.stages["prepare-engagement"].status = "completed"
+      state.stages["prepare-engagement"].completedAt = simplifiedStagesData["prepare-engagement"].confirmedAt
+      currentStage = "internal-engagement-review"
+    }
+
+    // Internal Engagement Review
+    if (simplifiedStagesData["internal-engagement-review"]?.confirmedAt) {
+      hasAnyData = true
+      state.stages["internal-engagement-review"].status = "completed"
+      state.stages["internal-engagement-review"].completedAt = simplifiedStagesData["internal-engagement-review"].confirmedAt
+      currentStage = "send-engagement"
+    }
+
+    // Send Engagement
+    if (simplifiedStagesData["send-engagement"]?.confirmedAt) {
+      hasAnyData = true
+      state.stages["send-engagement"].status = "completed"
+      state.stages["send-engagement"].completedAt = simplifiedStagesData["send-engagement"].confirmedAt
+      currentStage = "closed-won" // Or closed-lost, will be determined next
+    }
+
+    // Closed Won
+    if (simplifiedStagesData["closed-won"]?.confirmedAt && !simplifiedStagesData["closed-won"].isSkipped) {
+      hasAnyData = true
+      state.stages["closed-won"].status = "completed"
+      state.stages["closed-won"].completedAt = simplifiedStagesData["closed-won"].confirmedAt
+      currentStage = "closed-won"
+    }
+
+    // Closed Lost
+    if (simplifiedStagesData["closed-lost"]?.confirmedAt && !simplifiedStagesData["closed-lost"].isSkipped) {
+      hasAnyData = true
+      state.stages["closed-lost"].status = "completed"
+      state.stages["closed-lost"].completedAt = simplifiedStagesData["closed-lost"].confirmedAt
+      currentStage = "closed-lost"
+    }
+
+    // If no data found in Supabase, return null
+    if (!hasAnyData) {
+      console.log(`[rebuildTimelineStateFromSupabase] No data found in Supabase for deal ${dealId}`)
+      return null
+    }
+
+    // Set current stage
+    state.currentStage = currentStage
+
+    // Update status for current stage to in_progress if not completed
+    if (state.stages[currentStage].status === "pending") {
+      state.stages[currentStage].status = "in_progress"
+    }
+
+    console.log(`[rebuildTimelineStateFromSupabase] Successfully rebuilt state for deal ${dealId}, current stage: ${currentStage}`)
+    return state
+  } catch (error) {
+    console.error(`[rebuildTimelineStateFromSupabase] Error rebuilding state for deal ${dealId}:`, error)
+    return null
+  }
+}
+
+/**
  * Get timeline state for a specific deal
+ * First checks localStorage, then falls back to rebuilding from Supabase
  */
 export async function getTimelineState(dealId: string): Promise<SalesPipelineTimelineState | null> {
   const timelines = getAllTimelines()
-  return timelines[dealId] || null
+  const localState = timelines[dealId]
+
+  // If we have local state, return it
+  if (localState) {
+    return localState
+  }
+
+  // If no local state, try to rebuild from Supabase
+  console.log(`[getTimelineState] No localStorage data for deal ${dealId}, attempting to rebuild from Supabase`)
+  const supabaseState = await rebuildTimelineStateFromSupabase(dealId)
+
+  // If we got state from Supabase, save it to localStorage for future use
+  if (supabaseState) {
+    console.log(`[getTimelineState] Rebuilt state from Supabase, saving to localStorage`)
+    timelines[dealId] = supabaseState
+    saveAllTimelines(timelines)
+    return supabaseState
+  }
+
+  return null
 }
 
 /**
@@ -2319,6 +2601,9 @@ export async function resetGLReviewComparison(
 /**
  * Initialize create quote stage with calculated pricing using the full pricing calculator.
  * Fetches data from both Sales Intake (Supabase) and GL Review (timeline state).
+ *
+ * IMPORTANT: This function checks if data already exists in Supabase before initializing.
+ * If data exists, it loads from Supabase instead of overwriting.
  */
 export async function initializeCreateQuote(
   dealId: string
@@ -2327,6 +2612,49 @@ export async function initializeCreateQuote(
   const existing = timelines[dealId]
 
   if (!existing) return null
+
+  // CRITICAL: Check if quote data already exists in Supabase before overwriting
+  // This prevents losing data when localStorage is cleared and component re-mounts
+  try {
+    const existingQuoteData = await getCreateQuoteData(dealId)
+    if (existingQuoteData && existingQuoteData.accountingMonthlyPrice) {
+      console.log("Create quote data already exists in Supabase, loading instead of re-initializing")
+
+      // Update localStorage with Supabase data
+      existing.stages["create-quote"].data = {
+        accountingMonthlyPrice: existingQuoteData.accountingMonthlyPrice,
+        accountingPriceCalculatedAt: existingQuoteData.accountingPriceCalculatedAt,
+        accountingPriceBreakdown: existingQuoteData.accountingPriceBreakdown,
+        accountingPriceBreakdownData: existingQuoteData.accountingPriceBreakdownData,
+        accountingMethod: existingQuoteData.accountingMethod,
+        recommendedCadence: existingQuoteData.recommendedCadence,
+        appliedMultiplier: existingQuoteData.appliedMultiplier,
+        priorityMultiplier: existingQuoteData.priorityMultiplier,
+        cleanupEstimate: existingQuoteData.cleanupEstimate,
+        lineItems: existingQuoteData.lineItems || [],
+        isEdited: existingQuoteData.isEdited,
+        hubspotSynced: existingQuoteData.hubspotSynced,
+        hubspotSyncedAt: existingQuoteData.hubspotSyncedAt,
+        hubspotQuoteLink: existingQuoteData.hubspotQuoteLink,
+        quoteConfirmedAt: existingQuoteData.quoteConfirmedAt
+      }
+
+      // Update stage status based on quote confirmation
+      if (existingQuoteData.quoteConfirmedAt) {
+        existing.stages["create-quote"].status = "completed"
+        existing.stages["create-quote"].completedAt = existingQuoteData.quoteConfirmedAt
+      } else {
+        existing.stages["create-quote"].status = "in_progress"
+      }
+
+      existing.updatedAt = new Date().toISOString()
+      saveAllTimelines(timelines)
+      return existing
+    }
+  } catch (error) {
+    console.error("Error checking existing quote data:", error)
+    // Continue with initialization if check fails
+  }
 
   const now = new Date().toISOString()
 
@@ -2401,7 +2729,8 @@ export async function initializeCreateQuote(
       service: "Cleanup/Catchup Bookkeeping",
       description: "One-time cleanup fee (estimate)",
       monthlyPrice: pricingResult.cleanupEstimate,
-      isCustom: false
+      isCustom: false,
+      isOneTime: true
     })
   }
 
@@ -2605,6 +2934,65 @@ export async function pushQuoteToHubspot(
     }
   } catch (error) {
     console.error("Error calling HubSpot quote webhook:", error)
+    return null
+  }
+}
+
+/**
+ * Load create quote data from Supabase and update local state
+ * This is called on page load to restore the stage state from Supabase
+ */
+export async function loadCreateQuoteFromSupabase(
+  dealId: string
+): Promise<SalesPipelineTimelineState | null> {
+  try {
+    const data = await getCreateQuoteData(dealId)
+
+    if (!data) {
+      return null
+    }
+
+    const timelines = getAllTimelines()
+    const existing = timelines[dealId]
+
+    if (!existing) {
+      return null
+    }
+
+    // Update data from Supabase
+    existing.stages["create-quote"].data = {
+      accountingMonthlyPrice: data.accountingMonthlyPrice,
+      accountingPriceCalculatedAt: data.accountingPriceCalculatedAt,
+      accountingPriceBreakdown: data.accountingPriceBreakdown,
+      accountingPriceBreakdownData: data.accountingPriceBreakdownData,
+      accountingMethod: data.accountingMethod,
+      recommendedCadence: data.recommendedCadence,
+      appliedMultiplier: data.appliedMultiplier,
+      priorityMultiplier: data.priorityMultiplier,
+      cleanupEstimate: data.cleanupEstimate,
+      lineItems: data.lineItems || [],
+      isEdited: data.isEdited,
+      hubspotSynced: data.hubspotSynced,
+      hubspotSyncedAt: data.hubspotSyncedAt,
+      hubspotQuoteLink: data.hubspotQuoteLink,
+      quoteConfirmedAt: data.quoteConfirmedAt
+    }
+
+    // Update stage status based on quote confirmation
+    if (data.quoteConfirmedAt) {
+      existing.stages["create-quote"].status = "completed"
+      existing.stages["create-quote"].completedAt = data.quoteConfirmedAt
+    } else if (data.accountingMonthlyPrice) {
+      // If we have pricing data but not confirmed, stage should be in_progress
+      if (existing.stages["create-quote"].status === "pending") {
+        existing.stages["create-quote"].status = "in_progress"
+      }
+    }
+
+    saveAllTimelines(timelines)
+    return existing
+  } catch (error) {
+    console.error("Error loading create quote data from Supabase:", error)
     return null
   }
 }

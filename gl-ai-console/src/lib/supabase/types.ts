@@ -465,6 +465,7 @@ export interface Database {
           active_classes: string | null
           catchup_required: string | null
           catchup_date_range: string | null
+          catchup_months: string | null
           additional_notes: string | null
           field_confidence: Json
           qbo_client_name: string | null
@@ -495,6 +496,7 @@ export interface Database {
           active_classes?: string | null
           catchup_required?: string | null
           catchup_date_range?: string | null
+          catchup_months?: string | null
           additional_notes?: string | null
           field_confidence?: Json
           qbo_client_name?: string | null
@@ -525,6 +527,7 @@ export interface Database {
           active_classes?: string | null
           catchup_required?: string | null
           catchup_date_range?: string | null
+          catchup_months?: string | null
           additional_notes?: string | null
           field_confidence?: Json
           qbo_client_name?: string | null

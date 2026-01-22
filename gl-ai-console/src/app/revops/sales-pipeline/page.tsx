@@ -88,6 +88,8 @@ export default function SalesPipelinePage() {
     firstName: "",
     lastName: "",
     email: "",
+    hsDealId: "",
+    hsDealUrl: "",
   })
 
   // Loading state
@@ -114,6 +116,8 @@ export default function SalesPipelinePage() {
         firstName: editingDeal.firstName || "",
         lastName: editingDeal.lastName || "",
         email: editingDeal.email || "",
+        hsDealId: editingDeal.hsDealId || "",
+        hsDealUrl: editingDeal.hsDealUrl || "",
       })
     } else {
       setFormData({
@@ -122,6 +126,8 @@ export default function SalesPipelinePage() {
         firstName: "",
         lastName: "",
         email: "",
+        hsDealId: "",
+        hsDealUrl: "",
       })
     }
   }, [editingDeal, showDealForm])
@@ -179,6 +185,8 @@ export default function SalesPipelinePage() {
           firstName: formData.firstName || null,
           lastName: formData.lastName || null,
           email: formData.email || null,
+          hsDealId: formData.hsDealId || null,
+          hsDealUrl: formData.hsDealUrl || null,
         })
       } else {
         // Add new deal with default stage values (auto-filled)
@@ -190,8 +198,8 @@ export default function SalesPipelinePage() {
           email: formData.email || null,
           stage: "Demo Call", // Default automation stage (first stage in timeline)
           hsStage: "MQO - Meeting Booked", // Default HubSpot stage
-          hsDealId: null, // No HubSpot deal ID initially
-          hsDealUrl: null, // No HubSpot deal URL initially
+          hsDealId: formData.hsDealId || null, // Optional HubSpot deal ID
+          hsDealUrl: formData.hsDealUrl || null, // Optional HubSpot deal URL
         })
       }
 
@@ -486,6 +494,28 @@ export default function SalesPipelinePage() {
                     onChange={(e) =>
                       setFormData({ ...formData, email: e.target.value })
                     }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hsDealId">HubSpot Deal ID (Optional)</Label>
+                  <Input
+                    id="hsDealId"
+                    value={formData.hsDealId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, hsDealId: e.target.value })
+                    }
+                    placeholder="e.g., 12345678"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hsDealUrl">HubSpot Deal URL (Optional)</Label>
+                  <Input
+                    id="hsDealUrl"
+                    value={formData.hsDealUrl}
+                    onChange={(e) =>
+                      setFormData({ ...formData, hsDealUrl: e.target.value })
+                    }
+                    placeholder="e.g., https://app.hubspot.com/contacts/..."
                   />
                 </div>
               </div>

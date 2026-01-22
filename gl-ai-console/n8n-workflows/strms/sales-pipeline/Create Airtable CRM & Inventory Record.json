@@ -1,0 +1,769 @@
+{
+  "name": "Create Airtable CRM & Inventory Record",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "create-airtable-records",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1e522b6b-c8ae-4360-92a0-aabd72a8adc7",
+      "name": "Catch Project ID",
+      "webhookId": "0b4c8d12-b128-433b-826f-1d00d8602a42"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "strms_projects",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.body.project_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        256,
+        0
+      ],
+      "id": "41b28824-892e-410b-b459-07b96ea737d4",
+      "name": "Get Project Details",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "strms_project_stage_data",
+        "limit": 100,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "project_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Catch Project ID').item.json.body.project_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        464,
+        0
+      ],
+      "id": "76e41cb0-a838-414d-808c-0f0e73aaf6f5",
+      "name": "Get Project Stage Data",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items and extract the JSON payload\nconst records = $input.all().map(item => item.json);\n\n// Find matching entry\nconst match = records.find(\n  item => item.stage_id === \"decision\" && item.data_key === \"decision_made\"\n);\n\n// Get decision_value or null\nconst decision_value = match ? match.data_value : null;\n\n// Default values\nlet developerEmail = null;\nlet devSingleSelect = null;\n\n// Map decision to dev info\nif (decision_value === \"proceed_nick\") {\n  developerEmail = \"n.sementilli@strms.io\";\n  devSingleSelect = \"Nic\";\n} else if (decision_value === \"proceed_gon\") {\n  developerEmail = \"g.alvarezdetoledo@strms.io\";\n  devSingleSelect = \"Gon\";\n}\n\n// Return result in proper n8n format\nreturn [\n  {\n    json: {\n      decision_value,\n      developerEmail,\n      devSingleSelect,\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "5062cce6-5ccc-485a-bd8c-7c6884a7d58f",
+      "name": "Return Developer Email & Single Select"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "app8VjdmxfiRZeeRj",
+          "mode": "list",
+          "cachedResultName": "STRMS Database",
+          "cachedResultUrl": "https://airtable.com/app8VjdmxfiRZeeRj"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl1hebVOHDUAuAda",
+          "mode": "list",
+          "cachedResultName": "CRM",
+          "cachedResultUrl": "https://airtable.com/app8VjdmxfiRZeeRj/tbl1hebVOHDUAuAda"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Active": true,
+            "Company Name": "={{ $('Get Project Details').first().json.company }}",
+            "Customer First Name": "={{ $('Get Project Details').first().json.contact_name.split(' ')[0] }}",
+            "Customer Contact Email for Errors": "={{ $('Get Project Details').first().json.email }}",
+            "Maintained by": "={{ $json.developerEmail }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Customer First Name",
+              "displayName": "Customer First Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Customer Contact Email for Errors",
+              "displayName": "Customer Contact Email for Errors",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Errors Log",
+              "displayName": "Errors Log",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Automations Projects",
+              "displayName": "Automations Projects",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Automations Inventory",
+              "displayName": "Automations Inventory",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Maintained by",
+              "displayName": "Maintained by",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Active",
+              "displayName": "Active",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        0
+      ],
+      "id": "c5cb21f9-f45c-40ed-965a-99b72aef727b",
+      "name": "Create STRMS CRM Record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "vnpUxlVC6KBOGtEk",
+          "name": "Automation Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "app8VjdmxfiRZeeRj",
+          "mode": "list",
+          "cachedResultName": "STRMS Database",
+          "cachedResultUrl": "https://airtable.com/app8VjdmxfiRZeeRj"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblam7uH599SKSI6Y",
+          "mode": "list",
+          "cachedResultName": "Automations Inventory",
+          "cachedResultUrl": "https://airtable.com/app8VjdmxfiRZeeRj/tblam7uH599SKSI6Y"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "LIVE",
+            "Company Name": "=[\"{{ $json.id }}\"]",
+            "Type": "STRMS - Customer",
+            "Owner": "={{ $('Return Developer Email & Single Select').item.json.devSingleSelect }}",
+            "Internal Customer Name": "={{ $('Get Project Details').first().json.company }}",
+            "Project Name": "={{ $('Get Project Details').first().json.project_name }}",
+            "Platform": "n8n",
+            "Last Modified by API": "=\"{{ new Date().toISOString().split('T')[0] }}\""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Autonumber",
+              "displayName": "Autonumber",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "LIVE",
+                  "value": "LIVE"
+                },
+                {
+                  "name": "TURNED OFF",
+                  "value": "TURNED OFF"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Type",
+              "displayName": "Type",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "GL Internal - RevOps",
+                  "value": "GL Internal - RevOps"
+                },
+                {
+                  "name": "GL Internal - Accounting",
+                  "value": "GL Internal - Accounting"
+                },
+                {
+                  "name": "GL Internal - Corporate",
+                  "value": "GL Internal - Corporate"
+                },
+                {
+                  "name": "STRMS - Internal",
+                  "value": "STRMS - Internal"
+                },
+                {
+                  "name": "STRMS - Customer",
+                  "value": "STRMS - Customer"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Owner",
+              "displayName": "Owner",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Gon",
+                  "value": "Gon"
+                },
+                {
+                  "name": "Nic",
+                  "value": "Nic"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Internal Customer Name",
+              "displayName": "Internal Customer Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Project Name",
+              "displayName": "Project Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Platform",
+              "displayName": "Platform",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Make",
+                  "value": "Make"
+                },
+                {
+                  "name": "Zapier",
+                  "value": "Zapier"
+                },
+                {
+                  "name": "Prismatic",
+                  "value": "Prismatic"
+                },
+                {
+                  "name": "Vercel - v0",
+                  "value": "Vercel - v0"
+                },
+                {
+                  "name": "n8n",
+                  "value": "n8n"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Documentation",
+              "displayName": "Documentation",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Apps Used",
+              "displayName": "Apps Used",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "options": [
+                {
+                  "name": "Stripe",
+                  "value": "Stripe"
+                },
+                {
+                  "name": "TripleSeat",
+                  "value": "TripleSeat"
+                },
+                {
+                  "name": "Kindful",
+                  "value": "Kindful"
+                },
+                {
+                  "name": "QBO",
+                  "value": "QBO"
+                },
+                {
+                  "name": "Pipedrive",
+                  "value": "Pipedrive"
+                },
+                {
+                  "name": "Hubspot",
+                  "value": "Hubspot"
+                },
+                {
+                  "name": "Xero",
+                  "value": "Xero"
+                },
+                {
+                  "name": "Zoho",
+                  "value": "Zoho"
+                },
+                {
+                  "name": "Salesforce",
+                  "value": "Salesforce"
+                },
+                {
+                  "name": "Airtable",
+                  "value": "Airtable"
+                },
+                {
+                  "name": "Claude",
+                  "value": "Claude"
+                },
+                {
+                  "name": "Chat GPT",
+                  "value": "Chat GPT"
+                },
+                {
+                  "name": "Vimeo",
+                  "value": "Vimeo"
+                },
+                {
+                  "name": "Firebase",
+                  "value": "Firebase"
+                },
+                {
+                  "name": "Email",
+                  "value": "Email"
+                },
+                {
+                  "name": "Slack",
+                  "value": "Slack"
+                },
+                {
+                  "name": "Teams",
+                  "value": "Teams"
+                },
+                {
+                  "name": "Jotform",
+                  "value": "Jotform"
+                },
+                {
+                  "name": "Ramp",
+                  "value": "Ramp"
+                },
+                {
+                  "name": "Supabase",
+                  "value": "Supabase"
+                },
+                {
+                  "name": "Google Sheets",
+                  "value": "Google Sheets"
+                },
+                {
+                  "name": "Google Forms",
+                  "value": "Google Forms"
+                },
+                {
+                  "name": "MoGo",
+                  "value": "MoGo"
+                },
+                {
+                  "name": "Radar API",
+                  "value": "Radar API"
+                },
+                {
+                  "name": "Gmail",
+                  "value": "Gmail"
+                },
+                {
+                  "name": "Karbon",
+                  "value": "Karbon"
+                },
+                {
+                  "name": "Google Groups",
+                  "value": "Google Groups"
+                },
+                {
+                  "name": "Clay",
+                  "value": "Clay"
+                },
+                {
+                  "name": "Mineral",
+                  "value": "Mineral"
+                },
+                {
+                  "name": "Fireflies",
+                  "value": "Fireflies"
+                },
+                {
+                  "name": "Affinda",
+                  "value": "Affinda"
+                },
+                {
+                  "name": "Google Drive",
+                  "value": "Google Drive"
+                },
+                {
+                  "name": "asana",
+                  "value": "asana"
+                },
+                {
+                  "name": "Google Calendar",
+                  "value": "Google Calendar"
+                },
+                {
+                  "name": "Zapier",
+                  "value": "Zapier"
+                },
+                {
+                  "name": "Bursale",
+                  "value": "Bursale"
+                },
+                {
+                  "name": "Azure",
+                  "value": "Azure"
+                },
+                {
+                  "name": "MailChimp",
+                  "value": "MailChimp"
+                },
+                {
+                  "name": "ADP",
+                  "value": "ADP"
+                },
+                {
+                  "name": "Ignition",
+                  "value": "Ignition"
+                },
+                {
+                  "name": "Keap",
+                  "value": "Keap"
+                },
+                {
+                  "name": "Toast",
+                  "value": "Toast"
+                },
+                {
+                  "name": "Outlook",
+                  "value": "Outlook"
+                },
+                {
+                  "name": "Intuit Practice Manager",
+                  "value": "Intuit Practice Manager"
+                },
+                {
+                  "name": "Excel",
+                  "value": "Excel"
+                },
+                {
+                  "name": "Smart Vault",
+                  "value": "Smart Vault"
+                },
+                {
+                  "name": "ClickUp",
+                  "value": "ClickUp"
+                },
+                {
+                  "name": "Anko",
+                  "value": "Anko"
+                },
+                {
+                  "name": "Keeper",
+                  "value": "Keeper"
+                },
+                {
+                  "name": "Notion",
+                  "value": "Notion"
+                },
+                {
+                  "name": "Thanks",
+                  "value": "Thanks"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Last Modified",
+              "displayName": "Last Modified",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Last Modified by API",
+              "displayName": "Last Modified by API",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1088,
+        0
+      ],
+      "id": "8b18cf6c-2e36-4ea9-8804-4e7d8e9208b2",
+      "name": "Create STRMS Automation Inventory Record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "vnpUxlVC6KBOGtEk",
+          "name": "Automation Airtable Account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Catch Project ID": {
+      "main": [
+        [
+          {
+            "node": "Get Project Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Project Details": {
+      "main": [
+        [
+          {
+            "node": "Get Project Stage Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Project Stage Data": {
+      "main": [
+        [
+          {
+            "node": "Return Developer Email & Single Select",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Developer Email & Single Select": {
+      "main": [
+        [
+          {
+            "node": "Create STRMS CRM Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create STRMS CRM Record": {
+      "main": [
+        [
+          {
+            "node": "Create STRMS Automation Inventory Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/New_York",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
+  },
+  "versionId": "3f2f5fc5-33b9-4e50-99ac-9d7c03a731ae",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "HOuyoO105o1tuCHF",
+  "tags": []
+}

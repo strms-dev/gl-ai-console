@@ -54,6 +54,7 @@ export interface PricingInput {
   activeClasses: string  // '0' to '10'
   catchupRequired: "yes" | "no" | ""
   catchupDateRange: string
+  catchupMonths: string  // Direct number of months (preferred) or empty to calculate from date range
 }
 
 // ============================================================================
@@ -324,8 +325,9 @@ function calculateEcommercePricing(
 
 /**
  * Estimate months from catchup date range
+ * Exported so it can be used in the GL Review form for auto-calculation
  */
-function estimateCatchupMonths(dateRange: string): number {
+export function estimateCatchupMonths(dateRange: string): number {
   if (!dateRange) return 0
 
   // Try to parse date range like "Jan 2024 - Dec 2024" or "2024-01 to 2024-12"
@@ -526,7 +528,10 @@ export function calculateAccountingPrice(input: PricingInput): PricingResult {
   let cleanupEstimate: number | null = null
   if (input.catchupRequired === "yes") {
     const intensity = CLEANUP_INTENSITY[accountingMethod] || 0.3
-    const months = estimateCatchupMonths(input.catchupDateRange)
+    // Use direct catchupMonths if provided, otherwise fall back to parsing date range
+    const months = input.catchupMonths && parseInt(input.catchupMonths) > 0
+      ? parseInt(input.catchupMonths)
+      : estimateCatchupMonths(input.catchupDateRange)
     if (months > 0) {
       cleanupEstimate = Math.round(monthlyPrice * intensity * months)
     }
@@ -576,7 +581,8 @@ export function buildPricingInput(
     revenueCoaAllocations: glReview?.revenueCoaAllocations || "",
     activeClasses: glReview?.activeClasses || "",
     catchupRequired: glReview?.catchupRequired || "",
-    catchupDateRange: glReview?.catchupDateRange || ""
+    catchupDateRange: glReview?.catchupDateRange || "",
+    catchupMonths: glReview?.catchupMonths || ""
   }
 }
 

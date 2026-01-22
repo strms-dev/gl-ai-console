@@ -1,0 +1,370 @@
+{
+  "name": "Push GL Demo To Supabase",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gl-demo-transcript-complete",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a893fec9-467b-4ad8-bbd5-e7f2d86d1d05",
+      "name": "GL Demo Transcript Complete",
+      "webhookId": "e6c283ad-d42f-4e91-8a0f-b32ba2a80e96"
+    },
+    {
+      "parameters": {
+        "transcriptId": "={{ $json.body.meetingId }}"
+      },
+      "type": "@firefliesai/n8n-nodes-fireflies.fireflies",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "45e0d53d-6609-4c92-990a-f8612c70c6f6",
+      "name": "Get Transcript Details",
+      "credentials": {
+        "firefliesApi": {
+          "id": "JwI8ZgmTBobwj6cR",
+          "name": "Nick Fireflies API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const transcript = $input.item.json.data;\n\nif (!transcript) {\n  throw new Error('No transcript data found');\n}\n\nconst transcriptText = (transcript.sentences || [])\n  .map(s => `${s.speaker_name}: ${s.text}`)\n  .join('\\n');\n\n// Build a flat list of participant emails (handles arrays + comma-separated strings)\nconst excludedDomains = ['growthlabfinancial.com', 'strms.io'];\n\nconst participantEmails = Array.isArray(transcript.participants)\n  ? transcript.participants\n      .flatMap(p => String(p).split(',')) // in case any entry is comma-separated\n      .map(e => e.trim())\n      .filter(Boolean)\n  : [];\n\nconst leadEmail =\n  participantEmails.find(email => {\n    const domain = email.split('@')[1]?.toLowerCase();\n    return domain && !excludedDomains.includes(domain);\n  }) || null;\n\nreturn {\n  json: {\n    transcript_id: transcript.id,\n    title: transcript.title,\n    meeting_date: transcript.date,\n    transcript_url: transcript.transcript_url,\n    transcript_text: transcriptText,\n    leadEmail\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "a1f6199c-2a68-4fe9-8b2b-930651ce759c",
+      "name": "Extract Transcript Data"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "revops_pipeline_deals",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "condition": "eq",
+              "keyValue": "={{ $json.leadEmail }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "id": "62c665b4-685a-4664-a566-03c5d247c42f",
+      "name": "Search For Participant Email",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const dealId = $input.first().json.id;\nconst transcriptText = $('Extract Transcript Data').first().json.transcript_text;\nconst dealName = $input.first().json.deal_name;\nconst meetingDate = new Date($('Extract Transcript Data').first().json.meeting_date);\nconst company = $input.first().json.company_name;\n\n// Create timestamp and sanitized name\nconst timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];\nconst sanitizeddealName = dealName\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '_')\n  .replace(/^_+|_+$/g, '')\n  .substring(0, 50);\n\n// File metadata\nconst filename = `${sanitizeddealName}_demo_transcript_${timestamp}.txt`;\nconst storagePath = `${dealId}/demo-call-transcript/${filename}`;\n\n// ✅ Use Buffer instead of TextEncoder\nconst fileSizeBytes = Buffer.byteLength(transcriptText, 'utf8');\nconst base64Data = Buffer.from(transcriptText, 'utf8').toString('base64');\n\n// Human-readable name\nconst monthNames = [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\",\n  \"Jul\", \"Aug\", \"Sep\", \"Oct\", \"Nov\", \"Dec\"];\nconst humanReadableName = `${company} STRMS Demo Call - ${monthNames[meetingDate.getMonth()]} ${meetingDate.getDate()}, ${meetingDate.getFullYear()}`;\n\n// Return structured output\nreturn {\n  json: {\n    deal_id: dealId,\n    filename,\n    storage_path: storagePath,\n    file_size: fileSizeBytes,\n    human_readable_file_name: humanReadableName,\n    transcript_text: transcriptText\n  },\n  binary: {\n    demoCallTranscript: {\n      data: base64Data,\n      mimeType: 'text/plain',\n      fileName: filename\n    }\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "c327b453-43d8-47f5-9dac-d89d5b27d60c",
+      "name": "Prepare File for Upload"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://scahyfdsgpfurpcnwyrb.supabase.co/storage/v1/object/revops-pipeline-files/{{ $json.storage_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/plain"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "demoCallTranscript",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "e04d49e0-95cf-4112-8568-04c51583edc8",
+      "name": "Upload File to Supabase Storage",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8o7ThfsHa3QWcSYa",
+          "name": "GL AI Console Supabase Service Role Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "3754c369-828a-49cf-84aa-f7481d73a16c",
+      "name": "Wait For File Upload",
+      "webhookId": "cff76596-51fa-41dd-b70e-952a35a379cf"
+    },
+    {
+      "parameters": {
+        "tableId": "revops_pipeline_files",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "deal_id",
+              "fieldValue": "={{ $('Prepare File for Upload').item.json.deal_id }}"
+            },
+            {
+              "fieldId": "file_type_id",
+              "fieldValue": "revops-demo-call-transcript"
+            },
+            {
+              "fieldId": "file_name",
+              "fieldValue": "={{ $('Prepare File for Upload').item.json.human_readable_file_name }}"
+            },
+            {
+              "fieldId": "file_path",
+              "fieldValue": "={{ $('Prepare File for Upload').item.json.storage_path }}"
+            },
+            {
+              "fieldId": "file_size",
+              "fieldValue": "={{ $('Prepare File for Upload').item.json.file_size }}"
+            },
+            {
+              "fieldId": "uploaded_by",
+              "fieldValue": "fireflies-integration"
+            },
+            {
+              "fieldId": "storage_bucket",
+              "fieldValue": "revops-pipeline-files"
+            },
+            {
+              "fieldId": "storage_path",
+              "fieldValue": "={{ $('Prepare File for Upload').item.json.storage_path }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        0
+      ],
+      "id": "d3c8c1d3-ad09-469b-ad77-04ca587a1378",
+      "name": "Create File Record in Database",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.srv1055749.hstgr.cloud/webhook/sales-intake-ai",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "deal_id",
+              "value": "={{ $json.deal_id }}"
+            },
+            {
+              "name": "transcript_url",
+              "value": "={{ $('Get Transcript Details').item.json.data.transcript_url }}"
+            },
+            {
+              "name": "lead_email",
+              "value": "={{ $('Search For Participant Email').item.json.email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1776,
+        0
+      ],
+      "id": "3d547035-2891-4bf9-9166-721f2e99920e",
+      "name": "Trigger Sales Intake Flow"
+    }
+  ],
+  "pinData": {
+    "GL Demo Transcript Complete": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.srv1055749.hstgr.cloud",
+            "user-agent": "axios/1.12.2",
+            "content-length": "80",
+            "accept": "application/json, text/plain, */*",
+            "accept-encoding": "gzip, compress, deflate, br",
+            "baggage": "sentry-environment=production,sentry-release=bdfd820df6e7ad98d8764e8f1387ab502651ea7d,sentry-public_key=010261725034495cbd9605cd1d3c1a2d,sentry-trace_id=5d427c9b929a48bf8202249e7fd52204",
+            "content-type": "application/json",
+            "sentry-trace": "5d427c9b929a48bf8202249e7fd52204-9c80468d53bdd51a",
+            "x-forwarded-for": "34.60.166.19",
+            "x-forwarded-host": "n8n.srv1055749.hstgr.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "30ef30da0b1d",
+            "x-real-ip": "34.60.166.19"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "meetingId": "01KBNF44X4Z9J83T50JQXDSTQ9",
+            "eventType": "Transcription completed"
+          },
+          "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook/fireflies-transcript-complete",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "GL Demo Transcript Complete": {
+      "main": [
+        [
+          {
+            "node": "Get Transcript Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Transcript Details": {
+      "main": [
+        [
+          {
+            "node": "Extract Transcript Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Transcript Data": {
+      "main": [
+        [
+          {
+            "node": "Search For Participant Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search For Participant Email": {
+      "main": [
+        [
+          {
+            "node": "Prepare File for Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare File for Upload": {
+      "main": [
+        [
+          {
+            "node": "Upload File to Supabase Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload File to Supabase Storage": {
+      "main": [
+        [
+          {
+            "node": "Wait For File Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For File Upload": {
+      "main": [
+        [
+          {
+            "node": "Create File Record in Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create File Record in Database": {
+      "main": [
+        [
+          {
+            "node": "Trigger Sales Intake Flow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "America/New_York",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
+  },
+  "versionId": "d5141200-c5b5-4ee7-9e66-5bf6723dd024",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "NF8S9O9bp83_4GqLIZMXV",
+  "tags": []
+}

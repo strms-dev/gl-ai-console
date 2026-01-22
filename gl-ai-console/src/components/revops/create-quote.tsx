@@ -133,18 +133,27 @@ export function CreateQuote({
 
   const handlePushToHubspot = () => {
     setIsPushingToHubspot(true)
-    // Simulate HubSpot API call - in production this would be a real API call
-    setTimeout(() => {
-      onPushToHubspot()
-      setIsPushingToHubspot(false)
-    }, 2000)
+    onPushToHubspot()
+    // Loading state will be cleared when quoteData.hubspotSynced becomes true
   }
+
+  // Clear loading state when HubSpot sync completes
+  useEffect(() => {
+    if (quoteData.hubspotSynced && isPushingToHubspot) {
+      setIsPushingToHubspot(false)
+    }
+  }, [quoteData.hubspotSynced, isPushingToHubspot])
 
   const isConfirmed = !!quoteData.quoteConfirmedAt
   const isHubspotSynced = !!quoteData.hubspotSynced
 
-  // Calculate total monthly price
-  const totalMonthly = quoteData.lineItems.reduce((sum, item) => sum + (item.monthlyPrice || 0), 0)
+  // Separate monthly and one-time items
+  const monthlyItems = quoteData.lineItems.filter(item => !item.isOneTime)
+  const oneTimeItems = quoteData.lineItems.filter(item => item.isOneTime)
+
+  // Calculate totals
+  const totalMonthly = monthlyItems.reduce((sum, item) => sum + (item.monthlyPrice || 0), 0)
+  const totalOneTime = oneTimeItems.reduce((sum, item) => sum + (item.monthlyPrice || 0), 0)
 
   // If quote is confirmed, show completed state
   if (isConfirmed) {
@@ -177,6 +186,17 @@ export function CreateQuote({
               Synced to HubSpot on {new Date(quoteData.hubspotSyncedAt).toLocaleDateString()}
             </p>
           )}
+          {quoteData.hubspotQuoteLink && (
+            <a
+              href={quoteData.hubspotQuoteLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center mt-2 text-sm text-[#407B9D] hover:text-[#366a88] hover:underline"
+            >
+              <ExternalLink className="w-3 h-3 mr-1" />
+              View Quote in HubSpot
+            </a>
+          )}
         </div>
 
         {/* Summary Table */}
@@ -185,11 +205,12 @@ export function CreateQuote({
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-2 text-left font-medium text-gray-600">Service</th>
-                <th className="px-4 py-2 text-right font-medium text-gray-600">Monthly</th>
+                <th className="px-4 py-2 text-right font-medium text-gray-600">Price</th>
               </tr>
             </thead>
             <tbody>
-              {quoteData.lineItems.map((item) => (
+              {/* Monthly recurring items */}
+              {monthlyItems.map((item) => (
                 <tr key={item.id} className="border-t">
                   <td className="px-4 py-2">
                     <p className="font-medium">{item.service}</p>
@@ -198,14 +219,39 @@ export function CreateQuote({
                     )}
                   </td>
                   <td className="px-4 py-2 text-right font-medium">
-                    ${(item.monthlyPrice || 0).toLocaleString()}
+                    ${(item.monthlyPrice || 0).toLocaleString()}/mo
                   </td>
                 </tr>
               ))}
-              <tr className="border-t bg-gray-50 font-bold">
-                <td className="px-4 py-2">Total</td>
-                <td className="px-4 py-2 text-right">${(totalMonthly || 0).toLocaleString()}</td>
-              </tr>
+              {monthlyItems.length > 0 && (
+                <tr className="border-t bg-gray-50 font-bold">
+                  <td className="px-4 py-2">Total Monthly</td>
+                  <td className="px-4 py-2 text-right">${(totalMonthly || 0).toLocaleString()}/mo</td>
+                </tr>
+              )}
+              {/* One-time items */}
+              {oneTimeItems.length > 0 && (
+                <>
+                  <tr className="border-t-2 border-gray-300">
+                    <td colSpan={2} className="px-4 py-1 text-xs font-medium text-amber-700 bg-amber-50">
+                      One-Time Fees
+                    </td>
+                  </tr>
+                  {oneTimeItems.map((item) => (
+                    <tr key={item.id} className="border-t bg-amber-50/50">
+                      <td className="px-4 py-2">
+                        <p className="font-medium">{item.service}</p>
+                        {item.description && (
+                          <p className="text-xs text-muted-foreground">{item.description}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right font-medium text-amber-700">
+                        ${(item.monthlyPrice || 0).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </>
+              )}
             </tbody>
           </table>
         </div>
@@ -316,12 +362,13 @@ export function CreateQuote({
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-2 text-left font-medium text-gray-600">Service</th>
-              <th className="px-4 py-2 text-right font-medium text-gray-600">Monthly Price</th>
+              <th className="px-4 py-2 text-right font-medium text-gray-600">Price</th>
               <th className="px-4 py-2 text-center font-medium text-gray-600 w-24">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {quoteData.lineItems.map((item) => (
+            {/* Monthly recurring items */}
+            {monthlyItems.map((item) => (
               <tr key={item.id} className="border-t">
                 {editingItemId === item.id ? (
                   // Edit mode
@@ -393,7 +440,7 @@ export function CreateQuote({
                       )}
                     </td>
                     <td className="px-4 py-2 text-right font-medium">
-                      ${(item.monthlyPrice || 0).toLocaleString()}
+                      ${(item.monthlyPrice || 0).toLocaleString()}/mo
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center justify-center gap-1">
@@ -428,15 +475,110 @@ export function CreateQuote({
                 </td>
               </tr>
             )}
-            {/* Total Row */}
-            {quoteData.lineItems.length > 0 && (
+            {/* Total Monthly Row */}
+            {monthlyItems.length > 0 && (
               <tr className="border-t bg-gray-50 font-bold">
                 <td className="px-4 py-2">Total Monthly</td>
                 <td className="px-4 py-2 text-right text-[#407B9D]">
-                  ${totalMonthly.toLocaleString()}
+                  ${totalMonthly.toLocaleString()}/mo
                 </td>
                 <td></td>
               </tr>
+            )}
+            {/* One-time items section */}
+            {oneTimeItems.length > 0 && (
+              <>
+                <tr className="border-t-2 border-gray-300">
+                  <td colSpan={3} className="px-4 py-1 text-xs font-medium text-amber-700 bg-amber-50">
+                    One-Time Fees
+                  </td>
+                </tr>
+                {oneTimeItems.map((item) => (
+                  <tr key={item.id} className="border-t bg-amber-50/50">
+                    {editingItemId === item.id ? (
+                      // Edit mode for one-time items
+                      <>
+                        <td className="px-4 py-2">
+                          <div className="space-y-2">
+                            <Input
+                              value={editServiceName || ""}
+                              onChange={(e) => setEditServiceName(e.target.value)}
+                              placeholder="Service name"
+                              className="h-8"
+                            />
+                            <Input
+                              value={editServiceDescription || ""}
+                              onChange={(e) => setEditServiceDescription(e.target.value)}
+                              placeholder="Description (optional)"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-gray-500">$</span>
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              value={editServicePrice || ""}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9]/g, "")
+                                setEditServicePrice(val)
+                              }}
+                              className="h-8 w-24 text-right [appearance:textfield]"
+                            />
+                          </div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleSaveEdit}
+                              className="h-7 w-7 p-0 text-[#5A8A4A] hover:text-[#5A8A4A] hover:bg-[#C8E4BB]/30"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleCancelEdit}
+                              className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      // Display mode for one-time items
+                      <>
+                        <td className="px-4 py-2">
+                          <p className="font-medium">{item.service}</p>
+                          {item.description && (
+                            <p className="text-xs text-muted-foreground">{item.description}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-right font-medium text-amber-700">
+                          ${(item.monthlyPrice || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center justify-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleStartEdit(item)}
+                              className="h-7 w-7 p-0 text-[#407B9D] hover:text-[#366a88] hover:bg-[#407B9D]/10"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </>
             )}
           </tbody>
         </table>
@@ -529,32 +671,24 @@ export function CreateQuote({
       {/* HubSpot Integration & Confirm Section */}
       <div className="pt-4 border-t">
         {!isHubspotSynced ? (
-          // Step 1: Push to HubSpot
-          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h5 className="text-sm font-medium mb-2" style={{ fontFamily: "var(--font-heading)" }}>
-              Step 1: Create Quote in HubSpot
-            </h5>
-            <p className="text-xs text-muted-foreground mb-3">
-              Push line items to HubSpot to generate the official quote with a shareable link.
-            </p>
-            <Button
-              onClick={handlePushToHubspot}
-              disabled={quoteData.lineItems.length === 0 || isPushingToHubspot}
-              className="w-full bg-[#407B9D] hover:bg-[#366a88] text-white"
-            >
-              {isPushingToHubspot ? (
-                <>
-                  <RotateCw className="w-4 h-4 mr-2 animate-spin" />
-                  Pushing to HubSpot...
-                </>
-              ) : (
-                <>
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Push Line Items &amp; Create Quote in HubSpot
-                </>
-              )}
-            </Button>
-          </div>
+          // Push to HubSpot button
+          <Button
+            onClick={handlePushToHubspot}
+            disabled={quoteData.lineItems.length === 0 || isPushingToHubspot}
+            className="w-full bg-[#407B9D] hover:bg-[#366a88] text-white"
+          >
+            {isPushingToHubspot ? (
+              <>
+                <RotateCw className="w-4 h-4 mr-2 animate-spin" />
+                Creating Quote in HubSpot...
+              </>
+            ) : (
+              <>
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Push Line Items &amp; Create Quote in HubSpot
+              </>
+            )}
+          </Button>
         ) : (
           // Step 2: HubSpot synced - show link and confirm button
           <div className="space-y-4">

@@ -1,0 +1,538 @@
+{
+  "name": "Generate Project Specific EA Wording",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "47cfbf23-faf9-498a-8f75-39c9d48099e1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -192
+      ],
+      "id": "d5568351-59db-49fa-b3a6-3663db6a492d",
+      "name": "Catch Project ID",
+      "webhookId": "47cfbf23-faf9-498a-8f75-39c9d48099e1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "607b85aa-2ced-4374-87be-040ef2ea9252",
+              "leftValue": "={{ $json.body.project_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "40327336-b06a-4b1c-9528-5ba5d7f6a06f",
+              "leftValue": "={{ $json.body.project_id }}",
+              "rightValue": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        -192
+      ],
+      "id": "4d55b119-249b-47bf-bfe8-f8026348c549",
+      "name": "Validate Project ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate filename and storage path\nconst projectId = $('Catch Project ID').first().json.body.project_id;\nconst timestamp = $input.first().json.generation_timestamp;\n\nconst filename = `project_${projectId}_ea_wording_${timestamp}.txt`;\nconst storagePath = `${projectId}/ea-wording/${filename}`;\n\nreturn [\n  {\n    json: {\n      ...($input.first().json),\n      generated_filename: filename,\n      storage_path: storagePath,\n      upload_path: storagePath\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        -192
+      ],
+      "id": "01e95fca-4a87-4b85-b9d3-fd2dcef3beb2",
+      "name": "Generate Filename"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f4c31576-8f97-4088-87f6-42ae5e5a93fd",
+              "name": "file_size",
+              "value": "={{ $json.formatted_ea_wording.length }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2240,
+        -192
+      ],
+      "id": "3840558e-4990-4606-9171-c1d4c4716dc0",
+      "name": "Calculate File Size"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2688,
+        -192
+      ],
+      "id": "f19d8444-a712-4dcc-94c5-dc9c8070c13c",
+      "name": "Wait For File Upload",
+      "webhookId": "491866ec-b6eb-4ab9-9a39-f269c0b0751f"
+    },
+    {
+      "parameters": {
+        "tableId": "strms_project_files",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "project_id",
+              "fieldValue": "={{ $('Catch Project ID').item.json.body.project_id }}"
+            },
+            {
+              "fieldId": "file_type_id",
+              "fieldValue": "ea-wording"
+            },
+            {
+              "fieldId": "file_name",
+              "fieldValue": "={{ $('Generate Filename').item.json.generated_filename }}"
+            },
+            {
+              "fieldId": "file_path",
+              "fieldValue": "={{ $('Calculate File Size').item.json.storage_path }}"
+            },
+            {
+              "fieldId": "file_size",
+              "fieldValue": "={{ $('Calculate File Size').item.json.file_size }}"
+            },
+            {
+              "fieldId": "uploaded_by",
+              "fieldValue": "n8n-workflow"
+            },
+            {
+              "fieldId": "storage_bucket",
+              "fieldValue": "strms-project-files"
+            },
+            {
+              "fieldId": "storage_path",
+              "fieldValue": "={{ $('Calculate File Size').item.json.storage_path }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2912,
+        -192
+      ],
+      "id": "2df92ebd-e228-43b5-90b4-2cb240b1f4e7",
+      "name": "Insert File Metadata",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "strms_project_files",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "project_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Catch Project ID').item.json.body.project_id }}"
+            },
+            {
+              "keyName": "file_type_id",
+              "condition": "eq",
+              "keyValue": "workflow-description"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -192
+      ],
+      "id": "a82fd095-ae9c-40d4-9291-ff0d4ac6c5cc",
+      "name": "Query n8n Workflow Description",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "474151a1-bfd1-4ed2-aa2c-cac97378170b",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        -192
+      ],
+      "id": "058a876b-73db-4632-8196-ddcd49797130",
+      "name": "Check n8n Workflow Description Found"
+    },
+    {
+      "parameters": {
+        "url": "=https://scahyfdsgpfurpcnwyrb.supabase.co/storage/v1/object/{{ $json.storage_bucket }}/{{ $json.storage_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        -192
+      ],
+      "id": "4f720b75-b654-4524-82cf-e23e7f296461",
+      "name": "Download n8n Workflow Description",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8o7ThfsHa3QWcSYa",
+          "name": "GL AI Console Supabase Service Role Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "strms_sprint_pricing",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "project_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Catch Project ID').item.json.body.project_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        -192
+      ],
+      "id": "745049ee-cd67-4ab4-b408-c20c77cd5893",
+      "name": "Retrieve Sprint Length",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5",
+          "mode": "list",
+          "cachedResultName": "GPT-5"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=SYSTEM PROMPT (RETURN ONLY SCOPE, DELIVERABLES, MILESTONES)\n\nYour task is to generate concise, client-facing engagement language for a workflow implementation sprint. The output must be non-technical, professional, and ready to paste into a contract.\n\nYou will receive two inputs:\n1. A sprint multiplier (0.5, 1, 1.5, or 2)\n2. A workflow description document describing the workflow’s purpose, business logic, triggers, integrations, and intended outcomes.\n\nSPRINT LENGTH CONVERSION (MUST ALWAYS APPLY):\n0.5x sprint = 3 days\n1.0x sprint = 5 days\n1.5x sprint = 8 days\n2.0x sprint = 10 days\n\nCONTENT RULES:\nDo NOT mention or reference:\n- n8n\n- workflows or automations\n- APIs, nodes, or technical implementation steps\n- error handling, retries, or system constraints\n\nDo summarize:\n- The business problem being solved\n- Which systems, teams, or processes are being connected or improved\n- The outcome and experience the client will have after completion\n\nOUTPUT FORMAT (MUST FOLLOW EXACT STRUCTURE BELOW):\n\nScope:\nWrite 1–2 paragraphs summarizing the business objective and the improved state the client will experience after the sprint. Avoid technical language.\n\nDeliverables:\n- 3–8 bullet points describing outcome-based functionality (e.g., “Customer data will sync automatically between platforms.”)\n\nMilestones:\n- 5–10 bullets describing the project progression at a business level (e.g., “Confirm access and review data requirements”; “Validate final data flow and complete handoff”).\n",
+              "role": "system"
+            },
+            {
+              "content": "=Sprint Length Multiplier:\n{{ $json.confirmed_sprint_length }}\n\nWorkflow Description Document:\n{{ $('Download n8n Workflow Description').item.json.data }}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1360,
+        -192
+      ],
+      "id": "4d8252e6-f17a-484c-ae3b-cb25b7f592a6",
+      "name": "Generate Project Specific EA Wording",
+      "credentials": {
+        "openAiApi": {
+          "id": "lSSimk5MMw6cbVWo",
+          "name": "Automation OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the AI-generated workflow description with headers and metadata\nconst projectId = $('Catch Project ID').first().json.body.project_id;\nconst aiResponse = $input.first().json.message.content;\n\n// Generate timestamp for filename\nconst now = new Date();\nconst timestamp = now\n  .toISOString()\n  .replace(/[-:]/g, '')\n  .split('.')[0]\n  .replace('T', '_');\n\nconst dateFormatted = now.toISOString().split('T')[0];\nconst timeFormatted = now.toTimeString().split(' ')[0];\n\n// Construct plain text workflow description document\nlet formattedDocument = `===================================================\nProject Specific EA Wording\n===================================================\nProject ID: ${projectId}\nGenerated: ${dateFormatted} ${timeFormatted}\nGenerated By: AI Automation\n===================================================\n\n${aiResponse}\n\n===================================================\nEnd of Project Specific EA Wording\nGenerated automatically by GrowthLab AI Console\n===================================================`;\n\n// ✅ Normalize all text for UTF-8 and JSON compatibility\nformattedDocument = formattedDocument\n  // Replace smart quotes with straight quotes\n  .replace(/[“”]/g, '\"')\n  .replace(/[‘’]/g, \"'\")\n  // Replace en/em dashes with hyphen\n  .replace(/[–—]/g, '-')\n  // Replace ellipsis with three dots\n  .replace(/…/g, '...')\n  // Replace bullet points with a hyphen\n  .replace(/•/g, '-')\n  // Replace non-breaking spaces with normal ones\n  .replace(/\\u00A0/g, ' ')\n  // Normalize line endings\n  .replace(/\\r?\\n/g, '\\n');\n\n// ✅ Make it JSON-safe for Supabase\nconst jsonSafeFormatted = JSON.stringify(formattedDocument);\n\n// ✅ Parse back to remove wrapping quotes (so stored as readable text)\nconst safeDocument = JSON.parse(jsonSafeFormatted);\n\nreturn [\n  {\n    json: {\n      project_id: projectId,\n      formatted_ea_wording: safeDocument,\n      raw_description_content: aiResponse,\n      generation_timestamp: timestamp,\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        -192
+      ],
+      "id": "a2798543-f4e7-4b8b-8135-186964e3d07e",
+      "name": "Format EA Wording Document"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://scahyfdsgpfurpcnwyrb.supabase.co/storage/v1/object/strms-project-files/{{ $json.upload_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/plain"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "Text/Plain",
+        "body": "={{ $json.formatted_ea_wording }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2464,
+        -192
+      ],
+      "id": "457996f0-5de3-4c1c-aba4-94e8ae7a16cd",
+      "name": "Upload EA Wording To Storage",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8o7ThfsHa3QWcSYa",
+          "name": "GL AI Console Supabase Service Role Key"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Catch Project ID": {
+      "main": [
+        [
+          {
+            "node": "Validate Project ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Project ID": {
+      "main": [
+        [
+          {
+            "node": "Query n8n Workflow Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Filename": {
+      "main": [
+        [
+          {
+            "node": "Calculate File Size",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate File Size": {
+      "main": [
+        [
+          {
+            "node": "Upload EA Wording To Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For File Upload": {
+      "main": [
+        [
+          {
+            "node": "Insert File Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert File Metadata": {
+      "main": [
+        []
+      ]
+    },
+    "Query n8n Workflow Description": {
+      "main": [
+        [
+          {
+            "node": "Check n8n Workflow Description Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check n8n Workflow Description Found": {
+      "main": [
+        [
+          {
+            "node": "Download n8n Workflow Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download n8n Workflow Description": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Sprint Length",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Sprint Length": {
+      "main": [
+        [
+          {
+            "node": "Generate Project Specific EA Wording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Project Specific EA Wording": {
+      "main": [
+        [
+          {
+            "node": "Format EA Wording Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format EA Wording Document": {
+      "main": [
+        [
+          {
+            "node": "Generate Filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload EA Wording To Storage": {
+      "main": [
+        [
+          {
+            "node": "Wait For File Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/New_York",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
+  },
+  "versionId": "49457f89-2abb-4121-99bd-5683d7d6ef10",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "mBtsdhWui0kSDQXs",
+  "tags": []
+}

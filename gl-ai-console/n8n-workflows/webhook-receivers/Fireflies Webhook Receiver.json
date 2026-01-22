@@ -1,0 +1,262 @@
+{
+  "name": "Fireflies Webhook Receiver",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "receive-fireflies-events",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -224
+      ],
+      "id": "696a1d96-9f95-4196-b530-4bebe2e18299",
+      "name": "Receive Fireflies Events",
+      "webhookId": "fe4c576a-a03d-4269-84ab-ec3869e8ddc2"
+    },
+    {
+      "parameters": {
+        "transcriptId": "={{ $json.body.meetingId }}"
+      },
+      "type": "@firefliesai/n8n-nodes-fireflies.fireflies",
+      "typeVersion": 1,
+      "position": [
+        224,
+        -224
+      ],
+      "id": "4290d2c4-e5d8-4644-b9c8-a10904f004cc",
+      "name": "Get Transcript Details",
+      "credentials": {
+        "firefliesApi": {
+          "id": "JwI8ZgmTBobwj6cR",
+          "name": "Nick Fireflies API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.data.title }}",
+                    "rightValue": "STRMS Demo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "id": "a9aa79aa-478f-4a19-a6bf-7738b3ec232a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "STRMS Demo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c77ea057-39df-4c4e-b53b-63289c81c8ef",
+                    "leftValue": "={{ $json.data.title }}",
+                    "rightValue": "STRMS Scoping",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "STRMS Scoping"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "aa899c8e-b91c-4ab9-8abc-fa79c076299d",
+                    "leftValue": "={{ $json.data.title }}",
+                    "rightValue": "GrowthLab Demo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "GrowthLab Demo"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        -240
+      ],
+      "id": "cd8c300b-0a33-4469-8c6a-34f8ac7bc367",
+      "name": "Call Type"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.srv1055749.hstgr.cloud/webhook/fireflies-transcript-complete",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Receive Fireflies Events').item.json.body) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        672,
+        -320
+      ],
+      "id": "1306c471-e4da-406e-a968-1a3cd17f075e",
+      "name": "Push To STRMS Demo & Scoping Workflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.srv1055749.hstgr.cloud/webhook/gl-demo-transcript-complete",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Receive Fireflies Events').item.json.body) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        672,
+        -128
+      ],
+      "id": "ee8c4602-84ff-4049-b961-b6e4e2260e9d",
+      "name": "Push To GL Demo Workflow"
+    }
+  ],
+  "pinData": {
+    "Receive Fireflies Events": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.srv1055749.hstgr.cloud",
+            "user-agent": "axios/1.12.2",
+            "content-length": "80",
+            "accept": "application/json, text/plain, */*",
+            "accept-encoding": "gzip, compress, deflate, br",
+            "baggage": "sentry-environment=production,sentry-release=bdfd820df6e7ad98d8764e8f1387ab502651ea7d,sentry-public_key=010261725034495cbd9605cd1d3c1a2d,sentry-trace_id=5d427c9b929a48bf8202249e7fd52204",
+            "content-type": "application/json",
+            "sentry-trace": "5d427c9b929a48bf8202249e7fd52204-9c80468d53bdd51a",
+            "x-forwarded-for": "34.60.166.19",
+            "x-forwarded-host": "n8n.srv1055749.hstgr.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "30ef30da0b1d",
+            "x-real-ip": "34.60.166.19"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "meetingId": "01KEMSEFE19GD4RR5NK57ZMWNK",
+            "eventType": "Transcription completed"
+          },
+          "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook/fireflies-transcript-complete",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Receive Fireflies Events": {
+      "main": [
+        [
+          {
+            "node": "Get Transcript Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Transcript Details": {
+      "main": [
+        [
+          {
+            "node": "Call Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Type": {
+      "main": [
+        [
+          {
+            "node": "Push To STRMS Demo & Scoping Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Push To STRMS Demo & Scoping Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Push To GL Demo Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "America/New_York",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
+  },
+  "versionId": "e227601b-3db3-48af-b8db-e391b5b0162b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "Vuq38dgQ-D6D2AMDVQZTA",
+  "tags": []
+}

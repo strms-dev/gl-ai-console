@@ -5,7 +5,8 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
-  ExternalLink
+  ExternalLink,
+  RotateCcw
 } from "lucide-react"
 
 export interface SimplifiedStageCardProps {
@@ -46,6 +47,8 @@ export interface SimplifiedStageCardProps {
   isTerminal?: boolean
   /** Variant for special styling (won/lost) */
   variant?: "default" | "success" | "error"
+  /** Callback when reset button is clicked (optional) */
+  onReset?: () => void
 }
 
 export function SimplifiedStageCard({
@@ -64,7 +67,8 @@ export function SimplifiedStageCard({
   externalLink,
   // isTerminal is kept for API compatibility but not used in this version
   isTerminal: _isTerminal,
-  variant = "default"
+  variant = "default",
+  onReset
 }: SimplifiedStageCardProps) {
   // Determine styling based on variant
   const getVariantStyles = () => {
@@ -167,6 +171,21 @@ export function SimplifiedStageCard({
             <ExternalLink className="w-3 h-3" />
             {externalLink.label}
           </a>
+        )}
+
+        {/* Reset button (only show if onReset is provided and stage is not skipped) */}
+        {onReset && !isSkipped && (
+          <div className="mt-4 pt-3 border-t border-gray-200">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onReset}
+              className="text-gray-500 border-gray-300 hover:bg-gray-50 hover:text-gray-700"
+            >
+              <RotateCcw className="w-3 h-3 mr-2" />
+              Reset Stage
+            </Button>
+          </div>
         )}
       </div>
     )

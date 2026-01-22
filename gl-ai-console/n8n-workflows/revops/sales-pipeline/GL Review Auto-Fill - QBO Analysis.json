@@ -1,0 +1,508 @@
+{
+  "name": "GL Review Auto-Fill - QBO Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gl-review-ai",
+        "responseMode": "responseNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2656,
+        -496
+      ],
+      "id": "5f32e909-642a-4d5d-85ef-7f55208b44b1",
+      "name": "Catch GL Review Request",
+      "webhookId": "gl-review-ai-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "validate-deal-id-exists",
+              "leftValue": "={{ $json.body.deal_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "validate-deal-id-uuid",
+              "leftValue": "={{ $json.body.deal_id }}",
+              "rightValue": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            },
+            {
+              "id": "validate-qbo-client-name",
+              "leftValue": "={{ $json.body.qbo_client_name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2880,
+        -496
+      ],
+      "id": "8aab5d8b-fe18-4011-a269-0f36d5c7528f",
+      "name": "Validate Input"
+    },
+    {
+      "parameters": {
+        "url": "https://qbo-mcp.vercel.app/api/reports/account-list",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "clientName",
+              "value": "={{ $('Catch GL Review Request').item.json.body.qbo_client_name }}"
+            },
+            {
+              "name": "accountTypes",
+              "value": "Bank,Credit Card,Other Current Liability,Long Term Liability"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3104,
+        -496
+      ],
+      "id": "59b1e607-f668-4b57-b528-09e01899509d",
+      "name": "Fetch Account List",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "B4p8xjVGBoWMKU5O",
+          "name": "QBO MCP API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://qbo-mcp.vercel.app/api/reports/general-ledger",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type\t",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ clientName: $('Catch GL Review Request').first().json.body.qbo_client_name, startDate: $now.minus({months: 3}).toFormat('yyyy-MM-dd'), endDate: $now.toFormat('yyyy-MM-dd') }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3328,
+        -496
+      ],
+      "id": "2adff728-cdf3-4e70-b6c8-b256f5228273",
+      "name": "Fetch General Ledger",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "B4p8xjVGBoWMKU5O",
+          "name": "QBO MCP API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://qbo-mcp.vercel.app/api/reports/profit-loss",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ clientName: $('Catch GL Review Request').first().json.body.qbo_client_name, startDate: $now.minus({years: 1}).toFormat('yyyy-MM-dd'), endDate: $now.toFormat('yyyy-MM-dd') }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3552,
+        -496
+      ],
+      "id": "b6a8b80a-4edf-43a7-968b-3d43651d5e44",
+      "name": "Fetch Profit & Loss",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "B4p8xjVGBoWMKU5O",
+          "name": "QBO MCP API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://qbo-mcp.vercel.app/api/reports/reconciliation-summary",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "clientName",
+              "value": "={{ $('Catch GL Review Request').item.json.body.qbo_client_name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3776,
+        -496
+      ],
+      "id": "964bdf2e-baef-4c25-be3a-fd1284e9baa5",
+      "name": "Fetch Reconciliation",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "B4p8xjVGBoWMKU5O",
+          "name": "QBO MCP API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// GL Review Analysis - Deterministic Code\n// Analyze QBO data and produce GL Review\n\nconst webhookData = $('Catch GL Review Request').first().json.body;\nconst accountListRaw = $('Fetch Account List').first().json;\nconst generalLedgerRaw = $('Fetch General Ledger').first().json;\nconst profitLossRaw = $('Fetch Profit & Loss').first().json;\nconst reconciliationRaw = $('Fetch Reconciliation').first().json;\n\n// Get account line counts from GL summary\nconst accountLineCounts = generalLedgerRaw.summary?.accountLineCounts || [];\nconst monthsCovered = 3;\n\n// Create a map of account name -> line count\nconst lineCountMap = {};\nfor (const alc of accountLineCounts) {\n  lineCountMap[alc.accountName] = alc.lineCount;\n}\n\n// Filter accounts to Bank, Credit Card, Long Term Liability\n// Exclude payroll-related accounts\nconst validAccountTypes = ['Bank', 'Credit Card', 'Long Term Liability'];\nconst filteredAccounts = (accountListRaw.accounts || []).filter(acc => {\n  const type = acc.accountType || '';\n  const name = (acc.fullyQualifiedName || acc.name || '').toLowerCase();\n  const isValidType = validAccountTypes.includes(type);\n  const isPayrollRelated = name.includes('payroll') || name.includes('401k') || \n                           name.includes('pto') || name.includes('vacation') ||\n                           name.includes('retirement') || name.includes('garnishment');\n  return isValidType && !isPayrollRelated;\n});\n\n// Build accounts array with transaction counts from GL data\nconst accountsWithCounts = filteredAccounts.map(acc => {\n  const lineCount = lineCountMap[acc.name] || 0;\n  const monthlyAvg = lineCount / monthsCovered;\n  let transactionCount;\n  if (monthlyAvg < 20) transactionCount = '<20';\n  else if (monthlyAvg <= 100) transactionCount = '20-100';\n  else transactionCount = '>100';\n  \n  return {\n    name: acc.name,\n    transactionCount: transactionCount,\n    _lineCount: lineCount,\n    _monthlyAvg: Math.round(monthlyAvg)\n  };\n});\n\n// Sort by line count descending, take top 20\naccountsWithCounts.sort((a, b) => b._lineCount - a._lineCount);\nconst topAccounts = accountsWithCounts.slice(0, 20).map(acc => ({\n  name: acc.name,\n  transactionCount: acc.transactionCount\n}));\n\n// Extract income accounts from P&L\nconst incomeAccounts = [];\nconst extractIncomeAccounts = (sections) => {\n  if (!sections) return;\n  for (const section of sections) {\n    const sectionName = (section.name || '').toLowerCase();\n    if (sectionName.includes('income') || sectionName.includes('revenue') || sectionName.includes('sales')) {\n      if (section.accounts) {\n        for (const acc of section.accounts) {\n          if (acc.name && !acc.isTotal && !acc.isParent) {\n            incomeAccounts.push(acc.name);\n          }\n        }\n      }\n    }\n    if (section.sections) extractIncomeAccounts(section.sections);\n  }\n};\nextractIncomeAccounts(profitLossRaw.report?.sections || []);\n\n// eCommerce detection\nconst ecommercePlatforms = ['amazon', 'shopify', 'square', 'etsy', 'ebay', 'woocommerce', 'stripe', 'klarna', 'tiktok', 'paypal', 'walmart', 'affirm'];\nconst ecommerceResult = {\n  amazon: '',\n  shopify: '',\n  square: '',\n  etsy: '',\n  ebay: '',\n  woocommerce: '',\n  other: ''\n};\n\nconst otherPlatforms = [];\nfor (const accName of incomeAccounts) {\n  const lowerName = accName.toLowerCase();\n  for (const platform of ecommercePlatforms) {\n    if (lowerName.includes(platform)) {\n      if (['amazon', 'shopify', 'square', 'etsy', 'ebay', 'woocommerce'].includes(platform)) {\n        // Count for main platforms\n        const currentCount = ecommerceResult[platform] ? parseInt(ecommerceResult[platform].split('-')[0]) || 1 : 0;\n        const newCount = currentCount + 1;\n        if (newCount <= 3) ecommerceResult[platform] = '1-3';\n        else if (newCount <= 7) ecommerceResult[platform] = '4-7';\n        else ecommerceResult[platform] = '>7';\n      } else {\n        // Other platforms go to 'other'\n        if (!otherPlatforms.includes(platform)) otherPlatforms.push(platform);\n      }\n    }\n  }\n}\necommerceResult.other = otherPlatforms.join(', ');\n\n// Revenue COA allocations - count distinct income accounts\nconst incomeCount = incomeAccounts.length;\nlet revenueCoaAllocations;\nif (incomeCount <= 2) revenueCoaAllocations = '1-2';\nelse if (incomeCount <= 5) revenueCoaAllocations = '3-5';\nelse revenueCoaAllocations = '>5';\n\n// COA Revenue Categories - describe main types\nconst uniqueCategories = [...new Set(incomeAccounts.map(name => {\n  // Extract main category from account name\n  if (name.toLowerCase().includes('construction')) return 'Construction';\n  if (name.toLowerCase().includes('service')) return 'Service';\n  if (name.toLowerCase().includes('sales')) return 'Sales';\n  if (name.toLowerCase().includes('consulting')) return 'Consulting';\n  if (name.toLowerCase().includes('product')) return 'Product';\n  return name.split(' ')[0]; // Use first word as category\n}))].slice(0, 5);\nconst coaRevenueCategories = uniqueCategories.join(', ') || 'General Income';\n\n// Active classes\nconst classCount = generalLedgerRaw.summary?.classCount || 0;\nconst activeClasses = String(Math.min(classCount, 10));\n\n// Catchup bookkeeping\nconst reconSummary = reconciliationRaw.summary || {};\nconst accountsNeedingCatchup = reconSummary.accountsNeedingCatchup || 0;\nconst earliestDate = reconSummary.earliestReconciliationDate;\nconst latestDate = reconSummary.latestReconciliationDate;\n\nlet catchupRequired = 'no';\nlet catchupDateRange = '';\n\nif (accountsNeedingCatchup > 0) {\n  catchupRequired = 'yes';\n  if (earliestDate && latestDate) {\n    catchupDateRange = `${earliestDate} - ${latestDate}`;\n  }\n}\n\n// Additional notes\nconst notes = [];\nconst totalMonthlyTrx = (generalLedgerRaw.summary?.totalLineCount || 0) / monthsCovered;\nif (totalMonthlyTrx > 1000) {\n  notes.push(`High transaction volume: ~${Math.round(totalMonthlyTrx)} transactions/month`);\n}\nif (!earliestDate && !latestDate) {\n  notes.push('Reconciliation data not available in QBO');\n}\nif (incomeAccounts.length === 0) {\n  notes.push('No income accounts found in P&L');\n}\nconst additionalNotes = notes.join('. ');\n\n// Build the GL Review result\nconst glReviewData = {\n  accounts: topAccounts,\n  ecommerce: ecommerceResult,\n  revenueCoaAllocations: revenueCoaAllocations,\n  coaRevenueCategories: coaRevenueCategories,\n  activeClasses: activeClasses,\n  catchupRequired: catchupRequired,\n  catchupDateRange: catchupDateRange,\n  additionalNotes: additionalNotes\n};\n\n// Build Supabase payload\nconst supabaseData = {\n  deal_id: webhookData.deal_id,\n  review_type: 'ai',\n  accounts: glReviewData.accounts,\n  ecommerce: glReviewData.ecommerce,\n  revenue_coa_allocations: glReviewData.revenueCoaAllocations,\n  coa_revenue_categories: glReviewData.coaRevenueCategories,\n  active_classes: glReviewData.activeClasses,\n  catchup_required: glReviewData.catchupRequired,\n  catchup_date_range: glReviewData.catchupDateRange,\n  additional_notes: glReviewData.additionalNotes,\n  qbo_client_name: webhookData.qbo_client_name,\n  qbo_access_confirmed_at: new Date().toISOString(),\n  is_auto_filled: true,\n  auto_filled_at: new Date().toISOString(),\n  is_confirmed: false,\n  confirmed_at: null,\n  confirmed_by: null\n};\n\nreturn [{\n  json: {\n    deal_id: webhookData.deal_id,\n    supabase_data: supabaseData,\n    gl_review: glReviewData\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        -496
+      ],
+      "id": "317d839d-b538-46ae-921a-4efbbe95b3b1",
+      "name": "Analyze GL Review"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "revops_gl_reviews",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "deal_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Catch GL Review Request').item.json.body.deal_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "accounts",
+              "fieldValue": "={{ $json.supabase_data.accounts }}"
+            },
+            {
+              "fieldId": "ecommerce",
+              "fieldValue": "={{ $json.supabase_data.ecommerce }}"
+            },
+            {
+              "fieldId": "revenue_coa_allocations",
+              "fieldValue": "={{ $json.supabase_data.revenue_coa_allocations }}"
+            },
+            {
+              "fieldId": "coa_revenue_categories",
+              "fieldValue": "={{ $json.supabase_data.coa_revenue_categories }}"
+            },
+            {
+              "fieldId": "active_classes",
+              "fieldValue": "={{ $json.supabase_data.active_classes }}"
+            },
+            {
+              "fieldId": "catchup_required",
+              "fieldValue": "={{ $json.supabase_data.catchup_required }}"
+            },
+            {
+              "fieldId": "catchup_date_range",
+              "fieldValue": "={{ $json.supabase_data.catchup_date_range }}"
+            },
+            {
+              "fieldId": "additional_notes",
+              "fieldValue": "={{ $json.supabase_data.additional_notes }}"
+            },
+            {
+              "fieldId": "qbo_client_name",
+              "fieldValue": "={{ $json.supabase_data.qbo_client_name }}"
+            },
+            {
+              "fieldId": "qbo_access_confirmed_at",
+              "fieldValue": "={{ $json.supabase_data.qbo_access_confirmed_at }}"
+            },
+            {
+              "fieldId": "is_auto_filled",
+              "fieldValue": "={{ $json.supabase_data.is_auto_filled }}"
+            },
+            {
+              "fieldId": "auto_filled_at",
+              "fieldValue": "={{ $json.supabase_data.auto_filled_at }}"
+            },
+            {
+              "fieldId": "is_confirmed",
+              "fieldValue": "={{ $json.supabase_data.is_confirmed }}"
+            },
+            {
+              "fieldId": "submitted_by",
+              "fieldValue": "n8n automation"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4224,
+        -496
+      ],
+      "id": "fdc2e4d5-2d09-42a7-9419-9b79013fb48f",
+      "name": "Save GL Review to Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, deal_id: $('Catch GL Review Request').first().json.body.deal_id, message: 'GL Review auto-fill complete and saved to Supabase' } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        4448,
+        -496
+      ],
+      "id": "721fd2ab-b153-40de-914b-5780403c85de",
+      "name": "Respond Success"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'Invalid request. Must provide deal_id (UUID) and qbo_client_name.' } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3104,
+        -112
+      ],
+      "id": "51603e2e-21bd-4889-8efb-07eaf50b7616",
+      "name": "Respond Invalid Input"
+    }
+  ],
+  "pinData": {
+    "Catch GL Review Request": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.srv1055749.hstgr.cloud",
+            "content-type": "application/json"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "deal_id": "091dfc57-052b-4564-afff-46752758fc48",
+            "qbo_client_name": "Assembly Builders"
+          },
+          "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook/gl-review-ai",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Catch GL Review Request": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Account List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Account List": {
+      "main": [
+        [
+          {
+            "node": "Fetch General Ledger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch General Ledger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Profit & Loss",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Profit & Loss": {
+      "main": [
+        [
+          {
+            "node": "Fetch Reconciliation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Reconciliation": {
+      "main": [
+        [
+          {
+            "node": "Analyze GL Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze GL Review": {
+      "main": [
+        [
+          {
+            "node": "Save GL Review to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save GL Review to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "America/New_York",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
+  },
+  "versionId": "53d87716-a466-4db6-b7e4-b9cb44a2d40a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "x57rWSZ2gmluJDNp-o8Mt",
+  "tags": [
+    {
+      "updatedAt": "2026-01-16T21:18:14.473Z",
+      "createdAt": "2026-01-16T21:18:14.473Z",
+      "id": "R2cPedMPaljX3cTC",
+      "name": "GL Review"
+    },
+    {
+      "updatedAt": "2025-12-11T19:21:10.351Z",
+      "createdAt": "2025-12-11T19:21:10.351Z",
+      "id": "rl3dgwNKRpy2rNV1",
+      "name": "RevOps"
+    }
+  ]
+}

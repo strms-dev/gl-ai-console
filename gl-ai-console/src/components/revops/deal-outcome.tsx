@@ -17,7 +17,8 @@ import {
   DollarSign,
   XCircle,
   AlertCircle,
-  HelpCircle
+  HelpCircle,
+  RotateCcw
 } from "lucide-react"
 
 interface DealOutcomeProps {
@@ -26,6 +27,8 @@ interface DealOutcomeProps {
   companyName: string
   onConfirmWon: () => void
   onConfirmLost: (reason: LostReason, details: string) => void
+  onResetWon?: () => void
+  onResetLost?: () => void
 }
 
 // Map lost reason to display labels
@@ -43,7 +46,9 @@ export function DealOutcome({
   closedLostData,
   companyName,
   onConfirmWon,
-  onConfirmLost
+  onConfirmLost,
+  onResetWon,
+  onResetLost
 }: DealOutcomeProps) {
   const [showLostForm, setShowLostForm] = useState(false)
   const [lostReason, setLostReason] = useState<LostReason | "">(closedLostData.lostReason || "")
@@ -110,6 +115,21 @@ export function DealOutcome({
             </span>
           </div>
         )}
+
+        {/* Reset button */}
+        {onResetWon && (
+          <div className="mt-4 pt-3 border-t border-[#C8E4BB]">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onResetWon}
+              className="text-gray-500 border-gray-300 hover:bg-gray-50 hover:text-gray-700"
+            >
+              <RotateCcw className="w-3 h-3 mr-2" />
+              Reset Stage
+            </Button>
+          </div>
+        )}
       </div>
     )
   }
@@ -166,6 +186,21 @@ export function DealOutcome({
               <CheckCircle2 className="w-3 h-3 mr-1" />
               Synced from HubSpot
             </span>
+          </div>
+        )}
+
+        {/* Reset button */}
+        {onResetLost && (
+          <div className="mt-4 pt-3 border-t border-red-200">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onResetLost}
+              className="text-gray-500 border-gray-300 hover:bg-gray-50 hover:text-gray-700"
+            >
+              <RotateCcw className="w-3 h-3 mr-2" />
+              Reset Stage
+            </Button>
           </div>
         )}
       </div>

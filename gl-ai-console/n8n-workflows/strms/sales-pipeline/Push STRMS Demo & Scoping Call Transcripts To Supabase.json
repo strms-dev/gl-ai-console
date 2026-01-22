@@ -1,0 +1,812 @@
+{
+  "name": "Push STRMS Demo & Scoping Call Transcripts To Supabase",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fireflies-transcript-complete",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Fireflies Webhook - Transcript Complete",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        144
+      ],
+      "webhookId": "bbfcebce-003f-4eaa-b9ce-c66483f533cf"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const transcript = $input.item.json.data;\n\nif (!transcript) {\n  throw new Error('No transcript data found');\n}\n\nconst transcriptText = transcript.sentences\n  .map(s => `${s.speaker_name}: ${s.text}`)\n  .join('\\n');\n\nreturn {\n  json: {\n    transcript_id: transcript.id,\n    title: transcript.title,\n    meeting_date: transcript.date,\n    transcript_url: transcript.transcript_url,\n    transcript_text: transcriptText\n  }\n};"
+      },
+      "id": "extract-transcript-data",
+      "name": "Extract Transcript Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "chatModel": "gpt-5",
+        "prompt": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "You are a data extraction assistant specializing in sales call analysis. You extract structured data from meeting transcripts and return ONLY valid JSON."
+            },
+            {
+              "content": "=Analyze this sales demo transcript and extract:\n1. Project Name: Generate a short, descriptive name for the automation or integration discussed — e.g., \"Karbon To Notion Sync\", \"Push Ignition Proposals To Karbon\", or \"Sync Xero Invoices To HubSpot\". Base the name on the systems, tools, or processes discussed in the transcript. \n   - If a specific project is mentioned, use that as the base.\n   - If no explicit project name exists, infer one from the main integration or automation topic discussed.\n\n2. Company Name: Extract from the meeting title. \n   - The meeting title follows a format like \"STRMS Demo x Hale Innovation\" — in that case, the company name is everything after the \"x\", e.g., \"Hale Innovation\".\n   - If not clearly formatted, use the company name mentioned in the transcript.\n   - If still unclear, return \"Unknown Company\".\n\n3. Contact Name: Identify the primary client contact from the transcript.\n   - This will be the person speaking or referenced who does **not** have an email ending in \"@growthlabfinancial.com\".\n   - If no clear name is found, return \"Unknown Contact\".\n\n4. Email: Extract the email address of the primary client contact from the participants list. \n   - Choose the main customer participant whose email does **not** include \"@growthlabfinancial.com\".\n   - If no such participant exists, return \"no-email@pending.com\".\n\nReturn ONLY valid JSON in this structure:\n{\n  \"project_name\": \"extracted or generated descriptive automation name\",\n  \"company\": \"company name or Unknown Company\",\n  \"contact_name\": \"contact name or Unknown Contact\",\n  \"email\": \"email or no-email@pending.com\"\n}\n\nMeeting Title:\n{{ $json.title }}\n\nTranscript:\n{{ $json.transcript_text }}\n\nParticipants:\n{{ $('Get a transcript').item.json.data.participants[0] }}"
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "ai-extract-project-data",
+      "name": "AI Extract Project Data",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.1,
+      "position": [
+        688,
+        48
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "lSSimk5MMw6cbVWo",
+          "name": "Automation OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Parse AI extraction results\nconst aiResponseContent = $json.message.content\nlet extractedData;\n\ntry {\n  extractedData = JSON.parse(aiResponseContent);\n} catch (error) {\n  const prevNode = $('Extract Transcript Data').item.json;\n  const meetingDate = new Date(prevNode.meeting_date);\n\n  extractedData = {\n    project_name: 'STRMS Demo - ' + meetingDate.toISOString().split('T')[0],\n    company: 'Unknown Company',\n    contact_name: 'Unknown Contact',\n    email: 'no-email@pending.com'\n  };\n}\n\nif (!extractedData.project_name || extractedData.project_name === '') {\n  const prevNode = $('Extract Transcript Data').item.json;\n  const meetingDate = new Date(prevNode.meeting_date);\n\n  extractedData.project_name =\n    'STRMS Demo - ' + meetingDate.toISOString().split('T')[0];\n}\n\nextractedData.company = extractedData.company || 'Unknown Company';\nextractedData.contact_name = extractedData.contact_name || 'Unknown Contact';\nextractedData.email = extractedData.email || 'no-email@pending.com';\n\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (!emailRegex.test(extractedData.email)) {\n  extractedData.email = 'no-email@pending.com';\n}\n\nconst prevNode = $('Extract Transcript Data').item.json;\n\nreturn {\n  json: {\n    project_name: extractedData.project_name,\n    company: extractedData.company,\n    contact_name: extractedData.contact_name,\n    email: extractedData.email,\n    current_stage: 'demo',\n    project_status: 'active',\n    transcript_id: prevNode.transcript_id,\n    transcript_text: prevNode.transcript_text,\n    meeting_date: prevNode.meeting_date,\n    title: prevNode.title\n  }\n};\n"
+      },
+      "id": "parse-ai-response",
+      "name": "Parse and Validate AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "strms_projects",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "project_name",
+              "fieldValue": "={{ $json.project_name }}"
+            },
+            {
+              "fieldId": "company",
+              "fieldValue": "={{ $json.company }}"
+            },
+            {
+              "fieldId": "contact_name",
+              "fieldValue": "={{ $json.contact_name }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "current_stage",
+              "fieldValue": "demo"
+            },
+            {
+              "fieldId": "project_status",
+              "fieldValue": "active"
+            }
+          ]
+        }
+      },
+      "id": "create-project-record",
+      "name": "Create Project in Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        48
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const projectId = $json.id;\nconst source = $('Parse and Validate AI Response').item.json;\nconst transcriptText = source.transcript_text;\nconst projectName = source.project_name;\nconst meetingDate = new Date(source.meeting_date);\nconst company = source.company;\n\n// Create timestamp and sanitized name\nconst timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];\nconst sanitizedProjectName = projectName\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '_')\n  .replace(/^_+|_+$/g, '')\n  .substring(0, 50);\n\n// File metadata\nconst filename = `${sanitizedProjectName}_demo_transcript_${timestamp}.txt`;\nconst storagePath = `${projectId}/demo-call-transcript/${filename}`;\n\n// ✅ Use Buffer instead of TextEncoder\nconst fileSizeBytes = Buffer.byteLength(transcriptText, 'utf8');\nconst base64Data = Buffer.from(transcriptText, 'utf8').toString('base64');\n\n// Human-readable name\nconst monthNames = [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\",\n  \"Jul\", \"Aug\", \"Sep\", \"Oct\", \"Nov\", \"Dec\"];\nconst humanReadableName = `${company} STRMS Demo Call - ${monthNames[meetingDate.getMonth()]} ${meetingDate.getDate()}, ${meetingDate.getFullYear()}`;\n\n// Return structured output\nreturn {\n  json: {\n    project_id: projectId,\n    filename,\n    storage_path: storagePath,\n    file_size: fileSizeBytes,\n    human_readable_file_name: humanReadableName,\n    transcript_text: transcriptText\n  },\n  binary: {\n    demoCallTranscript: {\n      data: base64Data,\n      mimeType: 'text/plain',\n      fileName: filename\n    }\n  }\n};\n"
+      },
+      "id": "prepare-file-upload",
+      "name": "Prepare File for Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://scahyfdsgpfurpcnwyrb.supabase.co/storage/v1/object/strms-project-files/{{ $json.storage_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/plain"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "demoCallTranscript",
+        "options": {}
+      },
+      "id": "upload-to-supabase-storage",
+      "name": "Upload File to Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1584,
+        48
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8o7ThfsHa3QWcSYa",
+          "name": "GL AI Console Supabase Service Role Key"
+        },
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "strms_project_files",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "project_id",
+              "fieldValue": "={{ $('Prepare File for Upload').item.json.project_id }}"
+            },
+            {
+              "fieldId": "file_type_id",
+              "fieldValue": "demo-call-transcript"
+            },
+            {
+              "fieldId": "file_name",
+              "fieldValue": "={{ $('Prepare File for Upload').item.json.human_readable_file_name }}"
+            },
+            {
+              "fieldId": "file_path",
+              "fieldValue": "={{ $('Prepare File for Upload').item.json.storage_path }}"
+            },
+            {
+              "fieldId": "file_size",
+              "fieldValue": "={{ $('Prepare File for Upload').item.json.file_size }}"
+            },
+            {
+              "fieldId": "uploaded_by",
+              "fieldValue": "fireflies-integration"
+            },
+            {
+              "fieldId": "storage_bucket",
+              "fieldValue": "strms-project-files"
+            },
+            {
+              "fieldId": "storage_path",
+              "fieldValue": "={{ $('Prepare File for Upload').item.json.storage_path }}"
+            }
+          ]
+        }
+      },
+      "id": "create-file-record",
+      "name": "Create File Record in Database",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        48
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "transcriptId": "={{ $json.body.meetingId }}"
+      },
+      "type": "@firefliesai/n8n-nodes-fireflies.fireflies",
+      "typeVersion": 1,
+      "position": [
+        16,
+        144
+      ],
+      "id": "f8305ff5-ad9e-4924-af9b-d7292df270ce",
+      "name": "Get a transcript",
+      "credentials": {
+        "firefliesApi": {
+          "id": "JwI8ZgmTBobwj6cR",
+          "name": "Nick Fireflies API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1808,
+        48
+      ],
+      "id": "89c60eb8-9e57-42b4-b1f0-8cb322f6a68f",
+      "name": "Wait For File Upload",
+      "webhookId": "fa3e5092-6adc-4cec-9f39-a42a258f8446"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.srv1055749.hstgr.cloud/webhook/readiness-assessment",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "project_id",
+              "value": "={{ $('Create Project in Supabase').item.json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2256,
+        48
+      ],
+      "id": "3cf31073-4aac-4959-a195-ae243137706f",
+      "name": "Call Generate Readiness Assessment"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.title }}",
+                    "rightValue": "STRMS Demo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "id": "a2312f4b-b7e1-4081-ba06-a7aff5e68cfb"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "STRMS Demo Call"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "df4b34f4-a733-463a-88f2-94018feb61b1",
+                    "leftValue": "={{ $json.title }}",
+                    "rightValue": "STRMS Scoping",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "STRMS Scoping Call"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        464,
+        128
+      ],
+      "id": "c94c9c13-47f0-42f4-b339-806078b02c54",
+      "name": "Call Type"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "strms_projects",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "current_stage",
+              "condition": "eq",
+              "keyValue": "scoping"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        688,
+        240
+      ],
+      "id": "6e8255e8-f9e6-4a4f-9ae5-874b44591280",
+      "name": "List All Supabase Projects In Scoping",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get items from previous nodes\nconst supabaseProjects = $items(\"List All Supabase Projects In Scoping\");\nconst firefliesData = $items(\"Get a transcript\");\n\n// Extract all participants' emails from the Fireflies data\nlet participantEmails = [];\nfor (const item of firefliesData) {\n  const data = item.json.data;\n  if (data && data.participants) {\n    // Flatten all participant arrays into a single list\n    const emails = Object.values(data.participants)\n      .flat()\n      .join(',')\n      .split(',')\n      .map(e => e.trim().toLowerCase())\n      .filter(e => e.includes('@'));\n    participantEmails.push(...emails);\n  }\n}\n\n// Deduplicate the participant email list\nparticipantEmails = [...new Set(participantEmails)];\n\n// Search for Supabase project(s) where the contact email matches a Fireflies participant\nconst matchedProjects = supabaseProjects\n  .map(item => item.json)\n  .filter(project => participantEmails.includes(project.email.toLowerCase()))\n  .map(project => ({\n    project_id: project.id,\n    project_name: project.project_name,\n    company: project.company,\n    email: project.email\n  }));\n\n// Return matches (or an empty array if none)\nreturn matchedProjects.length > 0\n  ? matchedProjects.map(p => ({ json: p }))\n  : [{ json: { message: \"No matching projects found.\" } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        240
+      ],
+      "id": "ce0ea12e-36f6-4f78-9fb6-81f2f1004f78",
+      "name": "Return Matching Supabase Project"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4585d628-0dc4-4c32-9934-79525d7de60e",
+              "leftValue": "={{ $json.project_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1136,
+        240
+      ],
+      "id": "f5645297-6d84-4a7e-a69d-73ee7dce4561",
+      "name": "Was Match Found?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// --- Extract single-item data ---\nconst projectId = $json.project_id;\nconst projectName = $json.project_name;\nconst company = $json.company;\n\n// Get data directly from the \"Extract Transcript Data\" node (single item)\nconst extractData = $node[\"Extract Transcript Data\"].json;\nconst transcriptText = extractData.transcript_text;\nconst meetingDate = new Date(extractData.meeting_date);\n\n// --- Create timestamp and sanitized name ---\nconst timestamp = new Date().toISOString().replace(/:/g, '-').split('.')[0];\nconst sanitizedProjectName = projectName\n  .toLowerCase()\n  .replace(/[^a-z0-9]+/g, '_')\n  .replace(/^_+|_+$/g, '')\n  .substring(0, 50);\n\n// --- File metadata ---\nconst filename = `${sanitizedProjectName}_scoping_transcript_${timestamp}.txt`;\nconst storagePath = `${projectId}/scoping-call-transcript/${filename}`;\n\n// ✅ Use Buffer instead of TextEncoder\nconst fileSizeBytes = Buffer.byteLength(transcriptText, 'utf8');\nconst base64Data = Buffer.from(transcriptText, 'utf8').toString('base64');\n\n// --- Human-readable name ---\nconst monthNames = [\"Jan\", \"Feb\", \"Mar\", \"Apr\", \"May\", \"Jun\",\n  \"Jul\", \"Aug\", \"Sep\", \"Oct\", \"Nov\", \"Dec\"];\nconst humanReadableName = `${company} STRMS Demo Call - ${monthNames[meetingDate.getMonth()]} ${meetingDate.getDate()}, ${meetingDate.getFullYear()}`;\n\n// --- Return structured output ---\nreturn {\n  json: {\n    project_id: projectId,\n    filename,\n    storage_path: storagePath,\n    file_size: fileSizeBytes,\n    human_readable_file_name: humanReadableName,\n    transcript_text: transcriptText\n  },\n  binary: {\n    scopingCallTranscript: {\n      data: base64Data,\n      mimeType: 'text/plain',\n      fileName: filename\n    }\n  }\n};\n"
+      },
+      "id": "0ed842b0-fe0d-46ca-884e-b3a140654785",
+      "name": "Prepare File for Upload 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://scahyfdsgpfurpcnwyrb.supabase.co/storage/v1/object/strms-project-files/{{ $json.storage_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "text/plain"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "scopingCallTranscript",
+        "options": {}
+      },
+      "id": "23a4ae09-8258-47c5-80c5-67fc3a9bdc15",
+      "name": "Upload File to Supabase Storage 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1584,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8o7ThfsHa3QWcSYa",
+          "name": "GL AI Console Supabase Service Role Key"
+        },
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1808,
+        240
+      ],
+      "id": "6acab9df-18a2-4c2b-9346-cb17045de8b9",
+      "name": "Wait For File Upload 2",
+      "webhookId": "fa3e5092-6adc-4cec-9f39-a42a258f8446"
+    },
+    {
+      "parameters": {
+        "tableId": "strms_project_files",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "project_id",
+              "fieldValue": "={{ $('Prepare File for Upload 2').item.json.project_id }}"
+            },
+            {
+              "fieldId": "file_type_id",
+              "fieldValue": "scoping-call-transcript"
+            },
+            {
+              "fieldId": "file_name",
+              "fieldValue": "={{ $('Prepare File for Upload 2').item.json.human_readable_file_name }}"
+            },
+            {
+              "fieldId": "file_path",
+              "fieldValue": "={{ $('Prepare File for Upload 2').item.json.storage_path }}"
+            },
+            {
+              "fieldId": "file_size",
+              "fieldValue": "={{ $('Prepare File for Upload 2').item.json.file_size }}"
+            },
+            {
+              "fieldId": "uploaded_by",
+              "fieldValue": "fireflies-integration"
+            },
+            {
+              "fieldId": "storage_bucket",
+              "fieldValue": "strms-project-files"
+            },
+            {
+              "fieldId": "storage_path",
+              "fieldValue": "={{ $('Prepare File for Upload 2').item.json.storage_path }}"
+            }
+          ]
+        }
+      },
+      "id": "acd9888c-38db-46b5-8f86-9a7228c75f00",
+      "name": "Create File Record in Database 2",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2032,
+        240
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Fireflies Webhook - Transcript Complete": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.srv1055749.hstgr.cloud",
+            "user-agent": "axios/1.12.2",
+            "content-length": "80",
+            "accept": "application/json, text/plain, */*",
+            "accept-encoding": "gzip, compress, deflate, br",
+            "baggage": "sentry-environment=production,sentry-release=bdfd820df6e7ad98d8764e8f1387ab502651ea7d,sentry-public_key=010261725034495cbd9605cd1d3c1a2d,sentry-trace_id=5d427c9b929a48bf8202249e7fd52204",
+            "content-type": "application/json",
+            "sentry-trace": "5d427c9b929a48bf8202249e7fd52204-9c80468d53bdd51a",
+            "x-forwarded-for": "34.60.166.19",
+            "x-forwarded-host": "n8n.srv1055749.hstgr.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "30ef30da0b1d",
+            "x-real-ip": "34.60.166.19"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "meetingId": "01KEMSEFE19GD4RR5NK57ZMWNK",
+            "eventType": "Transcription completed"
+          },
+          "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook/fireflies-transcript-complete",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Fireflies Webhook - Transcript Complete": {
+      "main": [
+        [
+          {
+            "node": "Get a transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Transcript Data": {
+      "main": [
+        [
+          {
+            "node": "Call Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Extract Project Data": {
+      "main": [
+        [
+          {
+            "node": "Parse and Validate AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse and Validate AI Response": {
+      "main": [
+        [
+          {
+            "node": "Create Project in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Project in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Prepare File for Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare File for Upload": {
+      "main": [
+        [
+          {
+            "node": "Upload File to Supabase Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload File to Supabase Storage": {
+      "main": [
+        [
+          {
+            "node": "Wait For File Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a transcript": {
+      "main": [
+        [
+          {
+            "node": "Extract Transcript Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For File Upload": {
+      "main": [
+        [
+          {
+            "node": "Create File Record in Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create File Record in Database": {
+      "main": [
+        [
+          {
+            "node": "Call Generate Readiness Assessment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Type": {
+      "main": [
+        [
+          {
+            "node": "AI Extract Project Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "List All Supabase Projects In Scoping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List All Supabase Projects In Scoping": {
+      "main": [
+        [
+          {
+            "node": "Return Matching Supabase Project",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Matching Supabase Project": {
+      "main": [
+        [
+          {
+            "node": "Was Match Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Was Match Found?": {
+      "main": [
+        [
+          {
+            "node": "Prepare File for Upload 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare File for Upload 2": {
+      "main": [
+        [
+          {
+            "node": "Upload File to Supabase Storage 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload File to Supabase Storage 2": {
+      "main": [
+        [
+          {
+            "node": "Wait For File Upload 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For File Upload 2": {
+      "main": [
+        [
+          {
+            "node": "Create File Record in Database 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/New_York",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "executionTimeout": 300,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
+  },
+  "versionId": "b283594e-3f6f-4678-8a96-92474324db3b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "VFlauIazOLe2aiAH",
+  "tags": []
+}
