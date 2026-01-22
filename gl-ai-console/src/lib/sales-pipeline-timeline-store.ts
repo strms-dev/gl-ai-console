@@ -323,37 +323,37 @@ async function rebuildTimelineStateFromSupabase(dealId: string): Promise<SalesPi
     if (followUpData) {
       hasAnyData = true
       state.stages["follow-up-email"].data = {
-        templateType: followUpData.template_type as "qbo" | "xero" | "other" | null,
-        toEmail: followUpData.to_email || "",
-        ccEmail: followUpData.cc_email || "",
-        emailSubject: followUpData.email_subject || "",
-        emailBody: followUpData.email_body || "",
-        isEdited: followUpData.is_edited || false,
-        sentAt: followUpData.sent_at,
-        hubspotDealMoved: followUpData.hubspot_deal_moved || false,
-        hubspotDealMovedAt: followUpData.hubspot_deal_moved_at
+        templateType: followUpData.templateType,
+        toEmail: followUpData.toEmail || "",
+        ccEmail: followUpData.ccEmail || "",
+        emailSubject: followUpData.emailSubject || "",
+        emailBody: followUpData.emailBody || "",
+        isEdited: followUpData.isEdited || false,
+        sentAt: followUpData.sentAt,
+        hubspotDealMoved: followUpData.hubspotDealMoved || false,
+        hubspotDealMovedAt: followUpData.hubspotDealMovedAt
       }
-      if (followUpData.sent_at) {
+      if (followUpData.sentAt) {
         state.stages["follow-up-email"].status = "completed"
-        state.stages["follow-up-email"].completedAt = followUpData.sent_at
+        state.stages["follow-up-email"].completedAt = followUpData.sentAt
         currentStage = "reminder-sequence"
       }
     }
 
     // 3. Fetch Reminder Sequence data
     const reminderData = await getReminderSequenceData(dealId)
-    if (reminderData.enrolled_at || reminderData.access_received_at || reminderData.status !== "not_enrolled") {
+    if (reminderData.enrolledAt || reminderData.accessReceivedAt || reminderData.status !== "not_enrolled") {
       hasAnyData = true
       state.stages["reminder-sequence"].data = {
-        status: reminderData.status as "not_enrolled" | "enrolled" | "unenrolled" | "access_received",
+        status: reminderData.status,
         platform: reminderData.platform,
-        enrolledAt: reminderData.enrolled_at,
-        unenrolledAt: reminderData.unenrolled_at,
-        accessReceivedAt: reminderData.access_received_at
+        enrolledAt: reminderData.enrolledAt,
+        unenrolledAt: reminderData.unenrolledAt,
+        accessReceivedAt: reminderData.accessReceivedAt
       }
-      if (reminderData.access_received_at) {
+      if (reminderData.accessReceivedAt) {
         state.stages["reminder-sequence"].status = "completed"
-        state.stages["reminder-sequence"].completedAt = reminderData.access_received_at
+        state.stages["reminder-sequence"].completedAt = reminderData.accessReceivedAt
         currentStage = "internal-review"
       } else if (reminderData.status !== "not_enrolled") {
         state.stages["reminder-sequence"].status = "in_progress"
@@ -363,45 +363,45 @@ async function rebuildTimelineStateFromSupabase(dealId: string): Promise<SalesPi
 
     // 4. Fetch Internal Review data
     const internalReviewData = await getInternalReviewData(dealId)
-    if (internalReviewData.sent_at || internalReviewData.email_body) {
+    if (internalReviewData && (internalReviewData.sentAt || internalReviewData.emailBody)) {
       hasAnyData = true
-      const recipientsArray = internalReviewData.recipients ? JSON.parse(JSON.stringify(internalReviewData.recipients)) : []
+      const recipientsArray = internalReviewData.toRecipients ? JSON.parse(JSON.stringify(internalReviewData.toRecipients)) : []
       state.stages["internal-review"].data = {
         recipients: Array.isArray(recipientsArray) ? recipientsArray : [],
-        ccTimEnabled: true,
-        emailSubject: internalReviewData.email_subject || "",
-        emailBody: internalReviewData.email_body || "",
-        isEdited: internalReviewData.is_edited || false,
-        sentAt: internalReviewData.sent_at,
-        reviewAssignedTo: internalReviewData.assigned_to,
-        reviewCompletedAt: internalReviewData.completed_at,
-        reviewNotes: internalReviewData.review_notes
+        ccTimEnabled: internalReviewData.ccTimEnabled,
+        emailSubject: internalReviewData.emailSubject || "",
+        emailBody: internalReviewData.emailBody || "",
+        isEdited: internalReviewData.isEdited || false,
+        sentAt: internalReviewData.sentAt,
+        reviewAssignedTo: null,
+        reviewCompletedAt: null,
+        reviewNotes: null
       }
-      if (internalReviewData.sent_at) {
+      if (internalReviewData.sentAt) {
         state.stages["internal-review"].status = "completed"
-        state.stages["internal-review"].completedAt = internalReviewData.sent_at
+        state.stages["internal-review"].completedAt = internalReviewData.sentAt
         currentStage = "gl-review"
       }
     }
 
     // 5. Fetch GL Review data
     const glReviews = await fetchAllGLReviewsByDealId(dealId)
-    const aiReview = glReviews.find(r => r.review_type === "ai")
-    const teamReview = glReviews.find(r => r.review_type === "team")
-    const finalReview = glReviews.find(r => r.review_type === "final")
+    const aiReview = glReviews.ai
+    const teamReview = glReviews.team
+    const finalReview = glReviews.final
 
     if (aiReview) {
       hasAnyData = true
       state.stages["gl-review"].data = {
-        formData: aiReview.form_data as GLReviewFormData | null,
-        isAutoFilled: true,
-        autoFilledAt: aiReview.created_at,
-        confirmedAt: aiReview.confirmed_at,
-        fieldConfidence: aiReview.field_confidence as GLReviewFieldConfidence | null
+        formData: aiReview.formData as GLReviewFormData | null,
+        isAutoFilled: aiReview.isAutoFilled,
+        autoFilledAt: aiReview.autoFilledAt,
+        confirmedAt: aiReview.confirmedAt,
+        fieldConfidence: aiReview.fieldConfidence as GLReviewFieldConfidence | null
       }
-      if (aiReview.confirmed_at) {
+      if (aiReview.confirmedAt) {
         state.stages["gl-review"].status = "completed"
-        state.stages["gl-review"].completedAt = aiReview.confirmed_at
+        state.stages["gl-review"].completedAt = aiReview.confirmedAt
         currentStage = "gl-review-comparison"
       }
     }
@@ -409,42 +409,48 @@ async function rebuildTimelineStateFromSupabase(dealId: string): Promise<SalesPi
     if (teamReview || finalReview) {
       hasAnyData = true
       state.stages["gl-review-comparison"].data = {
-        teamReviewData: teamReview ? (teamReview.form_data as GLReviewFormData) : null,
-        teamReviewSubmittedAt: teamReview?.created_at || null,
-        teamReviewSubmittedBy: teamReview?.submitted_by || null,
-        aiReviewData: aiReview ? (aiReview.form_data as GLReviewFormData) : null,
-        finalReviewData: finalReview ? (finalReview.form_data as GLReviewFormData) : null,
-        fieldSelections: finalReview?.field_selections as GLReviewComparisonSelections | null,
-        customValues: finalReview?.custom_values as GLReviewCustomValues | null,
-        comparisonCompletedAt: finalReview?.confirmed_at || null,
-        movedToCreateQuoteAt: finalReview?.confirmed_at || null
+        teamReviewData: teamReview ? (teamReview.formData as GLReviewFormData) : null,
+        teamReviewSubmittedAt: teamReview?.autoFilledAt || null,
+        teamReviewSubmittedBy: teamReview?.submittedBy || null,
+        aiReviewData: aiReview ? (aiReview.formData as GLReviewFormData) : null,
+        finalReviewData: finalReview ? (finalReview.formData as GLReviewFormData) : null,
+        fieldSelections: finalReview?.fieldSelections as GLReviewComparisonSelections | null,
+        customValues: finalReview?.customValues as GLReviewCustomValues | null,
+        comparisonCompletedAt: finalReview?.confirmedAt || null,
+        movedToCreateQuoteAt: finalReview?.confirmedAt || null
       }
-      if (finalReview?.confirmed_at) {
+      if (finalReview?.confirmedAt) {
         state.stages["gl-review-comparison"].status = "completed"
-        state.stages["gl-review-comparison"].completedAt = finalReview.confirmed_at
+        state.stages["gl-review-comparison"].completedAt = finalReview.confirmedAt
         currentStage = "create-quote"
       }
     }
 
     // 6. Fetch Create Quote data
     const quoteData = await getCreateQuoteData(dealId)
-    if (quoteData.line_items || quoteData.quote_confirmed_at) {
+    if (quoteData && (quoteData.lineItems?.length || quoteData.quoteConfirmedAt)) {
       hasAnyData = true
-      const lineItemsArray = quoteData.line_items ? JSON.parse(JSON.stringify(quoteData.line_items)) : []
+      const lineItemsArray = quoteData.lineItems ? JSON.parse(JSON.stringify(quoteData.lineItems)) : []
       state.stages["create-quote"].data = {
-        accountingMonthlyPrice: quoteData.accounting_monthly_price,
-        accountingPriceCalculatedAt: quoteData.accounting_price_calculated_at,
-        accountingPriceBreakdown: quoteData.accounting_price_breakdown,
+        accountingMonthlyPrice: quoteData.accountingMonthlyPrice,
+        accountingPriceCalculatedAt: quoteData.accountingPriceCalculatedAt,
+        accountingPriceBreakdown: quoteData.accountingPriceBreakdown,
+        accountingPriceBreakdownData: quoteData.accountingPriceBreakdownData,
+        accountingMethod: quoteData.accountingMethod,
+        recommendedCadence: quoteData.recommendedCadence,
+        appliedMultiplier: quoteData.appliedMultiplier,
+        priorityMultiplier: quoteData.priorityMultiplier,
+        cleanupEstimate: quoteData.cleanupEstimate,
         lineItems: Array.isArray(lineItemsArray) ? lineItemsArray : [],
-        isEdited: quoteData.is_edited || false,
-        hubspotSynced: quoteData.hubspot_synced || false,
-        hubspotSyncedAt: quoteData.hubspot_synced_at,
-        hubspotQuoteLink: quoteData.hubspot_quote_link,
-        quoteConfirmedAt: quoteData.quote_confirmed_at
+        isEdited: quoteData.isEdited || false,
+        hubspotSynced: quoteData.hubspotSynced || false,
+        hubspotSyncedAt: quoteData.hubspotSyncedAt,
+        hubspotQuoteLink: quoteData.hubspotQuoteLink,
+        quoteConfirmedAt: quoteData.quoteConfirmedAt
       }
-      if (quoteData.quote_confirmed_at) {
+      if (quoteData.quoteConfirmedAt) {
         state.stages["create-quote"].status = "completed"
-        state.stages["create-quote"].completedAt = quoteData.quote_confirmed_at
+        state.stages["create-quote"].completedAt = quoteData.quoteConfirmedAt
         currentStage = "quote-sent"
       }
     }
@@ -582,8 +588,9 @@ export async function getOrCreateTimelineState(dealId: string): Promise<SalesPip
     }
 
     // Migrate existing follow-up-email data to add ccEmail if missing
-    if (existing.stages["follow-up-email"]?.data && !("ccEmail" in existing.stages["follow-up-email"].data)) {
-      existing.stages["follow-up-email"].data.ccEmail = ""
+    const followUpData = existing.stages["follow-up-email"]?.data
+    if (followUpData && !("ccEmail" in followUpData)) {
+      (followUpData as { ccEmail?: string }).ccEmail = ""
       needsSave = true
     }
 
@@ -594,15 +601,10 @@ export async function getOrCreateTimelineState(dealId: string): Promise<SalesPip
         completedAt: null,
         data: {
           status: "not_enrolled",
-          sequenceType: null,
-          scheduledEnrollmentAt: null,
+          platform: null,
           enrolledAt: null,
-          enrolledBy: null,
           unenrolledAt: null,
-          unenrollmentReason: null,
-          accessReceivedAt: null,
-          accessPlatform: null,
-          contactRespondedAt: null
+          accessReceivedAt: null
         }
       }
       needsSave = true
@@ -615,6 +617,7 @@ export async function getOrCreateTimelineState(dealId: string): Promise<SalesPip
         completedAt: null,
         data: {
           recipients: [],
+          ccTimEnabled: true,
           emailSubject: "",
           emailBody: "",
           isEdited: false,
@@ -678,6 +681,12 @@ export async function getOrCreateTimelineState(dealId: string): Promise<SalesPip
           accountingMonthlyPrice: null,
           accountingPriceCalculatedAt: null,
           accountingPriceBreakdown: null,
+          accountingPriceBreakdownData: null,
+          accountingMethod: null,
+          recommendedCadence: null,
+          appliedMultiplier: null,
+          priorityMultiplier: null,
+          cleanupEstimate: null,
           lineItems: [],
           isEdited: false,
           hubspotSynced: false,
@@ -2180,13 +2189,7 @@ export async function autoFillGLReview(
   const testData = createTestGLReviewFormData()
   const testConfidence = createTestGLReviewFieldConfidence()
 
-  // Pre-fill email, company name, and lead name from sales intake if available
-  const salesIntakeData = existing.stages["sales-intake"].data.formData
-  if (salesIntakeData) {
-    testData.email = salesIntakeData.emailAddress || testData.email
-    testData.companyName = salesIntakeData.companyName || testData.companyName
-    testData.leadName = salesIntakeData.contactName || testData.leadName
-  }
+  // Note: GL Review form no longer includes email/company/lead - these are now stored at deal level
 
   existing.stages["gl-review"].data = {
     formData: testData,
@@ -2380,14 +2383,7 @@ export async function submitTeamGLReview(
     ? createBlankGLReviewFormData()
     : createTestTeamGLReviewFormData()
 
-  // If we have AI data, pre-fill basic identity fields (email, company, lead name)
-  // These are always copied since they're identifying info, not review data
-  const aiData = existing.stages["gl-review-comparison"].data.aiReviewData
-  if (aiData) {
-    teamReviewData.email = aiData.email
-    teamReviewData.companyName = aiData.companyName
-    teamReviewData.leadName = aiData.leadName
-  }
+  // Note: GL Review form no longer includes email/company/lead - these are now stored at deal level
 
   existing.stages["gl-review-comparison"].data.teamReviewData = teamReviewData
   existing.stages["gl-review-comparison"].data.teamReviewSubmittedAt = now
@@ -2665,37 +2661,9 @@ export async function initializeCreateQuote(
   let salesIntakeData: SalesIntakeFormData | null = null
   try {
     const salesIntakeResult = await fetchSalesIntakeByDealId(dealId)
-    if (salesIntakeResult) {
-      // Transform Supabase data to SalesIntakeFormData format
-      salesIntakeData = {
-        companyName: salesIntakeResult.company_name || "",
-        contactName: salesIntakeResult.contact_name || "",
-        emailAddress: salesIntakeResult.email_address || "",
-        entityType: (salesIntakeResult.entity_type as SalesIntakeFormData["entityType"]) || "",
-        hasRestrictedGrants: (salesIntakeResult.has_restricted_grants as SalesIntakeFormData["hasRestrictedGrants"]) || "",
-        usesQboOrXero: (salesIntakeResult.uses_qbo_or_xero as SalesIntakeFormData["usesQboOrXero"]) || "",
-        accountingPlatform: (salesIntakeResult.accounting_platform as SalesIntakeFormData["accountingPlatform"]) || "",
-        accountingBasis: (salesIntakeResult.accounting_basis as SalesIntakeFormData["accountingBasis"]) || "",
-        bookkeepingCadence: (salesIntakeResult.bookkeeping_cadence as SalesIntakeFormData["bookkeepingCadence"]) || "",
-        needsFinancialsBefore15th: (salesIntakeResult.needs_financials_before_15th as SalesIntakeFormData["needsFinancialsBefore15th"]) || "",
-        financialReviewFrequency: (salesIntakeResult.financial_review_frequency as SalesIntakeFormData["financialReviewFrequency"]) || "",
-        payrollProvider: (salesIntakeResult.payroll_provider as SalesIntakeFormData["payrollProvider"]) || "",
-        has401k: (salesIntakeResult.has_401k as SalesIntakeFormData["has401k"]) || "",
-        payrollDepartments: (salesIntakeResult.payroll_departments as SalesIntakeFormData["payrollDepartments"]) || "",
-        employeeCount: (salesIntakeResult.employee_count as SalesIntakeFormData["employeeCount"]) || "",
-        tracksExpensesByEmployee: (salesIntakeResult.tracks_expenses_by_employee as SalesIntakeFormData["tracksExpensesByEmployee"]) || "",
-        expensePlatform: (salesIntakeResult.expense_platform as SalesIntakeFormData["expensePlatform"]) || "",
-        expensePlatformEmployees: (salesIntakeResult.expense_platform_employees as SalesIntakeFormData["expensePlatformEmployees"]) || "",
-        needsBillPaySupport: (salesIntakeResult.needs_bill_pay_support as SalesIntakeFormData["needsBillPaySupport"]) || "",
-        billPayCadence: (salesIntakeResult.bill_pay_cadence as SalesIntakeFormData["billPayCadence"]) || "",
-        billsPerMonth: (salesIntakeResult.bills_per_month as SalesIntakeFormData["billsPerMonth"]) || "",
-        needsInvoicingSupport: (salesIntakeResult.needs_invoicing_support as SalesIntakeFormData["needsInvoicingSupport"]) || "",
-        invoicingCadence: (salesIntakeResult.invoicing_cadence as SalesIntakeFormData["invoicingCadence"]) || "",
-        invoicesPerMonth: (salesIntakeResult.invoices_per_month as SalesIntakeFormData["invoicesPerMonth"]) || "",
-        interestedInCfoReview: (salesIntakeResult.interested_in_cfo_review as SalesIntakeFormData["interestedInCfoReview"]) || "",
-        additionalNotes: salesIntakeResult.additional_notes || "",
-        firefliesVideoLink: salesIntakeResult.fireflies_video_link || ""
-      }
+    if (salesIntakeResult?.formData) {
+      // SalesIntakeResult already has formData in the correct format
+      salesIntakeData = salesIntakeResult.formData
     }
   } catch (error) {
     console.error("Error fetching sales intake data for pricing:", error)

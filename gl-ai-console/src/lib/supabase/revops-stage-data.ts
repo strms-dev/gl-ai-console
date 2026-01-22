@@ -415,13 +415,13 @@ export async function getCreateQuoteData(
     accountingMonthlyPrice: (data.accounting_monthly_price as number) ?? null,
     accountingPriceCalculatedAt: (data.accounting_price_calculated_at as string) ?? null,
     accountingPriceBreakdown: (data.accounting_price_breakdown as string) ?? null,
-    accountingPriceBreakdownData: (data.accounting_price_breakdown_data as PricingBreakdownItem[]) ?? null,
+    accountingPriceBreakdownData: (data.accounting_price_breakdown_data as unknown as PricingBreakdownItem[]) ?? null,
     accountingMethod: (data.accounting_method as string) ?? null,
     recommendedCadence: (data.recommended_cadence as string) ?? null,
     appliedMultiplier: (data.applied_multiplier as number) ?? null,
     priorityMultiplier: (data.priority_multiplier as number) ?? null,
     cleanupEstimate: (data.cleanup_estimate as number) ?? null,
-    lineItems: (data.line_items as QuoteLineItem[]) ?? [],
+    lineItems: (data.line_items as unknown as QuoteLineItem[]) ?? [],
     isEdited: (data.is_edited as boolean) ?? false,
     hubspotSynced: (data.hubspot_synced as boolean) ?? false,
     hubspotSyncedAt: (data.hubspot_synced_at as string) ?? null,
@@ -441,13 +441,13 @@ export async function saveCreateQuoteData(
     accounting_monthly_price: quoteData.accountingMonthlyPrice,
     accounting_price_calculated_at: quoteData.accountingPriceCalculatedAt,
     accounting_price_breakdown: quoteData.accountingPriceBreakdown,
-    accounting_price_breakdown_data: quoteData.accountingPriceBreakdownData,
+    accounting_price_breakdown_data: quoteData.accountingPriceBreakdownData as unknown as Json,
     accounting_method: quoteData.accountingMethod,
     recommended_cadence: quoteData.recommendedCadence,
     applied_multiplier: quoteData.appliedMultiplier,
     priority_multiplier: quoteData.priorityMultiplier,
     cleanup_estimate: quoteData.cleanupEstimate,
-    line_items: quoteData.lineItems,
+    line_items: quoteData.lineItems as unknown as Json,
     is_edited: quoteData.isEdited,
     hubspot_synced: quoteData.hubspotSynced,
     hubspot_synced_at: quoteData.hubspotSyncedAt,
@@ -472,7 +472,7 @@ export async function addLineItemSupabase(
 
   // Save updated array
   await setStageDataBatch(dealId, CREATE_QUOTE_STAGE_ID, {
-    line_items: lineItems,
+    line_items: lineItems as unknown as Json,
     is_edited: true,
   })
 
@@ -504,7 +504,7 @@ export async function updateLineItemSupabase(
 
   // Save updated array
   await setStageDataBatch(dealId, CREATE_QUOTE_STAGE_ID, {
-    line_items: lineItems,
+    line_items: lineItems as unknown as Json,
     is_edited: true,
   })
 
@@ -527,7 +527,7 @@ export async function removeLineItemSupabase(
 
   // Save updated array
   await setStageDataBatch(dealId, CREATE_QUOTE_STAGE_ID, {
-    line_items: updatedLineItems,
+    line_items: updatedLineItems as unknown as Json,
     is_edited: true,
   })
 

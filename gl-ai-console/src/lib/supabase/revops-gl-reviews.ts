@@ -38,7 +38,7 @@ function dbRowToFormData(row: {
 }): GLReviewFormData {
   // Parse accounts from JSONB
   const accounts = Array.isArray(row.accounts)
-    ? row.accounts as GLReviewFormData['accounts']
+    ? (row.accounts as unknown as GLReviewFormData['accounts'])
     : []
 
   // Ensure we have 20 account slots
@@ -48,8 +48,8 @@ function dbRowToFormData(row: {
 
   // Parse ecommerce from JSONB
   const ecommerce = typeof row.ecommerce === 'object' && row.ecommerce !== null
-    ? row.ecommerce as GLReviewFormData['ecommerce']
-    : { amazon: '', shopify: '', square: '', etsy: '', ebay: '', woocommerce: '', other: '' }
+    ? (row.ecommerce as unknown as GLReviewFormData['ecommerce'])
+    : { amazon: '' as const, shopify: '' as const, square: '' as const, etsy: '' as const, ebay: '' as const, woocommerce: '' as const, other: '' as const }
 
   return {
     accounts,
