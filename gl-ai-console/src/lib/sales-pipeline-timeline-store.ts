@@ -323,7 +323,7 @@ async function rebuildTimelineStateFromSupabase(dealId: string): Promise<SalesPi
     if (followUpData) {
       hasAnyData = true
       state.stages["follow-up-email"].data = {
-        templateType: followUpData.template_type as "warm" | "cold" | null,
+        templateType: followUpData.template_type as "qbo" | "xero" | "other" | null,
         toEmail: followUpData.to_email || "",
         ccEmail: followUpData.cc_email || "",
         emailSubject: followUpData.email_subject || "",
