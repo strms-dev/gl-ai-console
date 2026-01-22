@@ -70,9 +70,6 @@ function valuesAreDifferent(aiValue: unknown, teamValue: unknown): boolean {
 
 // Field display names
 const FIELD_LABELS: Record<keyof GLReviewFormData, string> = {
-  email: "Email",
-  companyName: "Company Name",
-  leadName: "Lead Name",
   accounts: "Financial Accounts",
   ecommerce: "eCommerce Platforms",
   revenueCoaAllocations: "Revenue COA Allocations",
@@ -86,9 +83,6 @@ const FIELD_LABELS: Record<keyof GLReviewFormData, string> = {
 
 // Fields that can be edited
 const EDITABLE_FIELDS: (keyof GLReviewFormData)[] = [
-  "email",
-  "companyName",
-  "leadName",
   "coaRevenueCategories",
   "activeClasses",
   "catchupDateRange",
