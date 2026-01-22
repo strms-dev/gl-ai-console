@@ -126,7 +126,6 @@ import {
   updateClosingNotes,
   markClosedWonSyncedToHubspot,
   markDealAsLost,
-  updateLostReasonDetails,
   markClosedLostSyncedToHubspot
 } from "@/lib/sales-pipeline-timeline-store"
 import { updatePipelineDeal } from "@/lib/revops-pipeline-store"
@@ -1011,8 +1010,7 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
   // Closed Lost Handlers
   const handleMarkDealAsLost = useCallback(async (reason: LostReason, details: string) => {
-    await markDealAsLost(deal.id, reason)
-    await updateLostReasonDetails(deal.id, reason, details)
+    await markDealAsLost(deal.id, reason, details)
     await refreshState()
   }, [deal.id, refreshState])
 
