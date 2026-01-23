@@ -13,6 +13,7 @@ export interface Lead {
   estimatedValue?: number
   nextAction?: string
   notes?: string
+  archived?: boolean  // Whether the project has been archived
 }
 
 export const dummyLeads: Lead[] = [

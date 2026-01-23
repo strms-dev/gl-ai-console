@@ -25,6 +25,7 @@ export interface Database {
           created_at: string
           updated_at: string
           notes: string | null
+          archived: boolean
         }
         Insert: {
           id?: string
@@ -38,6 +39,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           notes?: string | null
+          archived?: boolean
         }
         Update: {
           id?: string
@@ -51,6 +53,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           notes?: string | null
+          archived?: boolean
         }
       }
       strms_project_files: {

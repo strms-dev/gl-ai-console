@@ -279,7 +279,7 @@
               "role": "system"
             },
             {
-              "content": "=You are given the following N8N WORKFLOW DESCRIPTION DOCUMENT.\n\nPlease analyze it and produce a detailed PROJECT SCOPING DOCUMENT according to the system instructions above.\n\n===================================================\nBEGIN N8N WORKFLOW DESCRIPTION DOCUMENT\n===================================================\n\n{{ $json.data }}\n\n===================================================\nEND N8N WORKFLOW DESCRIPTION DOCUMENT\n===================================================\n"
+              "content": "=You are given the following N8N WORKFLOW DESCRIPTION DOCUMENT.\n\nPlease analyze it and produce a detailed PROJECT SCOPING DOCUMENT according to the system instructions above.\n\n===================================================\nBEGIN N8N WORKFLOW DESCRIPTION DOCUMENT\n===================================================\n\n{{ $json.data }}\n\n===================================================\nEND N8N WORKFLOW DESCRIPTION DOCUMENT\n===================================================\n{{ $('Catch Project ID').first().json.body.adjustment_reasoning ? '\\n\\n===================================================\\nCLIENT ADJUSTMENT NOTES\\n===================================================\\nThe client requested adjustments to the original proposal. Please incorporate these adjustments into the scoping document, particularly in the Scope of Work and Deliverables sections:\\n\\n' + $('Catch Project ID').first().json.body.adjustment_reasoning + '\\n===================================================' : '' }}"
             }
           ]
         },

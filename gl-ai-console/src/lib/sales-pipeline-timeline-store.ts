@@ -118,6 +118,79 @@ async function updateDealAutomationStage(dealId: string, stageId: SalesPipelineS
   }
 }
 
+/**
+ * Calculate the current stage based on Supabase data and update both
+ * the automation stage in the database AND the localStorage currentStage.
+ * This ensures consistency between the displayed automation stage and
+ * the actual timeline state.
+ */
+export async function syncAutomationStageFromSupabase(dealId: string): Promise<SalesPipelineStageId> {
+  // Get the simplified stages data from Supabase
+  const simplifiedStagesData = await getAllSimplifiedStagesData(dealId)
+
+  // Stage order for determining current stage (simplified stages only for this sync)
+  const stageOrder: SalesPipelineStageId[] = [
+    "quote-sent",
+    "prepare-engagement",
+    "internal-engagement-review",
+    "send-engagement",
+    "closed-won",
+    "closed-lost"
+  ]
+
+  // Check for closed-won or closed-lost first (terminal states)
+  if (simplifiedStagesData["closed-won"]?.confirmedAt && !simplifiedStagesData["closed-won"].isSkipped) {
+    await updateDealAutomationStage(dealId, "closed-won")
+    await updateLocalStorageCurrentStage(dealId, "closed-won")
+    return "closed-won"
+  }
+
+  if (simplifiedStagesData["closed-lost"]?.confirmedAt && !simplifiedStagesData["closed-lost"].isSkipped) {
+    await updateDealAutomationStage(dealId, "closed-lost")
+    await updateLocalStorageCurrentStage(dealId, "closed-lost")
+    return "closed-lost"
+  }
+
+  // Find the first non-completed stage
+  let currentStage: SalesPipelineStageId = "quote-sent"
+
+  if (simplifiedStagesData["quote-sent"]?.confirmedAt) {
+    currentStage = "prepare-engagement"
+  }
+  if (simplifiedStagesData["prepare-engagement"]?.confirmedAt) {
+    currentStage = "internal-engagement-review"
+  }
+  if (simplifiedStagesData["internal-engagement-review"]?.confirmedAt) {
+    currentStage = "send-engagement"
+  }
+  if (simplifiedStagesData["send-engagement"]?.confirmedAt) {
+    // All stages before closed-won are complete, so current is closed-won (pending)
+    currentStage = "closed-won"
+  }
+
+  // Update both the deal's automation stage and localStorage
+  await updateDealAutomationStage(dealId, currentStage)
+  await updateLocalStorageCurrentStage(dealId, currentStage)
+
+  return currentStage
+}
+
+/**
+ * Update just the currentStage in localStorage without affecting other data
+ */
+async function updateLocalStorageCurrentStage(dealId: string, stageId: SalesPipelineStageId): Promise<void> {
+  const timelines = getAllTimelines()
+  const existing = timelines[dealId]
+
+  if (existing) {
+    existing.currentStage = stageId
+    existing.updatedAt = new Date().toISOString()
+    timelines[dealId] = existing
+    saveAllTimelines(timelines)
+    console.log(`[updateLocalStorageCurrentStage] Updated currentStage to ${stageId} for deal ${dealId}`)
+  }
+}
+
 // File data stored as base64 for localStorage persistence
 interface StoredFileData {
   fileName: string

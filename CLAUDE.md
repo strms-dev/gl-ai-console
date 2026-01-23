@@ -22,6 +22,12 @@ This is the **GrowthLab AI Console** - a Next.js 15 application that provides AI
 - **IMPORTANT**: When running `npm run build`, use a 60 second (60000ms) timeout. Builds can hang on this codebase and should be interrupted after 1 minute if not responding.
 - Only make code adjustments, do not run terminal commands unless specifically requested
 
+### Build Workflow
+- **DO NOT run builds after every code change** - the user typically has the dev server running which causes builds to hang
+- **ONLY run `npm run build` before committing to main branch** to verify there are no TypeScript/ESLint errors before Vercel deployment
+- When ready to commit and deploy, **ask the user to kill their dev server first**, then run the build to catch any errors
+- Use `npx tsc --noEmit` for quick TypeScript-only checks that won't conflict with the running dev server
+
 ### File Structure
 - Working directory: `gl-ai-console/` (the actual Next.js app is in this subdirectory)
 - Source code: `src/`

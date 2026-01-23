@@ -15,7 +15,8 @@ function projectToLead(project: Project): Lead {
     stage: project.current_stage as Lead['stage'],
     projectStatus: (project.project_status as Lead['projectStatus']) || 'active',
     lastActivity: formatTimestamp(project.last_activity),
-    notes: project.notes || undefined
+    notes: project.notes || undefined,
+    archived: project.archived || false
   }
 }
 
@@ -45,6 +46,7 @@ function leadToProject(lead: Partial<Lead>): ProjectInsert | ProjectUpdate {
   if (lead.email !== undefined) project.email = lead.email
   if (lead.stage !== undefined) project.current_stage = lead.stage
   if (lead.notes !== undefined) project.notes = lead.notes
+  if (lead.archived !== undefined) project.archived = lead.archived
 
   return project
 }
@@ -125,6 +127,42 @@ export async function deleteLead(id: string): Promise<void> {
     await deleteProject(id)
   } catch (error) {
     console.error("Error deleting lead from Supabase:", error)
+    throw error
+  }
+}
+
+/**
+ * Archive a lead in Supabase
+ */
+export async function archiveLead(id: string): Promise<Lead> {
+  try {
+    const projectUpdates: ProjectUpdate = {
+      archived: true,
+      last_activity: new Date().toISOString()
+    }
+
+    const project = await updateProjectSupabase(id, projectUpdates)
+    return projectToLead(project)
+  } catch (error) {
+    console.error("Error archiving lead in Supabase:", error)
+    throw error
+  }
+}
+
+/**
+ * Restore an archived lead in Supabase
+ */
+export async function restoreLead(id: string): Promise<Lead> {
+  try {
+    const projectUpdates: ProjectUpdate = {
+      archived: false,
+      last_activity: new Date().toISOString()
+    }
+
+    const project = await updateProjectSupabase(id, projectUpdates)
+    return projectToLead(project)
+  } catch (error) {
+    console.error("Error restoring lead in Supabase:", error)
     throw error
   }
 }
