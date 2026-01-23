@@ -1,298 +1,227 @@
 {
-  "name": "Handle HubSpot Stage Change",
+  "name": "HubSpot Webhook Receiver",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "revops-hubspot-stage-change",
+        "path": "receive-hubspot-events",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        4752,
-        -32
+        -320,
+        -208
       ],
-      "id": "79b48ecc-0aec-4ef8-a1f1-c85f0776bc2b",
-      "name": "Receive Stage Change",
-      "webhookId": "revops-hubspot-stage-change"
+      "id": "33b46d66-3a7f-4f0f-b1c0-f3f2b9977198",
+      "name": "Receive HubSpot Events",
+      "webhookId": "0d5fe79e-72d1-4928-b039-2eab0337ba92"
     },
     {
       "parameters": {
-        "jsCode": "// Extract event data from HubSpot webhook\n// Handle both direct webhook (json[0]) and forwarded webhook (json.body[0])\nconst input = $input.first().json;\nlet event;\n\nif (input.body && Array.isArray(input.body) && input.body.length > 0) {\n  // Forwarded from another workflow - event is in body array\n  event = input.body[0];\n} else if (Array.isArray(input) && input.length > 0) {\n  // Direct webhook - event is the json itself as array\n  event = input[0];\n} else {\n  // Fallback - maybe it's the event object directly\n  event = input;\n}\n\n// HubSpot Stage ID to Console Stage ID mapping\nconst HUBSPOT_TO_CONSOLE_STAGE = {\n  '762736': 'quote-sent',                    // SQO - Quote Sent\n  'ddea6e38-2305-4e0e-bdd9-5aa34b0d169b': 'prepare-engagement',  // Prepare EA\n  '10194290': 'internal-engagement-review',  // EA Ready for Review\n  'decisionmakerboughtin': 'send-engagement', // EA Sent\n  'closedwon': 'closed-won',                 // Closed Won\n  'closedlost': 'closed-lost'                // Closed Lost\n};\n\n// HubSpot Stage ID to human-readable stage name (for hs_stage column)\nconst HUBSPOT_STAGE_NAMES = {\n  '762736': 'SQO - Quote Sent',\n  'ddea6e38-2305-4e0e-bdd9-5aa34b0d169b': 'Prepare EA',\n  '10194290': 'EA Ready for Review',\n  'decisionmakerboughtin': 'EA Sent',\n  'closedwon': 'Closed Won',\n  'closedlost': 'Closed Lost'\n};\n\nconst hubspotDealId = event.objectId;\nconst hubspotStageId = event.propertyValue;\nconst occurredAt = new Date(event.occurredAt).toISOString();\n\n// Map to console stage\nconst consoleStageId = HUBSPOT_TO_CONSOLE_STAGE[hubspotStageId];\nconst hubspotStageName = HUBSPOT_STAGE_NAMES[hubspotStageId];\n\n// If not a stage we care about, skip (workflow ends here)\nif (!consoleStageId) {\n  return [];\n}\n\nreturn [{\n  json: {\n    hubspotDealId: String(hubspotDealId),\n    hubspotStageId,\n    hubspotStageName,\n    consoleStageId,\n    occurredAt,\n    changeSource: event.changeSource || 'unknown'\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        4976,
-        -32
-      ],
-      "id": "95e72852-d93b-44dd-b013-03d4c219048f",
-      "name": "Parse Event & Map Stage"
-    },
-    {
-      "parameters": {
-        "operation": "get",
-        "tableId": "revops_pipeline_deals",
-        "filters": {
-          "conditions": [
+        "rules": {
+          "values": [
             {
-              "keyName": "hs_deal_id",
-              "keyValue": "={{ $json.hubspotDealId }}"
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.some(e => e.subscriptionType === 'deal.creation') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    },
+                    "id": "6072a674-f9bd-4829-9518-253b1b1a8d91"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Deal Creation"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "stage-change-condition",
+                    "leftValue": "={{ $json.body.some(e => e.subscriptionType === 'deal.propertyChange' && e.propertyName === 'dealstage') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "id": "no-creation-condition",
+                    "leftValue": "={{ !$json.body.some(e => e.subscriptionType === 'deal.creation') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Deal Stage Change"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "99a6741f-36c7-444e-be9c-8dce7458ea1f",
+                    "leftValue": "={{ !$json.body.some(e => e.subscriptionType === 'deal.creation') && !$json.body.some(e => e.subscriptionType === 'deal.propertyChange' && e.propertyName === 'dealstage') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Other"
             }
           ]
-        }
-      },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        5200,
-        -32
-      ],
-      "id": "6c596cb8-50bb-4183-b3fb-9a05c6f68272",
-      "name": "Lookup Deal by HubSpot ID",
-      "credentials": {
-        "supabaseApi": {
-          "id": "ZHhTrJNxn34MA3CW",
-          "name": "GL AI Console Supabase Key"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "deal-found-check",
-              "leftValue": "={{ $json.id }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "exists"
-              }
-            }
-          ],
-          "combinator": "and"
         },
         "options": {}
       },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
       "position": [
-        5424,
-        -32
+        -96,
+        -224
       ],
-      "id": "4cb258a5-6a74-45d4-9a5b-0905c8be7c6c",
-      "name": "Deal Found?"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Get the deal_id from the lookup result and stage data from the earlier node\nconst dealId = $input.first().json.id;\nconst stageData = $('Parse Event & Map Stage').first().json;\n\n// Build the upsert records for the three fields we need to set\nconst records = [\n  {\n    deal_id: dealId,\n    stage_id: stageData.consoleStageId,\n    data_key: 'confirmed_at',\n    data_value: stageData.occurredAt\n  },\n  {\n    deal_id: dealId,\n    stage_id: stageData.consoleStageId,\n    data_key: 'hubspot_synced_at',\n    data_value: stageData.occurredAt\n  },\n  {\n    deal_id: dealId,\n    stage_id: stageData.consoleStageId,\n    data_key: 'is_auto_synced',\n    data_value: true\n  }\n];\n\nreturn [{\n  json: {\n    dealId,\n    hubspotStageName: stageData.hubspotStageName,\n    consoleStageId: stageData.consoleStageId,\n    occurredAt: stageData.occurredAt,\n    records\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        5648,
-        -32
-      ],
-      "id": "7d2ff0a4-0a39-4730-bc9d-11bf4fa01dd0",
-      "name": "Prepare Upsert Data"
+      "id": "a5c4fc78-5294-457e-88a9-dbfdb644e2fe",
+      "name": "Switch"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://scahyfdsgpfurpcnwyrb.supabase.co/rest/v1/revops_pipeline_stage_data",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpCustomAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Prefer",
-              "value": "resolution=merge-duplicates"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
+        "url": "https://n8n.srv1055749.hstgr.cloud/webhook/funnel-to-pipeline",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.records) }}",
+        "jsonBody": "={{ JSON.stringify($('Receive HubSpot Events').item.json.body) }}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        5872,
-        -32
+        128,
+        -304
       ],
-      "id": "f653c70d-ec50-4f6e-b6ef-ab230effb38d",
-      "name": "Upsert Stage Data",
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "B4p8xjVGBoWMKU5O",
-          "name": "QBO MCP API Key"
-        },
-        "httpCustomAuth": {
-          "id": "C0yjaqfgD8tpBP6n",
-          "name": "GL AI Console Supabase API Key"
-        }
-      }
+      "id": "0f333713-c6ab-4977-bc24-f9610329d4f5",
+      "name": "Call 'HubSpot Deal Created - Migrate Funnel to Pipeline' - WH"
     },
     {
       "parameters": {
-        "operation": "update",
-        "tableId": "revops_pipeline_deals",
-        "matchType": "allFilters",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "id",
-              "condition": "eq",
-              "keyValue": "={{ $('Prepare Upsert Data').item.json.dealId }}"
-            }
-          ]
-        },
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "hs_stage",
-              "fieldValue": "={{ $('Prepare Upsert Data').item.json.hubspotStageName }}"
-            }
-          ]
-        }
+        "method": "POST",
+        "url": "https://n8n.srv1055749.hstgr.cloud/webhook/revops-hubspot-stage-change",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Receive HubSpot Events').item.json.body) }}",
+        "options": {}
       },
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
       "position": [
-        6096,
-        -32
+        128,
+        -112
       ],
-      "id": "b449a052-f82b-4d57-a0c9-578fcab00a2e",
-      "name": "Update Deal hs_stage",
-      "credentials": {
-        "supabaseApi": {
-          "id": "ZHhTrJNxn34MA3CW",
-          "name": "GL AI Console Supabase Key"
-        }
-      }
+      "id": "c90e277c-7084-459c-a77c-0517962abf0d",
+      "name": "Call 'Handle HubSpot Stage Change' - WH"
     }
   ],
   "pinData": {
-    "Receive Stage Change": [
+    "Receive HubSpot Events": [
       {
         "json": {
           "headers": {
             "host": "n8n.srv1055749.hstgr.cloud",
-            "user-agent": "axios/1.12.0",
-            "content-length": "300",
-            "accept": "application/json,text/html,application/xhtml+xml,application/xml,text/*;q=0.9, image/*;q=0.8, */*;q=0.7",
-            "accept-encoding": "gzip, compress, deflate, br",
+            "user-agent": "HubSpot Connect 2.0 (http://dev.hubspot.com/) (namespace: webhooks-nio-http-client) - WebhooksExecutorDaemon-executor",
+            "content-length": "264",
+            "accept": "*/*",
             "content-type": "application/json",
-            "x-forwarded-for": "172.18.0.1",
+            "x-forwarded-for": "54.174.62.179",
             "x-forwarded-host": "n8n.srv1055749.hstgr.cloud",
             "x-forwarded-port": "443",
             "x-forwarded-proto": "https",
-            "x-forwarded-server": "30ef30da0b1d",
-            "x-real-ip": "172.18.0.1"
+            "x-forwarded-server": "658a1a16248d",
+            "x-hubspot-request-timestamp": "1767823092731",
+            "x-hubspot-signature": "61388ffa451abb95d58317b7b53132018b4bec5c14863cd0568f925d039a9f40",
+            "x-hubspot-signature-v3": "4JGjgDYZsfDSg741jJWavFrK0lmdQ70uKc2zuCK8s9k=",
+            "x-hubspot-signature-version": "v1",
+            "x-hubspot-timeout-millis": "10000",
+            "x-real-ip": "54.174.62.179",
+            "accept-encoding": "gzip"
           },
           "params": {},
           "query": {},
           "body": [
             {
-              "eventId": 971759095,
-              "subscriptionId": 5254466,
+              "eventId": 4028585488,
+              "subscriptionId": 5108761,
               "portalId": 4723689,
               "appId": 22032041,
-              "occurredAt": 1769036044581,
-              "subscriptionType": "deal.propertyChange",
+              "occurredAt": 1767823092255,
+              "subscriptionType": "deal.creation",
               "attemptNumber": 0,
-              "objectId": 53720646283,
-              "propertyName": "dealstage",
-              "propertyValue": "10194290",
+              "objectId": 53394414098,
+              "changeFlag": "CREATED",
               "changeSource": "CRM_UI",
               "sourceId": "userId:45206060"
             }
           ],
-          "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook/revops-hubspot-stage-change",
+          "webhookUrl": "https://n8n.srv1055749.hstgr.cloud/webhook/0d5fe79e-72d1-4928-b039-2eab0337ba92",
           "executionMode": "production"
-        },
-        "pairedItem": {
-          "item": 0
         }
       }
     ]
   },
   "connections": {
-    "Receive Stage Change": {
+    "Receive HubSpot Events": {
       "main": [
         [
           {
-            "node": "Parse Event & Map Stage",
+            "node": "Switch",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Parse Event & Map Stage": {
+    "Switch": {
       "main": [
         [
           {
-            "node": "Lookup Deal by HubSpot ID",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Lookup Deal by HubSpot ID": {
-      "main": [
-        [
-          {
-            "node": "Deal Found?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Deal Found?": {
-      "main": [
-        [
-          {
-            "node": "Prepare Upsert Data",
+            "node": "Call 'HubSpot Deal Created - Migrate Funnel to Pipeline' - WH",
             "type": "main",
             "index": 0
           }
         ],
-        []
-      ]
-    },
-    "Prepare Upsert Data": {
-      "main": [
         [
           {
-            "node": "Upsert Stage Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Upsert Stage Data": {
-      "main": [
-        [
-          {
-            "node": "Update Deal hs_stage",
+            "node": "Call 'Handle HubSpot Stage Change' - WH",
             "type": "main",
             "index": 0
           }
@@ -303,18 +232,15 @@
   "active": true,
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false,
-    "timeSavedMode": "fixed",
     "timezone": "America/New_York",
     "callerPolicy": "workflowsFromSameOwner",
-    "errorWorkflow": "DCoS5cl84RJM4RoS",
-    "executionTimeout": -1
+    "availableInMCP": false,
+    "errorWorkflow": "DCoS5cl84RJM4RoS"
   },
-  "versionId": "48833a43-f3db-4621-a817-d3a8a2dc5ee8",
+  "versionId": "7ee47f61-2b93-4f3f-b07f-68b4e3466798",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
   },
-  "id": "qjRQT44eEaGPCRymSqhWh",
+  "id": "IeUDhQVCPMV8CsXJ",
   "tags": []
 }

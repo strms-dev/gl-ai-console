@@ -38,7 +38,7 @@ export default function HomePage() {
                   className="text-4xl font-bold text-[#407B9D]"
                   style={{fontFamily: 'var(--font-heading)'}}
                 >
-                  2
+                  3
                 </p>
               </div>
             </CardContent>

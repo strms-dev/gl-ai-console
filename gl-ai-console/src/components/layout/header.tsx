@@ -11,6 +11,8 @@ const departmentTitles = {
   "/revops/home": "RevOps Home",
   "/revops/sales-funnel": "Sales Funnel",
   "/revops": "RevOps",
+  "/marketing/home": "Marketing Home",
+  "/marketing": "Marketing",
   "/home": "Home"
 }
 
@@ -28,7 +30,7 @@ export function Header() {
 
   const renderTitle = () => {
     const title = getPageTitle()
-    if (title === "STRMS" || title === "Home" || title === "STRMS Home" || title === "Sales Pipeline" || title === "RevOps" || title === "RevOps Home" || title === "Sales Funnel") {
+    if (title === "STRMS" || title === "Home" || title === "STRMS Home" || title === "Sales Pipeline" || title === "RevOps" || title === "RevOps Home" || title === "Sales Funnel" || title === "Marketing" || title === "Marketing Home") {
       return null // Don't render anything for department pages or Home page
     }
     return title
@@ -36,7 +38,7 @@ export function Header() {
 
   // Don't render header for department pages or Home page
   const title = getPageTitle()
-  if (title === "STRMS" || title === "Home" || title === "STRMS Home" || title === "Sales Pipeline" || title === "RevOps" || title === "RevOps Home" || title === "Sales Funnel") {
+  if (title === "STRMS" || title === "Home" || title === "STRMS Home" || title === "Sales Pipeline" || title === "RevOps" || title === "RevOps Home" || title === "Sales Funnel" || title === "Marketing" || title === "Marketing Home") {
     return null
   }
 
