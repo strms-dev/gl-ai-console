@@ -14,8 +14,8 @@ export const fileTypes: FileType[] = [
   {
     id: 'demo-call-transcript',
     label: 'Demo Call Transcript',
-    description: 'Transcript from the initial demo call',
-    acceptedTypes: ['.pdf', '.doc', '.docx', '.txt'],
+    description: 'Transcript from the initial demo call. Must be a .txt file.',
+    acceptedTypes: ['.txt'],
     icon: '🎤',
     IconComponent: Mic,
     category: 'call'
@@ -23,8 +23,8 @@ export const fileTypes: FileType[] = [
   {
     id: 'readiness-pdf',
     label: 'Readiness Assessment',
-    description: 'Client readiness assessment document',
-    acceptedTypes: ['.pdf'],
+    description: 'Client readiness assessment document. Must be a .txt file.',
+    acceptedTypes: ['.txt'],
     icon: '📊',
     IconComponent: BarChart3,
     category: 'document'
@@ -32,8 +32,8 @@ export const fileTypes: FileType[] = [
   {
     id: 'scoping-prep-doc',
     label: 'Scoping Call Prep',
-    description: 'Preparation document for scoping call',
-    acceptedTypes: ['.pdf', '.doc', '.docx'],
+    description: 'Preparation document for scoping call. Must be a .txt file.',
+    acceptedTypes: ['.txt'],
     icon: '📋',
     IconComponent: ClipboardList,
     category: 'planning'
@@ -41,8 +41,8 @@ export const fileTypes: FileType[] = [
   {
     id: 'scoping-call-transcript',
     label: 'Scoping Call Transcript',
-    description: 'Transcript from the scoping call',
-    acceptedTypes: ['.pdf', '.doc', '.docx', '.txt'],
+    description: 'Transcript from the scoping call. Must be a .txt file.',
+    acceptedTypes: ['.txt'],
     icon: '🎯',
     IconComponent: Target,
     category: 'call'
@@ -50,8 +50,8 @@ export const fileTypes: FileType[] = [
   {
     id: 'developer-audio-overview',
     label: 'Developer Overview',
-    description: 'Written overview document of project automation approach',
-    acceptedTypes: ['.pdf', '.doc', '.docx', '.txt'],
+    description: 'Written overview document of project automation approach. Must be a .txt file.',
+    acceptedTypes: ['.txt'],
     icon: '📄',
     IconComponent: FileText,
     category: 'technical'
@@ -59,8 +59,8 @@ export const fileTypes: FileType[] = [
   {
     id: 'workflow-description',
     label: 'N8N Workflow Description',
-    description: 'Natural language description of the n8n workflow',
-    acceptedTypes: ['.pdf', '.doc', '.docx', '.txt'],
+    description: 'Natural language description of the n8n workflow. Must be a .txt file.',
+    acceptedTypes: ['.txt'],
     icon: '🔄',
     IconComponent: RefreshCw,
     category: 'technical'
@@ -68,8 +68,8 @@ export const fileTypes: FileType[] = [
   {
     id: 'internal-client-documentation',
     label: 'Scoping Document',
-    description: 'Scoping document for team and client reference',
-    acceptedTypes: ['.pdf', '.doc', '.docx'],
+    description: 'Scoping document for team and client reference. Must be a .txt file.',
+    acceptedTypes: ['.txt'],
     icon: '📋',
     IconComponent: ClipboardList,
     category: 'document'
@@ -77,8 +77,8 @@ export const fileTypes: FileType[] = [
   {
     id: 'ea-wording',
     label: 'EA Wording',
-    description: 'Project-specific engagement agreement wording',
-    acceptedTypes: ['.txt', '.doc', '.docx', '.pdf'],
+    description: 'Project-specific engagement agreement wording. Must be a .txt file.',
+    acceptedTypes: ['.txt'],
     icon: '📝',
     IconComponent: FileText,
     category: 'document'
@@ -86,8 +86,8 @@ export const fileTypes: FileType[] = [
   {
     id: 'kickoff-meeting-brief',
     label: 'Kickoff Meeting Agenda',
-    description: 'Agenda document for project kickoff meeting',
-    acceptedTypes: ['.pdf', '.doc', '.docx'],
+    description: 'Agenda document for project kickoff meeting. Must be a .txt file.',
+    acceptedTypes: ['.txt'],
     icon: '🚀',
     IconComponent: Rocket,
     category: 'planning'

@@ -309,7 +309,7 @@
               "role": "system"
             },
             {
-              "content": "=Sprint Length Multiplier:\n{{ $json.confirmed_sprint_length }}\n\nWorkflow Description Document:\n{{ $('Download n8n Workflow Description').item.json.data }}\n"
+              "content": "=Sprint Length Multiplier:\n{{ $json.confirmed_sprint_length }}\n\nWorkflow Description Document:\n{{ $('Download n8n Workflow Description').item.json.data }}\n{{ $json.adjustment_reasoning ? '\\n\\nClient Adjustment Notes:\\nThe client requested adjustments to the original proposal. Please reflect these adjustments in the Scope and Deliverables sections:\\n' + $json.adjustment_reasoning : '' }}"
             }
           ]
         },

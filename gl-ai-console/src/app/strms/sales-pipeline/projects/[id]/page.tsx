@@ -8,7 +8,10 @@ import { stageLabels, stageColors, Lead } from "@/lib/dummy-data"
 import { getTimelineForLead } from "@/lib/timeline-data"
 import { cn } from "@/lib/utils"
 import { FileUpload } from "@/components/leads/file-upload"
-import { fileTypes, UploadedFile } from "@/lib/file-types"
+import { fileTypes, UploadedFile, FileType } from "@/lib/file-types"
+
+// Filter to only STRMS-related file types (exclude revops- prefixed types)
+const strmsFileTypes: FileType[] = fileTypes.filter(ft => !ft.id.startsWith('revops-'))
 import { getLeadById, updateLead } from "@/lib/leads-store"
 import { uploadFile, replaceFile, deleteFilesByType, getProjectFiles, getFileUploadDate } from "@/lib/supabase/files"
 import { getStageCompletionDate } from "@/lib/supabase/stage-data"
@@ -609,7 +612,7 @@ export default function LeadDetailPage({ params }: LeadDetailPageProps) {
           {!collapsedSections.documents && (
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {fileTypes.map((fileType) => (
+                {strmsFileTypes.map((fileType) => (
                   <FileUpload
                     key={fileType.id}
                     fileType={fileType}

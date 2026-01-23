@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Clock, User, Code, Wrench, ChevronDown } from "lucide-react"
+import { ChevronLeft, ChevronRight, Clock, User, Code, Wrench, ChevronDown, LayoutList, LayoutGrid } from "lucide-react"
 import { TimeEntry, DevelopmentProject, MaintenanceTicket } from "@/lib/types"
 import { getTimeEntries, getWeekStartDate, formatMinutes } from "@/lib/services/time-tracking-service"
 import { getDevProjects } from "@/lib/services/project-service"
@@ -17,6 +17,7 @@ export default function TimeTrackingPage() {
   const [timeEntriesExpanded, setTimeEntriesExpanded] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState<"list" | "matrix">("list")
 
   // Store projects and tickets for lookup (must be declared before useMemo hooks that use them)
   const [projects, setProjects] = useState<DevelopmentProject[]>([])
@@ -251,6 +252,129 @@ export default function TimeTrackingPage() {
           .sort((a, b) => b.totalMinutes - a.totalMinutes)
       }))
   }, [weekEntries, projects, tickets])
+
+  // Generate days of the week for matrix view (Mon-Fri only)
+  const weekDays = useMemo(() => {
+    if (!selectedWeekStart) return []
+
+    const days: { date: Date; dayName: string; dateStr: string; isToday: boolean }[] = []
+    // Parse the week start date properly (it's in YYYY-MM-DD format)
+    const [year, month, day] = selectedWeekStart.split('-').map(Number)
+    const startDate = new Date(year, month - 1, day) // month is 0-indexed
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // Only Mon-Fri (5 days)
+    for (let i = 0; i < 5; i++) {
+      const date = new Date(startDate)
+      date.setDate(startDate.getDate() + i)
+      date.setHours(0, 0, 0, 0)
+
+      days.push({
+        date,
+        dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        dateStr: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        isToday: date.getTime() === today.getTime()
+      })
+    }
+
+    return days
+  }, [selectedWeekStart])
+
+  // Matrix data: group by developer > project, with daily breakdown
+  const matrixData = useMemo(() => {
+    // Helper to get day index (0 = Monday, 4 = Friday) from a date
+    // Returns -1 for weekend days (should be filtered out)
+    const getDayIndex = (dateStr: string): number => {
+      const entryDate = new Date(dateStr)
+      // Parse week start properly
+      const [year, month, day] = selectedWeekStart.split('-').map(Number)
+      const weekStart = new Date(year, month - 1, day)
+      weekStart.setHours(0, 0, 0, 0)
+      entryDate.setHours(0, 0, 0, 0)
+
+      const diffTime = entryDate.getTime() - weekStart.getTime()
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+
+      // Only return valid index for Mon-Fri (0-4)
+      if (diffDays < 0 || diffDays > 4) return -1
+      return diffDays
+    }
+
+    // Build matrix structure
+    const developerMatrix = new Map<string, {
+      developer: string
+      totalMinutes: number
+      dailyTotals: number[] // 5 days (Mon-Fri)
+      projects: Map<string, {
+        projectId: string
+        projectName: string
+        projectType: "development" | "maintenance"
+        totalMinutes: number
+        dailyMinutes: number[] // 5 days (Mon-Fri)
+        dailyEntries: TimeEntry[][] // entries per day for drill-down
+      }>
+    }>()
+
+    weekEntries.forEach(entry => {
+      const dayIndex = getDayIndex(entry.createdAt)
+
+      // Skip entries that don't fall on Mon-Fri
+      if (dayIndex < 0) return
+
+      // Get or create developer
+      if (!developerMatrix.has(entry.assignee)) {
+        developerMatrix.set(entry.assignee, {
+          developer: entry.assignee,
+          totalMinutes: 0,
+          dailyTotals: [0, 0, 0, 0, 0],
+          projects: new Map()
+        })
+      }
+
+      const devData = developerMatrix.get(entry.assignee)!
+      devData.totalMinutes += entry.duration
+      devData.dailyTotals[dayIndex] += entry.duration
+
+      // Get or create project within developer
+      const projectKey = `${entry.projectType}-${entry.projectId}`
+      if (!devData.projects.has(projectKey)) {
+        devData.projects.set(projectKey, {
+          projectId: entry.projectId,
+          projectName: getProjectName(entry),
+          projectType: entry.projectType,
+          totalMinutes: 0,
+          dailyMinutes: [0, 0, 0, 0, 0],
+          dailyEntries: [[], [], [], [], []]
+        })
+      }
+
+      const projectData = devData.projects.get(projectKey)!
+      projectData.totalMinutes += entry.duration
+      projectData.dailyMinutes[dayIndex] += entry.duration
+      projectData.dailyEntries[dayIndex].push(entry)
+    })
+
+    // Convert to array and sort
+    return Array.from(developerMatrix.values())
+      .sort((a, b) => b.totalMinutes - a.totalMinutes)
+      .map(devData => ({
+        ...devData,
+        projects: Array.from(devData.projects.values())
+          .sort((a, b) => b.totalMinutes - a.totalMinutes)
+      }))
+  }, [weekEntries, selectedWeekStart, projects, tickets])
+
+  // Calculate daily totals across all developers (Mon-Fri only)
+  const dailyTotals = useMemo(() => {
+    const totals = [0, 0, 0, 0, 0]
+    matrixData.forEach(dev => {
+      dev.dailyTotals.forEach((minutes, index) => {
+        if (index < 5) totals[index] += minutes
+      })
+    })
+    return totals
+  }, [matrixData])
 
   // Toggle group expansion
   const toggleGroup = (groupKey: string) => {
@@ -536,15 +660,47 @@ export default function TimeTrackingPage() {
       {/* Time Entries Detail */}
       <Card>
         <CardHeader>
-          <button
-            onClick={() => setTimeEntriesExpanded(!timeEntriesExpanded)}
-            className="flex items-center gap-2 w-full hover:opacity-80 transition-opacity"
-          >
-            <CardTitle style={{fontFamily: 'var(--font-heading)'}}>
-              Time Entries ({weekEntries.length})
-            </CardTitle>
-            <ChevronDown className={`w-5 h-5 text-[#666666] transition-transform ${timeEntriesExpanded ? 'rotate-180' : ''}`} />
-          </button>
+          <div className="flex items-center justify-between w-full">
+            <button
+              onClick={() => setTimeEntriesExpanded(!timeEntriesExpanded)}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              <CardTitle style={{fontFamily: 'var(--font-heading)'}}>
+                Time Entries ({weekEntries.length})
+              </CardTitle>
+              <ChevronDown className={`w-5 h-5 text-[#666666] transition-transform ${timeEntriesExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* View Toggle */}
+            {timeEntriesExpanded && (
+              <div className="flex items-center gap-1 bg-[#F5F5F5] rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === "list"
+                      ? "bg-white text-[#407B9D] shadow-sm"
+                      : "text-[#666666] hover:text-[#463939]"
+                  }`}
+                  style={{fontFamily: 'var(--font-body)'}}
+                >
+                  <LayoutList className="w-4 h-4" />
+                  List
+                </button>
+                <button
+                  onClick={() => setViewMode("matrix")}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === "matrix"
+                      ? "bg-white text-[#407B9D] shadow-sm"
+                      : "text-[#666666] hover:text-[#463939]"
+                  }`}
+                  style={{fontFamily: 'var(--font-body)'}}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  Matrix
+                </button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         {timeEntriesExpanded && (
           <CardContent>
@@ -555,7 +711,8 @@ export default function TimeTrackingPage() {
                   No time entries for this week
                 </p>
               </div>
-            ) : (
+            ) : viewMode === "list" ? (
+              /* LIST VIEW */
               <div className="space-y-4">
                 {groupedByDeveloper.map((devGroup) => {
                   const devKey = `dev-${devGroup.developer}`
@@ -664,6 +821,171 @@ export default function TimeTrackingPage() {
                     </div>
                   )
                 })}
+              </div>
+            ) : (
+              /* MATRIX VIEW */
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  {/* Header Row with Days */}
+                  <thead>
+                    <tr>
+                      <th className="text-left p-3 bg-[#F5F5F5] border-b-2 border-[#E5E5E5] min-w-[200px]">
+                        <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
+                          Task / Project
+                        </span>
+                      </th>
+                      {weekDays.map((day, index) => (
+                        <th
+                          key={index}
+                          className={`text-center p-3 border-b-2 border-[#E5E5E5] min-w-[90px] ${
+                            day.isToday ? 'bg-[#407B9D]/10' : 'bg-[#F5F5F5]'
+                          }`}
+                        >
+                          <div className="flex flex-col items-center">
+                            <span className={`text-xs font-medium ${day.isToday ? 'text-[#407B9D]' : 'text-[#666666]'}`} style={{fontFamily: 'var(--font-body)'}}>
+                              {day.dayName}
+                            </span>
+                            <span className={`text-xs ${day.isToday ? 'text-[#407B9D] font-semibold' : 'text-[#999999]'}`} style={{fontFamily: 'var(--font-body)'}}>
+                              {day.dateStr}
+                            </span>
+                            {dailyTotals[index] > 0 && (
+                              <span className={`text-xs font-semibold mt-1 ${day.isToday ? 'text-[#407B9D]' : 'text-[#463939]'}`} style={{fontFamily: 'var(--font-body)'}}>
+                                {formatMinutes(dailyTotals[index])}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                      ))}
+                      <th className="text-center p-3 bg-[#F5F5F5] border-b-2 border-[#E5E5E5] min-w-[80px]">
+                        <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
+                          Total
+                        </span>
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {matrixData.map((devData) => {
+                      const devKey = `matrix-dev-${devData.developer}`
+                      const isDevExpanded = expandedGroups.has(devKey)
+
+                      return (
+                        <React.Fragment key={devKey}>
+                          {/* Developer Row */}
+                          <tr className="bg-[#407B9D]/5 hover:bg-[#407B9D]/10 transition-colors">
+                            <td className="p-3 border-b border-[#E5E5E5]">
+                              <button
+                                onClick={() => toggleGroup(devKey)}
+                                className="flex items-center gap-2 w-full text-left"
+                              >
+                                <ChevronDown className={`w-4 h-4 text-[#407B9D] transition-transform ${isDevExpanded ? 'rotate-180' : ''}`} />
+                                <User className="w-4 h-4 text-[#407B9D]" />
+                                <span className="font-semibold text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
+                                  {devData.developer}
+                                </span>
+                                <span className="text-xs text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                                  ({devData.projects.length} {devData.projects.length === 1 ? 'project' : 'projects'})
+                                </span>
+                              </button>
+                            </td>
+                            {weekDays.map((day, index) => (
+                              <td
+                                key={index}
+                                className={`text-center p-3 border-b border-[#E5E5E5] ${day.isToday ? 'bg-[#407B9D]/5' : ''}`}
+                              >
+                                {devData.dailyTotals[index] > 0 ? (
+                                  <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                                    {formatMinutes(devData.dailyTotals[index])}
+                                  </span>
+                                ) : (
+                                  <span className="text-[#CCCCCC]">—</span>
+                                )}
+                              </td>
+                            ))}
+                            <td className="text-center p-3 border-b border-[#E5E5E5] bg-[#F5F5F5]">
+                              <div className="flex items-center justify-center gap-1">
+                                <Clock className="w-4 h-4 text-[#407B9D]" />
+                                <span className="font-bold text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
+                                  {formatMinutes(devData.totalMinutes)}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Project Rows (when expanded) */}
+                          {isDevExpanded && devData.projects.map((project) => (
+                            <tr key={`${devKey}-${project.projectType}-${project.projectId}`} className="hover:bg-[#FAFAFA] transition-colors">
+                              <td className="p-3 pl-10 border-b border-[#E5E5E5]">
+                                <div className="flex items-center gap-2">
+                                  <Badge className={
+                                    project.projectType === "development"
+                                      ? "bg-[#95CBD7] text-[#463939] hover:bg-[#95CBD7]/90 border-none text-xs"
+                                      : "bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/90 border-none text-xs"
+                                  }>
+                                    {project.projectType === "development" ? "Dev" : "Maint"}
+                                  </Badge>
+                                  <span className="text-sm text-[#463939] truncate max-w-[150px]" style={{fontFamily: 'var(--font-body)'}} title={project.projectName}>
+                                    {project.projectName}
+                                  </span>
+                                </div>
+                              </td>
+                              {weekDays.map((day, index) => (
+                                <td
+                                  key={index}
+                                  className={`text-center p-3 border-b border-[#E5E5E5] ${day.isToday ? 'bg-[#407B9D]/5' : ''}`}
+                                >
+                                  {project.dailyMinutes[index] > 0 ? (
+                                    <span className="text-sm text-[#666666]" style={{fontFamily: 'var(--font-body)'}}>
+                                      {formatMinutes(project.dailyMinutes[index])}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[#DDDDDD]">—</span>
+                                  )}
+                                </td>
+                              ))}
+                              <td className="text-center p-3 border-b border-[#E5E5E5] bg-[#FAFAFA]">
+                                <span className="text-sm font-semibold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                                  {formatMinutes(project.totalMinutes)}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      )
+                    })}
+
+                    {/* Grand Total Row */}
+                    <tr className="bg-[#407B9D]/10">
+                      <td className="p-3 border-t-2 border-[#407B9D]">
+                        <span className="font-bold text-[#463939]" style={{fontFamily: 'var(--font-heading)'}}>
+                          Total
+                        </span>
+                      </td>
+                      {weekDays.map((day, index) => (
+                        <td
+                          key={index}
+                          className={`text-center p-3 border-t-2 border-[#407B9D] ${day.isToday ? 'bg-[#407B9D]/15' : ''}`}
+                        >
+                          {dailyTotals[index] > 0 ? (
+                            <span className="font-bold text-[#463939]" style={{fontFamily: 'var(--font-body)'}}>
+                              {formatMinutes(dailyTotals[index])}
+                            </span>
+                          ) : (
+                            <span className="text-[#CCCCCC]">—</span>
+                          )}
+                        </td>
+                      ))}
+                      <td className="text-center p-3 border-t-2 border-[#407B9D] bg-[#407B9D]/20">
+                        <div className="flex items-center justify-center gap-1">
+                          <Clock className="w-4 h-4 text-[#407B9D]" />
+                          <span className="font-bold text-[#407B9D]" style={{fontFamily: 'var(--font-heading)'}}>
+                            {formatMinutes(totalWeekMinutes)}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             )}
           </CardContent>

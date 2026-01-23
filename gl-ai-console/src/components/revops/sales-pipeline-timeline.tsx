@@ -126,9 +126,9 @@ import {
   updateClosingNotes,
   markClosedWonSyncedToHubspot,
   markDealAsLost,
-  markClosedLostSyncedToHubspot
+  markClosedLostSyncedToHubspot,
+  syncAutomationStageFromSupabase
 } from "@/lib/sales-pipeline-timeline-store"
-import { updatePipelineDeal } from "@/lib/revops-pipeline-store"
 import { SalesIntakeForm } from "@/components/revops/sales-intake-form"
 import { FollowUpEmail } from "@/components/revops/follow-up-email"
 import { ReminderSequence } from "@/components/revops/reminder-sequence"
@@ -1677,8 +1677,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     setIsSimplifiedStageLoading(true)
     try {
       await confirmSimplifiedStage(deal.id, "quote-sent")
-      // Update automation stage to next pending stage
-      await updatePipelineDeal(deal.id, { stage: "Prepare Engagement Walkthrough" })
+      // Sync automation stage from Supabase (dynamically determines correct stage)
+      await syncAutomationStageFromSupabase(deal.id)
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1694,8 +1694,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     setIsSimplifiedStageLoading(true)
     try {
       await confirmClosedLost(deal.id, "declined", "Quote was declined by prospect", "quote-sent")
-      // Update automation stage to Closed Lost
-      await updatePipelineDeal(deal.id, { stage: "Closed Lost" })
+      // Sync automation stage from Supabase (will set to Closed Lost)
+      await syncAutomationStageFromSupabase(deal.id)
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1710,8 +1710,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     setIsSimplifiedStageLoading(true)
     try {
       await confirmSimplifiedStage(deal.id, "prepare-engagement")
-      // Update automation stage to next pending stage
-      await updatePipelineDeal(deal.id, { stage: "EA Internal Review" })
+      // Sync automation stage from Supabase (dynamically determines correct stage)
+      await syncAutomationStageFromSupabase(deal.id)
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1726,8 +1726,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     setIsSimplifiedStageLoading(true)
     try {
       await confirmSimplifiedStage(deal.id, "internal-engagement-review")
-      // Update automation stage to next pending stage
-      await updatePipelineDeal(deal.id, { stage: "Send Engagement" })
+      // Sync automation stage from Supabase (dynamically determines correct stage)
+      await syncAutomationStageFromSupabase(deal.id)
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1742,8 +1742,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     setIsSimplifiedStageLoading(true)
     try {
       await confirmSimplifiedStage(deal.id, "send-engagement")
-      // Update automation stage to Deal Outcome (Closed Won pending)
-      await updatePipelineDeal(deal.id, { stage: "Closed Won" })
+      // Sync automation stage from Supabase (dynamically determines correct stage)
+      await syncAutomationStageFromSupabase(deal.id)
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1760,8 +1760,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
       const quoteLineItems = timelineState?.stages["create-quote"]?.data?.lineItems || []
       const totalMonthly = quoteLineItems.reduce((sum, item) => sum + (item.monthlyPrice || 0), 0)
       await confirmClosedWon(deal.id, totalMonthly)
-      // Update automation stage to Closed Won
-      await updatePipelineDeal(deal.id, { stage: "Closed Won" })
+      // Sync automation stage from Supabase (will set to Closed Won)
+      await syncAutomationStageFromSupabase(deal.id)
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1777,8 +1777,8 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
     try {
       const currentStage = timelineState?.currentStage || "quote-sent"
       await confirmClosedLost(deal.id, reason, details, currentStage)
-      // Update automation stage to Closed Lost
-      await updatePipelineDeal(deal.id, { stage: "Closed Lost" })
+      // Sync automation stage from Supabase (will set to Closed Lost)
+      await syncAutomationStageFromSupabase(deal.id)
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()
@@ -1791,25 +1791,12 @@ export function SalesPipelineTimeline({ deal, onDealUpdate }: SalesPipelineTimel
 
   // RESET HANDLERS
   // ============================================
-  // Mapping of stage IDs to their display names for automation stage update
-  const STAGE_DISPLAY_NAMES: Record<string, string> = {
-    "quote-sent": "Quote Sent",
-    "prepare-engagement": "Prepare Engagement Walkthrough",
-    "internal-engagement-review": "EA Internal Review",
-    "send-engagement": "Send Engagement",
-    "closed-won": "Closed Won",
-    "closed-lost": "Closed Lost",
-  }
-
   async function handleResetStage(stageId: string) {
     setIsSimplifiedStageLoading(true)
     try {
       await resetSimplifiedStage(deal.id, stageId as "quote-sent" | "prepare-engagement" | "internal-engagement-review" | "send-engagement" | "closed-won" | "closed-lost")
-      // Update automation stage to the reset stage (so it becomes the current pending stage)
-      const displayName = STAGE_DISPLAY_NAMES[stageId]
-      if (displayName) {
-        await updatePipelineDeal(deal.id, { stage: displayName })
-      }
+      // Sync automation stage from Supabase (dynamically determines correct stage after reset)
+      await syncAutomationStageFromSupabase(deal.id)
       const updatedData = await getAllSimplifiedStagesData(deal.id)
       setSimplifiedStagesData(updatedData)
       await refreshState()

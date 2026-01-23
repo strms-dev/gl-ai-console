@@ -345,6 +345,11 @@ const ActionZone = ({
                   </>
                 )}
               </Button>
+              {readinessGenerating && (
+                <p className="text-xs text-gray-500 mt-2">
+                  This may take 1-2 minutes. Please stay on this page and don&apos;t refresh.
+                </p>
+              )}
             </div>
           )}
 
@@ -394,6 +399,11 @@ const ActionZone = ({
                   </>
                 )}
               </Button>
+              {scopingPrepGenerating && (
+                <p className="text-xs text-gray-500 mt-2">
+                  This may take 1-2 minutes. Please stay on this page and don&apos;t refresh.
+                </p>
+              )}
             </div>
           )}
 
@@ -443,6 +453,11 @@ const ActionZone = ({
                   </>
                 )}
               </Button>
+              {workflowDocsGenerating && (
+                <p className="text-xs text-gray-500 mt-2">
+                  This may take 1-2 minutes. Please stay on this page and don&apos;t refresh.
+                </p>
+              )}
             </div>
           )}
 
@@ -781,6 +796,11 @@ Tim`
                   </>
                 )}
               </Button>
+              {scopingDocGenerating && (
+                <p className="text-xs text-gray-500 mt-2">
+                  This may take 1-2 minutes. Please stay on this page and don&apos;t refresh.
+                </p>
+              )}
             </div>
           )}
 
@@ -830,6 +850,11 @@ Tim`
                   </>
                 )}
               </Button>
+              {kickoffAgendaGenerating && (
+                <p className="text-xs text-gray-500 mt-2">
+                  This may take 1-2 minutes. Please stay on this page and don&apos;t refresh.
+                </p>
+              )}
             </div>
           )}
 
@@ -1253,6 +1278,11 @@ Tim`
                   </>
                 )}
               </Button>
+              {eaWordingGenerating && (
+                <p className="text-xs text-gray-500 mt-2">
+                  This may take 1-2 minutes. Please stay on this page and don&apos;t refresh.
+                </p>
+              )}
 
               <div className="mt-3">
                 <p className="text-sm font-medium text-foreground mb-2">Or upload manually:</p>
@@ -1450,7 +1480,9 @@ We're excited to kick off your ${sprintPricingData?.sprintLength || '[sprint len
 
 Project Details
 Scope:
-${sprintPricingData?.aiScope || sprintPricingData?.aiExplanation || '[Scope placeholder]'}
+${sprintPricingData?.aiScope || sprintPricingData?.aiExplanation || '[Scope placeholder]'}${sprintPricingData?.adjustmentReasoning ? `
+
+Note: Scope adjusted per client request - ${sprintPricingData.adjustmentReasoning}` : ''}
 
 Primary Contact/Developer: ${getDeveloperName()}
 
@@ -3637,14 +3669,15 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
       console.error("Failed to save proposal adjustment flag to Supabase:", error)
     })
 
-    // Trigger scoping document generation webhook
+    // Trigger scoping document generation webhook (include adjustment reasoning for context)
     fetch('https://n8n.srv1055749.hstgr.cloud/webhook/2979a880-57bb-4466-8880-7f93f42ccf0f', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        project_id: leadId
+        project_id: leadId,
+        adjustment_reasoning: data.explanation
       })
     })
       .then(response => {
@@ -3658,14 +3691,15 @@ export function Timeline({ events, leadId, hideHeader = false, uploadedFiles: pr
         console.error('Error triggering scoping document generation:', error)
       })
 
-    // Trigger EA wording generation webhook
+    // Trigger EA wording generation webhook (include adjustment reasoning for context)
     fetch('https://n8n.srv1055749.hstgr.cloud/webhook/47cfbf23-faf9-498a-8f75-39c9d48099e1', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        project_id: leadId
+        project_id: leadId,
+        adjustment_reasoning: data.explanation
       })
     })
       .then(response => {
@@ -3987,7 +4021,9 @@ We're excited to kick off your ${sprintPricingData?.sprintLength || '[sprint len
 
 Project Details
 Scope:
-${sprintPricingData?.aiScope || sprintPricingData?.aiExplanation || '[Scope placeholder]'}
+${sprintPricingData?.aiScope || sprintPricingData?.aiExplanation || '[Scope placeholder]'}${sprintPricingData?.adjustmentReasoning ? `
+
+Note: Scope adjusted per client request - ${sprintPricingData.adjustmentReasoning}` : ''}
 
 Primary Contact/Developer: ${getDeveloperName()}
 
@@ -4016,7 +4052,9 @@ We're excited to kick off your ${sprintPricingData?.sprintLength || '[sprint len
 
 Project Details
 Scope:
-${sprintPricingData?.aiScope || sprintPricingData?.aiExplanation || '[Scope placeholder]'}
+${sprintPricingData?.aiScope || sprintPricingData?.aiExplanation || '[Scope placeholder]'}${sprintPricingData?.adjustmentReasoning ? `
+
+Note: Scope adjusted per client request - ${sprintPricingData.adjustmentReasoning}` : ''}
 
 Primary Contact/Developer: ${getDeveloperName()}
 
