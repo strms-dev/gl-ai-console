@@ -31,6 +31,7 @@ const contentTypeFilters: { value: ContentType | 'all'; label: string }[] = [
   { value: 'case_study', label: 'Case Studies' },
   { value: 'website_page', label: 'Website Pages' },
   { value: 'meeting_transcript', label: 'Transcripts' },
+  { value: 'external', label: 'External' },
 ]
 
 export function ContentLibrary({ content }: ContentLibraryProps) {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Lightbulb,
@@ -11,6 +11,7 @@ import {
   Library,
   LayoutGrid,
   ArrowRight,
+  FileCheck,
 } from "lucide-react"
 
 // Components
@@ -24,21 +25,48 @@ import { RepurposeModal } from "@/components/marketing/repurpose-modal"
 import { RefreshModal } from "@/components/marketing/refresh-modal"
 import { ContentLibrary } from "@/components/marketing/content-library"
 import { ContentChat } from "@/components/marketing/content-chat"
+import { FinalDraftsSection } from "@/components/marketing/final-drafts-section"
 
-// Test Data
+// Test Data (for static content)
 import {
   testContentLibrary,
-  testTopicIdeas,
-  testBriefs,
   testRepurposeItems,
   testRefreshRecommendations,
   testChatMessages,
   getDashboardStats,
 } from "@/lib/marketing-content-data"
 
-import { WorkflowContext, ChatMessage } from "@/lib/marketing-content-types"
+// localStorage Store
+import {
+  getTopicIdeas,
+  saveTopicIdeas,
+  removeTopicIdea,
+  updateTopicIdea,
+  generateTopicIdeasForCategory,
+  getBriefs,
+  saveBriefs,
+  addBrief,
+  updateBrief,
+  removeBrief,
+  getBriefById,
+  getFinalDrafts,
+  addFinalDraft,
+  updateFinalDraft,
+  createBriefFromTopicIdea,
+  createFinalDraftFromBrief,
+  getMarketingStats,
+} from "@/lib/marketing-content-store"
 
-type ViewMode = 'workflows' | 'library'
+import {
+  WorkflowContext,
+  ChatMessage,
+  TopicCategory,
+  TopicIdea,
+  ContentBrief,
+  FinalDraft,
+} from "@/lib/marketing-content-types"
+
+type ViewMode = 'workflows' | 'library' | 'final_drafts'
 
 export default function ContentEnginePage() {
   // View state
@@ -51,11 +79,32 @@ export default function ContentEnginePage() {
   const [repurposeOpen, setRepurposeOpen] = useState(false)
   const [refreshOpen, setRefreshOpen] = useState(false)
 
+  // Data states (from localStorage)
+  const [topicIdeas, setTopicIdeas] = useState<TopicIdea[]>([])
+  const [briefs, setBriefs] = useState<ContentBrief[]>([])
+  const [finalDrafts, setFinalDrafts] = useState<FinalDraft[]>([])
+
+  // Analysis states
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [lastAnalysisCategory, setLastAnalysisCategory] = useState<TopicCategory | null>(null)
+
+  // Brief builder state
+  const [initialBriefId, setInitialBriefId] = useState<string | null>(null)
+
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(testChatMessages)
 
-  // Get stats
-  const stats = getDashboardStats()
+  // Load data from localStorage on mount
+  useEffect(() => {
+    setTopicIdeas(getTopicIdeas())
+    setBriefs(getBriefs())
+    setFinalDrafts(getFinalDrafts())
+  }, [])
+
+  // Get stats - combine localStorage with static test data
+  const staticStats = getDashboardStats()
+  const localStats = getMarketingStats()
+  const finalDraftsReady = finalDrafts.filter(d => !d.publishedAt).length
 
   // Handlers
   const handleSendMessage = (message: string) => {
@@ -86,6 +135,7 @@ export default function ContentEnginePage() {
         setWorkflowContext('topic_radar')
         break
       case 'brief':
+        setInitialBriefId(null)
         setBriefBuilderOpen(true)
         setWorkflowContext('brief_builder')
         break
@@ -107,6 +157,7 @@ export default function ContentEnginePage() {
         break
       case 'brief':
         setBriefBuilderOpen(false)
+        setInitialBriefId(null)
         break
       case 'repurpose':
         setRepurposeOpen(false)
@@ -117,6 +168,124 @@ export default function ContentEnginePage() {
     }
     setWorkflowContext('dashboard')
   }
+
+  const handleRunAnalysis = (category: TopicCategory) => {
+    console.log('Running topic analysis for category:', category)
+
+    // Open modal first and show loading state
+    setTopicRadarOpen(true)
+    setWorkflowContext('topic_radar')
+    setIsAnalyzing(true)
+    setLastAnalysisCategory(category)
+
+    // Simulate analysis delay, then generate ideas
+    setTimeout(() => {
+      const newIdeas = generateTopicIdeasForCategory(category)
+
+      // Add to existing ideas (don't replace)
+      const currentIdeas = getTopicIdeas()
+      const allIdeas = [...currentIdeas, ...newIdeas]
+      saveTopicIdeas(allIdeas)
+      setTopicIdeas(allIdeas)
+
+      setIsAnalyzing(false)
+    }, 2500)
+  }
+
+  const handleApproveIdea = (ideaId: string) => {
+    console.log('Approving idea:', ideaId)
+
+    // Get the idea
+    const idea = topicIdeas.find(i => i.id === ideaId)
+    if (!idea) return
+
+    // Create a brief from this idea
+    const newBrief = createBriefFromTopicIdea(idea)
+    const updatedBriefs = addBrief(newBrief)
+    setBriefs(updatedBriefs)
+
+    // Remove from topic ideas
+    const updatedIdeas = removeTopicIdea(ideaId)
+    setTopicIdeas(updatedIdeas)
+  }
+
+  const handleRejectIdea = (ideaId: string) => {
+    console.log('Rejecting idea:', ideaId)
+
+    // Simply remove from the list
+    const updatedIdeas = removeTopicIdea(ideaId)
+    setTopicIdeas(updatedIdeas)
+  }
+
+  const handleCreateBriefFromIdea = (ideaId: string) => {
+    console.log('Creating brief from idea:', ideaId)
+
+    // This is called when user clicks "Create Brief" on an approved idea
+    // The idea should already be in briefs, so just open the modal
+    const idea = topicIdeas.find(i => i.id === ideaId)
+    if (idea) {
+      // Create brief from idea and remove from topic ideas
+      const newBrief = createBriefFromTopicIdea(idea)
+      const updatedBriefs = addBrief(newBrief)
+      setBriefs(updatedBriefs)
+
+      const updatedIdeas = removeTopicIdea(ideaId)
+      setTopicIdeas(updatedIdeas)
+
+      // Open brief builder with this brief
+      setInitialBriefId(newBrief.id)
+    }
+
+    // Close topic radar, open brief builder
+    setTopicRadarOpen(false)
+    setBriefBuilderOpen(true)
+    setWorkflowContext('brief_builder')
+  }
+
+  const handleSaveBrief = (brief: ContentBrief) => {
+    console.log('Saving brief:', brief.id)
+
+    // Check if brief exists
+    const existing = briefs.find(b => b.id === brief.id)
+    if (existing) {
+      const updatedBriefs = updateBrief(brief.id, brief)
+      setBriefs(updatedBriefs)
+    } else {
+      const updatedBriefs = addBrief(brief)
+      setBriefs(updatedBriefs)
+    }
+  }
+
+  const handleApproveFinalDraft = (briefId: string) => {
+    console.log('Approving final draft for brief:', briefId)
+
+    // Get the brief
+    const brief = briefs.find(b => b.id === briefId)
+    if (!brief) return
+
+    // Create final draft
+    const authorName = brief.assignedTo || 'Unknown Author'
+    const newFinalDraft = createFinalDraftFromBrief(brief, authorName)
+    const updatedFinalDrafts = addFinalDraft(newFinalDraft)
+    setFinalDrafts(updatedFinalDrafts)
+
+    // Update brief status
+    const updatedBriefs = updateBrief(briefId, { status: 'completed', currentStep: 'published' })
+    setBriefs(updatedBriefs)
+  }
+
+  const handlePublishDraft = (draftId: string) => {
+    console.log('Publishing draft:', draftId)
+
+    // Update final draft with published date
+    const updatedFinalDrafts = updateFinalDraft(draftId, {
+      publishedAt: new Date().toISOString().split('T')[0],
+    })
+    setFinalDrafts(updatedFinalDrafts)
+  }
+
+  // Get approved ideas for brief builder (status === 'approved')
+  const approvedTopicIdeas = topicIdeas.filter(i => i.status === 'approved')
 
   return (
     <div className="min-h-screen bg-[#FAF9F9]">
@@ -159,6 +328,23 @@ export default function ContentEnginePage() {
             </Button>
             <Button
               size="sm"
+              variant={viewMode === 'final_drafts' ? 'default' : 'ghost'}
+              onClick={() => {
+                setViewMode('final_drafts')
+                setWorkflowContext('dashboard')
+              }}
+              className={viewMode === 'final_drafts' ? 'bg-[#407B9D]' : ''}
+            >
+              <FileCheck className="w-4 h-4 mr-2" />
+              Final Drafts
+              {finalDraftsReady > 0 && (
+                <span className="ml-1 text-xs bg-[#C8E4BB] text-[#463939] px-1.5 py-0.5 rounded-full">
+                  {finalDraftsReady}
+                </span>
+              )}
+            </Button>
+            <Button
+              size="sm"
               variant={viewMode === 'library' ? 'default' : 'ghost'}
               onClick={() => {
                 setViewMode('library')
@@ -168,7 +354,7 @@ export default function ContentEnginePage() {
             >
               <Library className="w-4 h-4 mr-2" />
               Library
-              <span className="ml-1 text-xs opacity-70">({stats.totalContent})</span>
+              <span className="ml-1 text-xs opacity-70">({staticStats.totalContent})</span>
             </Button>
           </div>
         </div>
@@ -223,23 +409,23 @@ export default function ContentEnginePage() {
             {/* Workflow Cards Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
               <TopicRadarCard
-                newIdeasCount={stats.newIdeas}
+                newIdeasCount={topicIdeas.filter(i => i.status === 'new').length}
                 onOpenModal={() => handleOpenModal('topic')}
-                onRunAnalysis={() => console.log('Running topic analysis...')}
+                onRunAnalysis={handleRunAnalysis}
               />
               <BriefBuilderCard
-                briefsInProgressCount={stats.briefsInProgress}
+                briefsInProgressCount={briefs.filter(b => b.status !== 'completed').length}
                 onOpenModal={() => handleOpenModal('brief')}
                 onCreateBrief={() => {
                   handleOpenModal('brief')
                 }}
               />
               <RepurposeFactoryCard
-                readyToRepurposeCount={stats.readyToRepurpose}
+                readyToRepurposeCount={staticStats.readyToRepurpose}
                 onOpenModal={() => handleOpenModal('repurpose')}
               />
               <RefreshFinderCard
-                needsRefreshCount={stats.needsRefresh}
+                needsRefreshCount={staticStats.needsRefresh}
                 onOpenModal={() => handleOpenModal('refresh')}
                 onRunAnalysis={() => console.log('Running refresh analysis...')}
               />
@@ -252,6 +438,13 @@ export default function ContentEnginePage() {
               onSendMessage={handleSendMessage}
             />
           </>
+        ) : viewMode === 'final_drafts' ? (
+          /* Final Drafts View */
+          <FinalDraftsSection
+            drafts={finalDrafts}
+            onPublish={handlePublishDraft}
+            onViewDraft={(draftId) => console.log('Viewing draft:', draftId)}
+          />
         ) : (
           /* Content Library View */
           <div className="bg-white rounded-xl border shadow-sm p-6">
@@ -263,23 +456,30 @@ export default function ContentEnginePage() {
         <TopicRadarModal
           open={topicRadarOpen}
           onOpenChange={(open) => !open && handleCloseModal('topic')}
-          ideas={testTopicIdeas}
-          onCreateBrief={(ideaId) => {
-            console.log('Creating brief for idea:', ideaId)
-            handleCloseModal('topic')
-            handleOpenModal('brief')
-          }}
-          onApproveIdea={(ideaId) => console.log('Approving idea:', ideaId)}
-          onRejectIdea={(ideaId) => console.log('Rejecting idea:', ideaId)}
+          ideas={topicIdeas}
+          isLoading={isAnalyzing}
+          lastAnalysisCategory={lastAnalysisCategory}
+          onCreateBrief={handleCreateBriefFromIdea}
+          onApproveIdea={handleApproveIdea}
+          onRejectIdea={handleRejectIdea}
         />
 
         <BriefBuilderModal
           open={briefBuilderOpen}
           onOpenChange={(open) => !open && handleCloseModal('brief')}
-          briefs={testBriefs}
+          briefs={briefs}
+          approvedTopicIdeas={approvedTopicIdeas}
+          onSaveBrief={handleSaveBrief}
           onEditBrief={(briefId) => console.log('Editing brief:', briefId)}
           onViewBrief={(briefId) => console.log('Viewing brief:', briefId)}
           onCreateNew={() => console.log('Creating new brief')}
+          onCreateFromIdea={(ideaId) => {
+            // Remove from approved ideas when creating a brief
+            const updatedIdeas = removeTopicIdea(ideaId)
+            setTopicIdeas(updatedIdeas)
+          }}
+          onApproveFinalDraft={handleApproveFinalDraft}
+          initialBriefId={initialBriefId}
         />
 
         <RepurposeModal

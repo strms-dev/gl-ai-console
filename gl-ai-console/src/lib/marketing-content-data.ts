@@ -7,6 +7,7 @@ import {
   RepurposeItem,
   RefreshRecommendation,
   ChatMessage,
+  FinalDraft,
 } from './marketing-content-types'
 
 // ===================
@@ -207,6 +208,39 @@ export const testContentLibrary: ContentItem[] = [
     author: 'Dan',
     description: 'Analysis of Q4 2024 economic conditions and what they mean for small businesses.',
   },
+  {
+    id: 'content-18',
+    title: 'Webinar: Mastering Cash Flow for Growing Businesses',
+    type: 'external',
+    url: 'https://rightworks.com/webinars/cash-flow-masterclass',
+    dateCreated: '2025-01-15',
+    status: 'published',
+    keywords: ['webinar', 'cash flow', 'RightWorks', 'partnership'],
+    author: 'Dan',
+    description: 'Joint webinar with RightWorks on cash flow management strategies for growing businesses.',
+  },
+  {
+    id: 'content-19',
+    title: 'Guest Post: The Future of Outsourced Accounting',
+    type: 'external',
+    url: 'https://accountingtoday.com/guest/future-outsourced-accounting',
+    dateCreated: '2024-11-20',
+    status: 'published',
+    keywords: ['guest post', 'outsourced accounting', 'industry trends'],
+    author: 'Dan',
+    description: 'Guest article published on Accounting Today discussing the evolution of outsourced accounting services.',
+  },
+  {
+    id: 'content-20',
+    title: 'Podcast Interview: Building a Fractional CFO Practice',
+    type: 'external',
+    url: 'https://cfoinsights.com/podcasts/fractional-cfo-practice',
+    dateCreated: '2024-10-05',
+    status: 'published',
+    keywords: ['podcast', 'fractional CFO', 'interview', 'thought leadership'],
+    author: 'Dan',
+    description: 'Dan was interviewed on CFO Insights podcast about building a successful fractional CFO practice.',
+  },
 ]
 
 // ===================
@@ -222,6 +256,7 @@ export const testTopicIdeas: TopicIdea[] = [
     suggestedFormat: 'blog',
     relatedContentIds: ['content-3'],
     status: 'new',
+    category: 'generalized',
     createdAt: '2025-01-22',
     createdBy: 'ai',
   },
@@ -232,6 +267,7 @@ export const testTopicIdeas: TopicIdea[] = [
     rationale: 'Moderate search volume (800/mo). We mention audits in several pieces but have no dedicated guide. Good lead gen opportunity.',
     suggestedFormat: 'blog',
     status: 'new',
+    category: 'generalized',
     createdAt: '2025-01-22',
     createdBy: 'ai',
   },
@@ -243,6 +279,7 @@ export const testTopicIdeas: TopicIdea[] = [
     suggestedFormat: 'blog',
     relatedContentIds: ['content-4'],
     status: 'approved',
+    category: 'generalized',
     createdAt: '2025-01-20',
     createdBy: 'ai',
   },
@@ -254,6 +291,7 @@ export const testTopicIdeas: TopicIdea[] = [
     suggestedFormat: 'youtube',
     relatedContentIds: ['content-12'],
     status: 'new',
+    category: 'generalized',
     createdAt: '2025-01-22',
     createdBy: 'ai',
   },
@@ -265,6 +303,63 @@ export const testTopicIdeas: TopicIdea[] = [
     suggestedFormat: 'linkedin',
     relatedContentIds: ['content-2', 'content-6'],
     status: 'new',
+    category: 'generalized',
+    createdAt: '2025-01-22',
+    createdBy: 'ai',
+  },
+  {
+    id: 'topic-6',
+    topic: 'How Bench Accounting Handles Month-End Close (And How You Can Do Better)',
+    gapScore: 79,
+    rationale: 'Competitor Bench ranks #2 for "month-end close process". Their blog gets 5K visits/month. We can create superior content targeting their audience.',
+    suggestedFormat: 'blog',
+    status: 'new',
+    category: 'competitor',
+    createdAt: '2025-01-22',
+    createdBy: 'ai',
+  },
+  {
+    id: 'topic-7',
+    topic: 'Why Companies Are Switching from Pilot to Fractional CFOs',
+    gapScore: 85,
+    rationale: 'Pilot (competitor) has significant market share. Their customers often outgrow their services. Position our fractional CFO offering as the next step.',
+    suggestedFormat: 'blog',
+    relatedContentIds: ['content-3'],
+    status: 'new',
+    category: 'competitor',
+    createdAt: '2025-01-22',
+    createdBy: 'ai',
+  },
+  {
+    id: 'topic-8',
+    topic: 'New FASB Standards 2025: What Your Business Needs to Know',
+    gapScore: 91,
+    rationale: 'FASB announced new lease accounting changes effective 2025. High search potential as businesses scramble to comply. Time-sensitive opportunity.',
+    suggestedFormat: 'blog',
+    status: 'new',
+    category: 'market_trends',
+    createdAt: '2025-01-22',
+    createdBy: 'ai',
+  },
+  {
+    id: 'topic-9',
+    topic: 'AI in Accounting: What CFOs Need to Know for 2025',
+    gapScore: 88,
+    rationale: 'AI accounting tools are trending topic. 340% increase in search volume year-over-year. Position as thought leaders on AI adoption.',
+    suggestedFormat: 'youtube',
+    status: 'new',
+    category: 'market_trends',
+    createdAt: '2025-01-22',
+    createdBy: 'ai',
+  },
+  {
+    id: 'topic-10',
+    topic: 'Interest Rate Changes 2025: Financial Planning Implications',
+    gapScore: 76,
+    rationale: 'Fed rate decisions affecting business planning. Timely content opportunity as rates are expected to shift. Good for thought leadership.',
+    suggestedFormat: 'linkedin',
+    status: 'new',
+    category: 'market_trends',
     createdAt: '2025-01-22',
     createdBy: 'ai',
   },
@@ -279,16 +374,18 @@ export const testBriefs: ContentBrief[] = [
     id: 'brief-1',
     title: 'Tax Planning Strategies for Q1 2025',
     status: 'draft',
+    currentStep: 'outline',
     targetFormat: 'blog',
     targetKeywords: ['tax planning 2025', 'Q1 tax strategy', 'business tax tips'],
     outline: [
-      'Introduction - Why Q1 tax planning matters',
-      'Key tax deadlines for Q1 2025',
-      'Top 5 strategies to implement now',
-      'Common mistakes to avoid',
-      'Checklist: Your Q1 tax prep action items',
-      'CTA - Schedule a tax planning consultation',
+      { id: 'section-1', title: 'Introduction - Why Q1 tax planning matters', description: 'Hook readers with the cost of procrastination. Include stat on penalties.' },
+      { id: 'section-2', title: 'Key tax deadlines for Q1 2025', description: 'Timeline/calendar visual of important dates.' },
+      { id: 'section-3', title: 'Top 5 strategies to implement now', description: 'Actionable tips with examples.' },
+      { id: 'section-4', title: 'Common mistakes to avoid', description: 'What not to do - cautionary tales.' },
+      { id: 'section-5', title: 'Checklist: Your Q1 tax prep action items', description: 'Downloadable PDF checklist offer.' },
+      { id: 'section-6', title: 'CTA - Schedule a tax planning consultation', description: 'Clear next step with calendar link.' },
     ],
+    outlineApproved: false,
     notes: 'Tie into existing tax planning blog. Include downloadable checklist as lead magnet.',
     assignedTo: 'Alison',
     createdAt: '2025-01-20',
@@ -297,18 +394,71 @@ export const testBriefs: ContentBrief[] = [
   {
     id: 'brief-2',
     title: 'Revenue Recognition Best Practices for SaaS Companies',
-    status: 'approved',
+    status: 'in_progress',
+    currentStep: 'first_draft',
     targetFormat: 'blog',
     targetKeywords: ['SaaS revenue recognition', 'ASC 606', 'deferred revenue'],
     outline: [
-      'Introduction - The complexity of SaaS revenue',
-      'ASC 606 overview and why it matters',
-      '5 common revenue recognition mistakes',
-      'Best practices for clean revenue reporting',
-      'Tools and systems that help',
-      'Case study snippet from TechStart',
-      'CTA - Get a revenue recognition assessment',
+      { id: 'section-1', title: 'Introduction - The complexity of SaaS revenue', description: 'Why SaaS revenue is uniquely challenging.' },
+      { id: 'section-2', title: 'ASC 606 overview and why it matters', description: 'Plain-English explanation of the standard.' },
+      { id: 'section-3', title: '5 common revenue recognition mistakes', description: 'Real examples from our experience.' },
+      { id: 'section-4', title: 'Best practices for clean revenue reporting', description: 'Step-by-step process recommendations.' },
+      { id: 'section-5', title: 'Tools and systems that help', description: 'Software recommendations and integrations.' },
+      { id: 'section-6', title: 'Case study snippet from TechStart', description: 'Before/after transformation story.' },
+      { id: 'section-7', title: 'CTA - Get a revenue recognition assessment', description: 'Free assessment offer.' },
     ],
+    outlineApproved: true,
+    firstDraft: `# Revenue Recognition Best Practices for SaaS Companies
+
+Revenue recognition in SaaS is notoriously complex. With subscription models, usage-based pricing, and multi-element arrangements, getting it right requires both technical knowledge and practical experience.
+
+## The Complexity of SaaS Revenue
+
+Unlike traditional businesses where revenue is recognized at the point of sale, SaaS companies must navigate a maze of timing issues...
+
+[Draft continues with placeholder content for each section...]
+
+## ASC 606 Overview and Why It Matters
+
+ASC 606 established a five-step model for revenue recognition that applies to all contracts with customers...
+
+## 5 Common Revenue Recognition Mistakes
+
+1. **Recognizing revenue before performance obligations are satisfied** - Many SaaS companies...
+2. **Failing to properly allocate transaction prices** - When bundles include multiple elements...
+3. **Ignoring variable consideration** - Usage-based components require estimation...
+4. **Inconsistent treatment of contract modifications** - Upgrades and downgrades...
+5. **Poor documentation of judgments** - Auditors need to see your reasoning...
+
+## Best Practices for Clean Revenue Reporting
+
+Start with a robust contract review process...
+
+## Tools and Systems That Help
+
+Consider implementing RevPro, Zuora Revenue, or similar solutions...
+
+## TechStart Solutions: A Success Story
+
+When TechStart came to us, they were manually tracking revenue in spreadsheets...
+
+## Ready to Get Your Revenue Recognition Right?
+
+Schedule a free revenue recognition assessment with our team...`,
+    faqs: [
+      { id: 'faq-1', question: 'What is ASC 606?', answer: 'ASC 606 is the revenue recognition standard that establishes a comprehensive framework for determining when and how to recognize revenue from contracts with customers.' },
+      { id: 'faq-2', question: 'When should SaaS companies recognize subscription revenue?', answer: 'SaaS subscription revenue should be recognized ratably over the subscription period as the service is delivered, not upfront when payment is received.' },
+      { id: 'faq-3', question: 'How do you handle revenue recognition for annual contracts paid monthly?', answer: 'The full annual contract value should be allocated across the service period. Monthly payments affect cash flow, not revenue recognition timing.' },
+    ],
+    internalLinks: [
+      { id: 'link-1', title: 'GrowthLab Client Success: TechStart Solutions Case Study', url: '/case-studies/techstart-solutions', type: 'internal', context: 'Reference in the case study section' },
+      { id: 'link-2', title: 'FP&A vs. Accounting: Understanding the Difference', url: '/blog/fpa-vs-accounting', type: 'internal', context: 'Link when discussing financial reporting' },
+    ],
+    externalLinks: [
+      { id: 'link-3', title: 'FASB ASC 606 Overview', url: 'https://fasb.org/asc606', type: 'external', context: 'Link in the ASC 606 section for official reference' },
+      { id: 'link-4', title: 'SEC Revenue Recognition Guidance', url: 'https://sec.gov/revenue-recognition', type: 'external', context: 'Additional authority for public companies' },
+    ],
+    recommendedAuthor: 'dan',
     sourceTopicId: 'topic-3',
     assignedTo: 'Dan',
     createdAt: '2025-01-18',
@@ -318,20 +468,125 @@ export const testBriefs: ContentBrief[] = [
     id: 'brief-3',
     title: 'LinkedIn Series: Finance Team Building Tips',
     status: 'in_progress',
+    currentStep: 'outline',
     targetFormat: 'linkedin',
     targetKeywords: ['finance hiring', 'CFO', 'controller', 'finance team'],
     outline: [
-      'Post 1: Signs you need finance help (teaser)',
-      'Post 2: Fractional vs full-time decision framework',
-      'Post 3: First hire - bookkeeper, controller, or CFO?',
-      'Post 4: Building the right finance stack',
-      'Post 5: Our journey helping 50+ companies build finance teams',
+      { id: 'section-1', title: 'Post 1: Signs you need finance help (teaser)', description: 'Hook with pain points founders experience.' },
+      { id: 'section-2', title: 'Post 2: Fractional vs full-time decision framework', description: 'Simple decision tree for choosing.' },
+      { id: 'section-3', title: 'Post 3: First hire - bookkeeper, controller, or CFO?', description: 'Role comparison for different stages.' },
+      { id: 'section-4', title: 'Post 4: Building the right finance stack', description: 'Tools and systems recommendations.' },
+      { id: 'section-5', title: 'Post 5: Our journey helping 50+ companies build finance teams', description: 'Social proof and CTA.' },
     ],
+    outlineApproved: false,
     notes: 'Create as a 5-part series. Schedule over 2 weeks. Use consistent hashtags.',
     sourceTopicId: 'topic-4',
     assignedTo: 'Alison',
     createdAt: '2025-01-15',
     updatedAt: '2025-01-22',
+  },
+  {
+    id: 'brief-4',
+    title: 'Fractional CFO vs Full-Time CFO Cost Comparison',
+    status: 'in_progress',
+    currentStep: 'final_review',
+    targetFormat: 'blog',
+    targetKeywords: ['fractional CFO cost', 'CFO salary', 'fractional vs full-time CFO'],
+    outline: [
+      { id: 'section-1', title: 'Introduction - The CFO decision every growing company faces', description: 'Set up the comparison.' },
+      { id: 'section-2', title: 'Full-Time CFO: Total Cost of Ownership', description: 'Salary, benefits, equity, overhead.' },
+      { id: 'section-3', title: 'Fractional CFO: Flexible Investment', description: 'Typical engagement models and costs.' },
+      { id: 'section-4', title: 'Side-by-Side Comparison Table', description: 'Visual breakdown of costs.' },
+      { id: 'section-5', title: 'When Each Option Makes Sense', description: 'Decision framework based on company stage.' },
+      { id: 'section-6', title: 'Real Examples from GrowthLab Clients', description: 'Anonymized case examples.' },
+      { id: 'section-7', title: 'CTA - Calculate Your CFO Needs', description: 'Interactive calculator or consultation offer.' },
+    ],
+    outlineApproved: true,
+    firstDraft: `# Fractional CFO vs Full-Time CFO: A Complete Cost Comparison
+
+Every growing company reaches a point where DIY finances no longer cut it. But should you hire a full-time CFO or engage a fractional CFO? The answer often comes down to cost—but not in the way you might think.
+
+## Full-Time CFO: Total Cost of Ownership
+
+When you hire a full-time CFO, salary is just the beginning. Let's break down the real numbers:
+
+**Base Salary:** $250,000 - $400,000
+**Benefits & Insurance:** $30,000 - $60,000
+**Equity (0.5-2% over 4 years):** Value varies by company
+**Recruiting Costs:** $75,000 - $150,000 (25-30% of first-year salary)
+**Onboarding & Ramp Time:** 3-6 months to full productivity
+
+**Total Year-One Investment:** $400,000 - $650,000+
+
+## Fractional CFO: Flexible Investment
+
+Fractional CFO engagements offer a different model entirely:
+
+**Monthly Retainer:** $5,000 - $15,000
+**Typical Engagement:** 20-40 hours per month
+**No benefits, equity, or recruiting costs**
+**Immediate productivity with experienced hire**
+
+**Annual Investment:** $60,000 - $180,000
+
+## Side-by-Side Comparison
+
+| Factor | Full-Time CFO | Fractional CFO |
+|--------|---------------|----------------|
+| Annual Cost | $400K-$650K+ | $60K-$180K |
+| Time to Value | 3-6 months | Immediate |
+| Flexibility | Low | High |
+| Experience Level | Varies | Usually senior |
+
+## When Each Option Makes Sense
+
+**Choose Full-Time When:**
+- Revenue exceeds $50M annually
+- Complex capital structure or M&A activity
+- Need dedicated, daily strategic input
+- Building out a full finance team
+
+**Choose Fractional When:**
+- Revenue between $2M - $50M
+- Need strategic guidance without full overhead
+- Rapid scaling with changing needs
+- Want senior expertise without senior cost
+
+## Real Examples from GrowthLab Clients
+
+**Company A (Series A SaaS):** Engaged fractional CFO at $10K/month. Saved $300K+ compared to full-time hire while navigating fundraise.
+
+**Company B (PE-Backed Services):** Started fractional, transitioned to full-time at $75M revenue when complexity justified the investment.
+
+## Calculate Your CFO Needs
+
+Not sure which option is right for your company? Schedule a free consultation to discuss your specific situation and get a customized recommendation.
+
+[Schedule Consultation Button]`,
+    faqs: [
+      { id: 'faq-1', question: 'What is a fractional CFO?', answer: 'A fractional CFO is an experienced finance executive who works with your company on a part-time or project basis, typically 20-40 hours per month, providing strategic financial leadership without the cost of a full-time hire.' },
+      { id: 'faq-2', question: 'How much does a fractional CFO cost?', answer: 'Fractional CFO services typically range from $5,000 to $15,000 per month, depending on the scope of work and level of experience. This is significantly less than the $400K-$650K+ annual cost of a full-time CFO.' },
+      { id: 'faq-3', question: 'At what revenue level should I hire a full-time CFO?', answer: 'Most companies transition from fractional to full-time CFO when they reach $50M+ in revenue, have complex capital structures, or need daily strategic financial leadership. Before that point, a fractional CFO often provides better value.' },
+    ],
+    internalLinks: [
+      { id: 'link-1', title: '5 Signs You Need a Fractional CFO', url: '/blog/signs-need-fractional-cfo', type: 'internal', context: 'Link in the introduction section' },
+      { id: 'link-2', title: 'When to Hire Your First Controller', url: '/blog/hire-first-controller', type: 'internal', context: 'Reference in the finance team building discussion' },
+    ],
+    externalLinks: [
+      { id: 'link-3', title: 'CFO Salary Survey - Robert Half', url: 'https://roberthalf.com/salary-guide/cfo', type: 'external', context: 'Source for salary data' },
+    ],
+    recommendedAuthor: 'dan',
+    finalDraft: `# Fractional CFO vs Full-Time CFO: A Complete Cost Comparison
+
+[Full polished content here - same as firstDraft but with final edits applied]
+
+Every growing company reaches a point where DIY finances no longer cut it...
+
+[Content continues...]`,
+    sourceTopicId: 'topic-1',
+    assignedTo: 'Dan',
+    createdAt: '2025-01-22',
+    updatedAt: '2025-01-25',
   },
 ]
 
@@ -556,3 +811,145 @@ export const getDashboardStats = () => {
     totalContent: testContentLibrary.length,
   }
 }
+
+// ===================
+// Final Drafts Test Data
+// ===================
+
+export const testFinalDrafts: FinalDraft[] = [
+  {
+    id: 'final-1',
+    briefId: 'brief-4',
+    title: 'Fractional CFO vs Full-Time CFO: A Complete Cost Comparison',
+    targetFormat: 'blog',
+    content: `# Fractional CFO vs Full-Time CFO: A Complete Cost Comparison
+
+Every growing company reaches a point where DIY finances no longer cut it. But should you hire a full-time CFO or engage a fractional CFO? The answer often comes down to cost—but not in the way you might think.
+
+## Full-Time CFO: Total Cost of Ownership
+
+When you hire a full-time CFO, salary is just the beginning. Let's break down the real numbers:
+
+**Base Salary:** $250,000 - $400,000
+**Benefits & Insurance:** $30,000 - $60,000
+**Equity (0.5-2% over 4 years):** Value varies by company
+**Recruiting Costs:** $75,000 - $150,000 (25-30% of first-year salary)
+**Onboarding & Ramp Time:** 3-6 months to full productivity
+
+**Total Year-One Investment:** $400,000 - $650,000+
+
+## Fractional CFO: Flexible Investment
+
+Fractional CFO engagements offer a different model entirely:
+
+**Monthly Retainer:** $5,000 - $15,000
+**Typical Engagement:** 20-40 hours per month
+**No benefits, equity, or recruiting costs**
+**Immediate productivity with experienced hire**
+
+**Annual Investment:** $60,000 - $180,000
+
+## Side-by-Side Comparison
+
+| Factor | Full-Time CFO | Fractional CFO |
+|--------|---------------|----------------|
+| Annual Cost | $400K-$650K+ | $60K-$180K |
+| Time to Value | 3-6 months | Immediate |
+| Flexibility | Low | High |
+| Experience Level | Varies | Usually senior |
+
+## When Each Option Makes Sense
+
+**Choose Full-Time When:**
+- Revenue exceeds $50M annually
+- Complex capital structure or M&A activity
+- Need dedicated, daily strategic input
+- Building out a full finance team
+
+**Choose Fractional When:**
+- Revenue between $2M - $50M
+- Need strategic guidance without full overhead
+- Rapid scaling with changing needs
+- Want senior expertise without senior cost
+
+## Real Examples from GrowthLab Clients
+
+**Company A (Series A SaaS):** Engaged fractional CFO at $10K/month. Saved $300K+ compared to full-time hire while navigating fundraise.
+
+**Company B (PE-Backed Services):** Started fractional, transitioned to full-time at $75M revenue when complexity justified the investment.
+
+## Frequently Asked Questions
+
+**What is a fractional CFO?**
+A fractional CFO is an experienced finance executive who works with your company on a part-time or project basis, typically 20-40 hours per month, providing strategic financial leadership without the cost of a full-time hire.
+
+**How much does a fractional CFO cost?**
+Fractional CFO services typically range from $5,000 to $15,000 per month, depending on the scope of work and level of experience. This is significantly less than the $400K-$650K+ annual cost of a full-time CFO.
+
+**At what revenue level should I hire a full-time CFO?**
+Most companies transition from fractional to full-time CFO when they reach $50M+ in revenue, have complex capital structures, or need daily strategic financial leadership.
+
+## Calculate Your CFO Needs
+
+Not sure which option is right for your company? Schedule a free consultation to discuss your specific situation and get a customized recommendation.`,
+    faqs: [
+      { id: 'faq-1', question: 'What is a fractional CFO?', answer: 'A fractional CFO is an experienced finance executive who works with your company on a part-time or project basis, typically 20-40 hours per month, providing strategic financial leadership without the cost of a full-time hire.' },
+      { id: 'faq-2', question: 'How much does a fractional CFO cost?', answer: 'Fractional CFO services typically range from $5,000 to $15,000 per month, depending on the scope of work and level of experience. This is significantly less than the $400K-$650K+ annual cost of a full-time CFO.' },
+      { id: 'faq-3', question: 'At what revenue level should I hire a full-time CFO?', answer: 'Most companies transition from fractional to full-time CFO when they reach $50M+ in revenue, have complex capital structures, or need daily strategic financial leadership. Before that point, a fractional CFO often provides better value.' },
+    ],
+    author: 'Dan Fennessy',
+    approvedAt: '2025-01-25',
+    keywords: ['fractional CFO cost', 'CFO salary', 'fractional vs full-time CFO'],
+  },
+  {
+    id: 'final-2',
+    briefId: 'brief-old-1',
+    title: 'The Complete Guide to Month-End Close Process',
+    targetFormat: 'blog',
+    content: `# The Complete Guide to Month-End Close Process
+
+A well-executed month-end close is the foundation of financial health. Here's how to streamline yours...
+
+[Full blog content here]
+
+## What is Month-End Close?
+
+The month-end close is the process of reviewing, reconciling, and reporting all financial transactions...
+
+## The 5-Day Close Framework
+
+Day 1: Cutoff and data collection
+Day 2: Reconciliations
+Day 3: Accruals and adjustments
+Day 4: Review and analysis
+Day 5: Reporting and sign-off
+
+## Common Close Challenges
+
+1. Late invoices and receipts
+2. Missing documentation
+3. Bank reconciliation delays
+4. Cross-department coordination
+5. Manual processes
+
+## Best Practices for Faster Close
+
+- Implement close calendar with clear deadlines
+- Automate routine reconciliations
+- Use checklists for consistency
+- Hold pre-close meetings
+- Document everything
+
+## Frequently Asked Questions
+
+**How long should month-end close take?**
+Best-in-class companies close within 5 business days. Average is 7-10 days. If you're taking longer than 15 days, there's significant room for improvement.
+
+**What are the most critical month-end tasks?**
+Bank reconciliations, revenue recognition review, expense accruals, and inter-company transactions are typically the highest priority items.`,
+    author: 'Dan Fennessy',
+    approvedAt: '2025-01-15',
+    publishedAt: '2025-01-18',
+    keywords: ['month-end close', 'financial close process', 'close calendar'],
+  },
+]
