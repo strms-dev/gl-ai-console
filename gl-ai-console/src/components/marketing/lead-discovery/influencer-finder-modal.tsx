@@ -104,8 +104,7 @@ export function InfluencerFinderModal({
             {influencer.niche.map((tag, idx) => (
               <Badge
                 key={idx}
-                variant="outline"
-                className="text-xs bg-slate-50"
+                className="text-xs bg-slate-50 border border-slate-200"
               >
                 {tag}
               </Badge>

@@ -75,8 +75,7 @@ export function HypothesisLabModal({
               {hypothesis.targetCriteria.map((criteria, idx) => (
                 <Badge
                   key={idx}
-                  variant="outline"
-                  className="text-xs bg-slate-50"
+                  className="text-xs bg-slate-50 border border-slate-200"
                 >
                   <Target className="w-3 h-3 mr-1" />
                   {criteria}
