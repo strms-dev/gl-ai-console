@@ -527,7 +527,7 @@ function DraftViewer({
             <div className="flex items-center gap-2">
               <HelpCircle className="w-4 h-4 text-amber-600" />
               <span className="text-sm font-medium text-[#463939]">FAQs</span>
-              <Badge variant="secondary" className="text-xs">
+              <Badge className="text-xs bg-slate-100 text-slate-700">
                 {brief.faqs.filter(f => f.approvalStatus !== 'rejected').length} active
               </Badge>
             </div>
@@ -601,7 +601,7 @@ function DraftViewer({
               <Link className="w-4 h-4 text-blue-600" />
               <span className="text-sm font-medium text-[#463939]">Internal Links</span>
               {brief.internalLinks && brief.internalLinks.filter(l => l.approvalStatus !== 'rejected').length > 0 && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge className="text-xs bg-slate-100 text-slate-700">
                   {brief.internalLinks.filter(l => l.approvalStatus !== 'rejected').length}
                 </Badge>
               )}
@@ -701,7 +701,7 @@ function DraftViewer({
               <ExternalLink className="w-4 h-4 text-purple-600" />
               <span className="text-sm font-medium text-[#463939]">External Links</span>
               {brief.externalLinks && brief.externalLinks.filter(l => l.approvalStatus !== 'rejected').length > 0 && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge className="text-xs bg-slate-100 text-slate-700">
                   {brief.externalLinks.filter(l => l.approvalStatus !== 'rejected').length}
                 </Badge>
               )}
@@ -947,7 +947,7 @@ function AuthorSelector({
                 {author.expertise.length > 0 && (
                   <div className="flex gap-1 mt-2 flex-wrap">
                     {author.expertise.slice(0, 3).map((exp) => (
-                      <Badge key={exp} variant="secondary" className="text-xs">
+                      <Badge key={exp} className="text-xs bg-slate-100 text-slate-700">
                         {exp}
                       </Badge>
                     ))}
@@ -1041,7 +1041,7 @@ function FinalReview({
             <span className="text-muted-foreground">Keywords:</span>
             <div className="flex gap-1 mt-1 flex-wrap">
               {brief.targetKeywords.map((kw, i) => (
-                <Badge key={i} variant="secondary" className="text-xs">{kw}</Badge>
+                <Badge key={i} className="text-xs bg-slate-100 text-slate-700">{kw}</Badge>
               ))}
             </div>
           </div>
@@ -1685,7 +1685,7 @@ export function BriefBuilderModal({
                         <Badge className={briefStepColors[brief.currentStep]}>
                           {briefStepLabels[brief.currentStep]}
                         </Badge>
-                        <Badge variant="outline">
+                        <Badge className="border border-slate-200 bg-white text-slate-700">
                           {contentTypeLabels[brief.targetFormat]}
                         </Badge>
                       </div>

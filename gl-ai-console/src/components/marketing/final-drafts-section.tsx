@@ -186,7 +186,7 @@ export function FinalDraftsSection({
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <Tag className="w-3.5 h-3.5 text-muted-foreground" />
                           {draft.keywords.slice(0, 3).map((kw, i) => (
-                            <Badge key={i} variant="secondary" className="text-xs">
+                            <Badge key={i} className="text-xs bg-slate-100 text-slate-700">
                               {kw}
                             </Badge>
                           ))}

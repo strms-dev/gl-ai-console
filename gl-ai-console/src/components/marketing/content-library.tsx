@@ -164,8 +164,7 @@ export function ContentLibrary({ content }: ContentLibraryProps) {
                           {item.keywords.slice(0, 2).map((keyword, idx) => (
                             <Badge
                               key={idx}
-                              variant="secondary"
-                              className="text-xs bg-slate-100"
+                              className="text-xs bg-slate-100 text-slate-700"
                             >
                               {keyword}
                             </Badge>
