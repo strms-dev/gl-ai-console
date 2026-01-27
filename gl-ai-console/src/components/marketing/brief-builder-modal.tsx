@@ -43,6 +43,11 @@ import {
   Loader2,
   Save,
   X,
+  Send,
+  MessageCircle,
+  Search,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import {
   ContentBrief,
@@ -50,6 +55,9 @@ import {
   ContentType,
   OutlineSection,
   TopicIdea,
+  FAQ,
+  LinkRecommendation,
+  ApprovalStatus,
   briefStatusLabels,
   briefStatusColors,
   briefStepLabels,
@@ -70,6 +78,7 @@ interface BriefBuilderModalProps {
   onCreateNew: () => void
   onCreateFromIdea?: (ideaId: string) => void
   onApproveFinalDraft?: (briefId: string) => void
+  onNavigateToFinalDrafts?: () => void
   initialBriefId?: string | null
 }
 
@@ -325,19 +334,42 @@ function OutlineEditor({
   )
 }
 
-// Draft viewer component
+// Draft viewer component with FAQ/Links approval and chatbot refinement
 function DraftViewer({
   brief,
   onApprove,
   onEdit,
-  isGenerating
+  isGenerating,
+  onUpdateBrief,
 }: {
   brief: ContentBrief
   onApprove: () => void
   onEdit: () => void
   isGenerating?: boolean
+  onUpdateBrief?: (updates: Partial<ContentBrief>) => void
 }) {
   const [copied, setCopied] = useState(false)
+  const [chatInput, setChatInput] = useState('')
+  const [isChatExpanded, setIsChatExpanded] = useState(false)
+  const [isRefining, setIsRefining] = useState(false)
+  const [showAddInternalLink, setShowAddInternalLink] = useState(false)
+  const [showAddExternalLink, setShowAddExternalLink] = useState(false)
+  const [newExternalLink, setNewExternalLink] = useState({ title: '', url: '' })
+  const [internalLinkSearch, setInternalLinkSearch] = useState('')
+  const [showValidationMessage, setShowValidationMessage] = useState(false)
+
+  // Mock content library for internal link search
+  const contentLibrary = [
+    { id: 'content-1', title: '5 Signs You Need a Fractional CFO', url: '/blog/signs-need-fractional-cfo' },
+    { id: 'content-2', title: 'Client Success Stories', url: '/case-studies' },
+    { id: 'content-3', title: 'Understanding Financial Statements', url: '/blog/understanding-financial-statements' },
+    { id: 'content-4', title: 'Cash Flow Management Best Practices', url: '/blog/cash-flow-management' },
+    { id: 'content-5', title: 'When to Hire a CFO vs Controller', url: '/blog/cfo-vs-controller' },
+  ]
+
+  const filteredContentLibrary = contentLibrary.filter(item =>
+    item.title.toLowerCase().includes(internalLinkSearch.toLowerCase())
+  )
 
   const handleCopy = async () => {
     if (brief.firstDraft) {
@@ -345,6 +377,96 @@ function DraftViewer({
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
+  }
+
+  const handleFAQApproval = (faqId: string, status: ApprovalStatus) => {
+    if (!brief.faqs || !onUpdateBrief) return
+    const updatedFaqs = brief.faqs.map(faq =>
+      faq.id === faqId ? { ...faq, approvalStatus: status } : faq
+    )
+    onUpdateBrief({ faqs: updatedFaqs })
+  }
+
+  const handleLinkApproval = (linkId: string, type: 'internal' | 'external', status: ApprovalStatus) => {
+    if (!onUpdateBrief) return
+    if (type === 'internal' && brief.internalLinks) {
+      const updatedLinks = brief.internalLinks.map(link =>
+        link.id === linkId ? { ...link, approvalStatus: status } : link
+      )
+      onUpdateBrief({ internalLinks: updatedLinks })
+    } else if (type === 'external' && brief.externalLinks) {
+      const updatedLinks = brief.externalLinks.map(link =>
+        link.id === linkId ? { ...link, approvalStatus: status } : link
+      )
+      onUpdateBrief({ externalLinks: updatedLinks })
+    }
+  }
+
+  const handleAddInternalLink = (contentItem: { id: string; title: string; url: string }) => {
+    if (!onUpdateBrief) return
+    const newLink: LinkRecommendation = {
+      id: `link-int-${Date.now()}`,
+      title: contentItem.title,
+      url: contentItem.url,
+      type: 'internal',
+      context: 'Manually added',
+      approvalStatus: 'approved',
+    }
+    const updatedLinks = [...(brief.internalLinks || []), newLink]
+    onUpdateBrief({ internalLinks: updatedLinks })
+    setShowAddInternalLink(false)
+    setInternalLinkSearch('')
+  }
+
+  const handleAddExternalLink = () => {
+    if (!onUpdateBrief || !newExternalLink.title || !newExternalLink.url) return
+    const newLink: LinkRecommendation = {
+      id: `link-ext-${Date.now()}`,
+      title: newExternalLink.title,
+      url: newExternalLink.url.startsWith('http') ? newExternalLink.url : `https://${newExternalLink.url}`,
+      type: 'external',
+      context: 'Manually added',
+      approvalStatus: 'approved',
+    }
+    const updatedLinks = [...(brief.externalLinks || []), newLink]
+    onUpdateBrief({ externalLinks: updatedLinks })
+    setShowAddExternalLink(false)
+    setNewExternalLink({ title: '', url: '' })
+  }
+
+  const handleChatSubmit = () => {
+    if (!chatInput.trim() || !onUpdateBrief) return
+    setIsRefining(true)
+
+    // Simulate AI refinement
+    setTimeout(() => {
+      // This would normally call an AI API - for now just show feedback was received
+      setIsRefining(false)
+      setChatInput('')
+      // In real implementation, this would update the draft based on AI response
+    }, 2000)
+  }
+
+  // Count items needing decisions (no approvalStatus or status is 'pending')
+  const pendingFaqs = brief.faqs?.filter(f => !f.approvalStatus || f.approvalStatus === 'pending').length || 0
+  const pendingInternalLinks = brief.internalLinks?.filter(l => !l.approvalStatus || l.approvalStatus === 'pending').length || 0
+  const pendingExternalLinks = brief.externalLinks?.filter(l => !l.approvalStatus || l.approvalStatus === 'pending').length || 0
+
+  // Total pending items that need a decision
+  const totalPendingDecisions = pendingFaqs + pendingInternalLinks + pendingExternalLinks
+
+  // Check if all items have been decided (approved or rejected)
+  const allDecisionsMade = totalPendingDecisions === 0
+
+  const handleApproveClick = () => {
+    if (!allDecisionsMade) {
+      setShowValidationMessage(true)
+      // Auto-hide after 5 seconds
+      setTimeout(() => setShowValidationMessage(false), 5000)
+      return
+    }
+    setShowValidationMessage(false)
+    onApprove()
   }
 
   if (isGenerating) {
@@ -398,65 +520,377 @@ function DraftViewer({
         </div>
       </div>
 
-      {/* FAQs */}
+      {/* FAQs with Approve/Deny */}
       {brief.faqs && brief.faqs.length > 0 && (
         <div className="border rounded-lg overflow-hidden">
-          <div className="bg-amber-50 px-4 py-2 border-b flex items-center gap-2">
-            <HelpCircle className="w-4 h-4 text-amber-600" />
-            <span className="text-sm font-medium text-[#463939]">FAQs ({brief.faqs.length})</span>
+          <div className="bg-amber-50 px-4 py-2 border-b flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-amber-600" />
+              <span className="text-sm font-medium text-[#463939]">FAQs</span>
+              <Badge variant="secondary" className="text-xs">
+                {brief.faqs.filter(f => f.approvalStatus !== 'rejected').length} active
+              </Badge>
+            </div>
           </div>
           <div className="p-4 space-y-3">
-            {brief.faqs.map((faq) => (
-              <div key={faq.id} className="text-sm">
-                <p className="font-medium text-[#463939]">{faq.question}</p>
-                <p className="text-muted-foreground mt-1">{faq.answer}</p>
-              </div>
-            ))}
+            {brief.faqs.map((faq) => {
+              const isRejected = faq.approvalStatus === 'rejected'
+              const isApproved = faq.approvalStatus === 'approved'
+              return (
+                <div
+                  key={faq.id}
+                  className={`p-3 rounded-lg border ${
+                    isRejected
+                      ? 'bg-red-50/50 border-red-200 opacity-50'
+                      : isApproved
+                      ? 'bg-green-50/50 border-green-200'
+                      : 'bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 text-sm">
+                      <p className={`font-medium ${isRejected ? 'text-slate-400 line-through' : 'text-[#463939]'}`}>
+                        {faq.question}
+                      </p>
+                      <p className={`mt-1 ${isRejected ? 'text-slate-400' : 'text-muted-foreground'}`}>
+                        {faq.answer}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {!isRejected && (
+                        <button
+                          onClick={() => handleFAQApproval(faq.id, 'approved')}
+                          className={`p-1.5 rounded-md transition-colors ${
+                            isApproved
+                              ? 'bg-green-500 text-white'
+                              : 'hover:bg-green-100 text-green-600'
+                          }`}
+                          title="Approve FAQ"
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      )}
+                      {!isApproved && (
+                        <button
+                          onClick={() => handleFAQApproval(faq.id, 'rejected')}
+                          className={`p-1.5 rounded-md transition-colors ${
+                            isRejected
+                              ? 'bg-red-500 text-white'
+                              : 'hover:bg-red-100 text-red-600'
+                          }`}
+                          title="Reject FAQ"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* Links */}
-      <div className="grid grid-cols-2 gap-4">
-        {brief.internalLinks && brief.internalLinks.length > 0 && (
-          <div className="border rounded-lg overflow-hidden">
-            <div className="bg-blue-50 px-4 py-2 border-b flex items-center gap-2">
+      {/* Links with Approve/Deny/Add */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Internal Links */}
+        <div className="border rounded-lg overflow-hidden">
+          <div className="bg-blue-50 px-4 py-2 border-b flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <Link className="w-4 h-4 text-blue-600" />
               <span className="text-sm font-medium text-[#463939]">Internal Links</span>
+              {brief.internalLinks && brief.internalLinks.filter(l => l.approvalStatus !== 'rejected').length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {brief.internalLinks.filter(l => l.approvalStatus !== 'rejected').length}
+                </Badge>
+              )}
             </div>
-            <div className="p-3 space-y-2">
-              {brief.internalLinks.map((link) => (
-                <div key={link.id} className="flex items-center gap-2 text-sm">
-                  <span className="text-[#407B9D] hover:underline cursor-pointer">{link.title}</span>
-                </div>
-              ))}
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAddInternalLink(!showAddInternalLink)}
+              className="text-blue-600 h-7 px-2"
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add
+            </Button>
           </div>
-        )}
 
-        {brief.externalLinks && brief.externalLinks.length > 0 && (
-          <div className="border rounded-lg overflow-hidden">
-            <div className="bg-purple-50 px-4 py-2 border-b flex items-center gap-2">
+          {/* Add Internal Link Search */}
+          {showAddInternalLink && (
+            <div className="p-3 bg-blue-50/50 border-b">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={internalLinkSearch}
+                  onChange={(e) => setInternalLinkSearch(e.target.value)}
+                  placeholder="Search content library..."
+                  className="pl-9 h-8 text-sm"
+                />
+              </div>
+              {internalLinkSearch && (
+                <div className="mt-2 max-h-32 overflow-y-auto space-y-1">
+                  {filteredContentLibrary.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleAddInternalLink(item)}
+                      className="w-full text-left p-2 text-sm rounded hover:bg-blue-100 transition-colors"
+                    >
+                      {item.title}
+                    </button>
+                  ))}
+                  {filteredContentLibrary.length === 0 && (
+                    <p className="text-sm text-muted-foreground p-2">No matching content found</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="p-3 space-y-2">
+            {brief.internalLinks && brief.internalLinks.length > 0 ? (
+              brief.internalLinks.map((link) => {
+                const isRejected = link.approvalStatus === 'rejected'
+                const isApproved = link.approvalStatus === 'approved'
+                return (
+                  <div
+                    key={link.id}
+                    className={`flex items-center justify-between gap-2 p-2 rounded ${
+                      isRejected ? 'bg-red-50 opacity-50' : isApproved ? 'bg-green-50' : 'bg-slate-50'
+                    }`}
+                  >
+                    <span className={`text-sm ${isRejected ? 'text-slate-400 line-through' : 'text-[#407B9D]'}`}>
+                      {link.title}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {!isRejected && (
+                        <button
+                          onClick={() => handleLinkApproval(link.id, 'internal', 'approved')}
+                          className={`p-1 rounded transition-colors ${
+                            isApproved ? 'bg-green-500 text-white' : 'hover:bg-green-100 text-green-600'
+                          }`}
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                      )}
+                      {!isApproved && (
+                        <button
+                          onClick={() => handleLinkApproval(link.id, 'internal', 'rejected')}
+                          className={`p-1 rounded transition-colors ${
+                            isRejected ? 'bg-red-500 text-white' : 'hover:bg-red-100 text-red-600'
+                          }`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-2">No internal links suggested</p>
+            )}
+          </div>
+        </div>
+
+        {/* External Links */}
+        <div className="border rounded-lg overflow-hidden">
+          <div className="bg-purple-50 px-4 py-2 border-b flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <ExternalLink className="w-4 h-4 text-purple-600" />
               <span className="text-sm font-medium text-[#463939]">External Links</span>
+              {brief.externalLinks && brief.externalLinks.filter(l => l.approvalStatus !== 'rejected').length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {brief.externalLinks.filter(l => l.approvalStatus !== 'rejected').length}
+                </Badge>
+              )}
             </div>
-            <div className="p-3 space-y-2">
-              {brief.externalLinks.map((link) => (
-                <div key={link.id} className="flex items-center gap-2 text-sm">
-                  <span className="text-purple-600 hover:underline cursor-pointer">{link.title}</span>
-                </div>
-              ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAddExternalLink(!showAddExternalLink)}
+              className="text-purple-600 h-7 px-2"
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add
+            </Button>
+          </div>
+
+          {/* Add External Link Form */}
+          {showAddExternalLink && (
+            <div className="p-3 bg-purple-50/50 border-b space-y-2">
+              <Input
+                value={newExternalLink.title}
+                onChange={(e) => setNewExternalLink(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Link title..."
+                className="h-8 text-sm"
+              />
+              <div className="flex gap-2">
+                <Input
+                  value={newExternalLink.url}
+                  onChange={(e) => setNewExternalLink(prev => ({ ...prev, url: e.target.value }))}
+                  placeholder="https://..."
+                  className="h-8 text-sm flex-1"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleAddExternalLink}
+                  disabled={!newExternalLink.title || !newExternalLink.url}
+                  className="h-8 bg-purple-600 hover:bg-purple-700"
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="p-3 space-y-2">
+            {brief.externalLinks && brief.externalLinks.length > 0 ? (
+              brief.externalLinks.map((link) => {
+                const isRejected = link.approvalStatus === 'rejected'
+                const isApproved = link.approvalStatus === 'approved'
+                return (
+                  <div
+                    key={link.id}
+                    className={`flex items-center justify-between gap-2 p-2 rounded ${
+                      isRejected ? 'bg-red-50 opacity-50' : isApproved ? 'bg-green-50' : 'bg-slate-50'
+                    }`}
+                  >
+                    <span className={`text-sm ${isRejected ? 'text-slate-400 line-through' : 'text-purple-600'}`}>
+                      {link.title}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {!isRejected && (
+                        <button
+                          onClick={() => handleLinkApproval(link.id, 'external', 'approved')}
+                          className={`p-1 rounded transition-colors ${
+                            isApproved ? 'bg-green-500 text-white' : 'hover:bg-green-100 text-green-600'
+                          }`}
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                      )}
+                      {!isApproved && (
+                        <button
+                          onClick={() => handleLinkApproval(link.id, 'external', 'rejected')}
+                          className={`p-1 rounded transition-colors ${
+                            isRejected ? 'bg-red-500 text-white' : 'hover:bg-red-100 text-red-600'
+                          }`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-2">No external links suggested</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* AI Refinement Chat */}
+      <div className="border rounded-lg overflow-hidden">
+        <button
+          onClick={() => setIsChatExpanded(!isChatExpanded)}
+          className="w-full bg-[#407B9D]/5 px-4 py-3 flex items-center justify-between hover:bg-[#407B9D]/10 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 text-[#407B9D]" />
+            <span className="text-sm font-medium text-[#463939]">Refine with AI</span>
+            <span className="text-xs text-muted-foreground">
+              Give feedback to improve the draft, FAQs, or links
+            </span>
+          </div>
+          {isChatExpanded ? (
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          )}
+        </button>
+
+        {isChatExpanded && (
+          <div className="p-4 border-t">
+            <p className="text-sm text-muted-foreground mb-3">
+              Describe what you&apos;d like to change. For example: &quot;Make the introduction more engaging&quot; or &quot;Add more detail to section 2&quot; or &quot;Suggest FAQs about pricing&quot;
+            </p>
+            <div className="flex gap-2">
+              <Textarea
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Type your feedback here..."
+                className="flex-1 min-h-[80px] resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleChatSubmit()
+                  }
+                }}
+              />
+            </div>
+            <div className="flex justify-end mt-2">
+              <Button
+                onClick={handleChatSubmit}
+                disabled={!chatInput.trim() || isRefining}
+                className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+              >
+                {isRefining ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    Refining...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-1" />
+                    Send Feedback
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         )}
       </div>
 
-      <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={onEdit}>
-          <Edit className="w-4 h-4 mr-1" />
-          Edit Draft
-        </Button>
-        <Button onClick={onApprove} className="bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/80">
+      {/* Validation Message */}
+      {showValidationMessage && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3">
+          <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <HelpCircle className="w-3 h-3 text-amber-600" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-800">Action Required</p>
+            <p className="text-sm text-amber-700 mt-0.5">
+              Please approve or reject all FAQs and links before approving the draft.
+              {pendingFaqs > 0 && ` ${pendingFaqs} FAQ${pendingFaqs > 1 ? 's' : ''} pending.`}
+              {pendingInternalLinks > 0 && ` ${pendingInternalLinks} internal link${pendingInternalLinks > 1 ? 's' : ''} pending.`}
+              {pendingExternalLinks > 0 && ` ${pendingExternalLinks} external link${pendingExternalLinks > 1 ? 's' : ''} pending.`}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowValidationMessage(false)}
+            className="text-amber-600 hover:text-amber-800 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <div className="flex justify-end pt-4 items-center gap-3">
+        {!allDecisionsMade && (
+          <span className="text-xs text-muted-foreground">
+            {totalPendingDecisions} item{totalPendingDecisions > 1 ? 's' : ''} need{totalPendingDecisions === 1 ? 's' : ''} approval
+          </span>
+        )}
+        <Button
+          onClick={handleApproveClick}
+          className={allDecisionsMade
+            ? "bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/80"
+            : "bg-slate-200 text-slate-500 hover:bg-slate-300"
+          }
+        >
           <Check className="w-4 h-4 mr-1" />
           Approve Draft
         </Button>
@@ -528,7 +962,7 @@ function AuthorSelector({
   )
 }
 
-// Final review component
+// Final review component - shows only approved content
 function FinalReview({
   brief,
   onApproveForPublish,
@@ -541,12 +975,48 @@ function FinalReview({
   const [copied, setCopied] = useState(false)
   const author = availableAuthors.find(a => a.id === brief.assignedTo)
 
-  const handleCopy = async () => {
-    if (brief.finalDraft || brief.firstDraft) {
-      await navigator.clipboard.writeText(brief.finalDraft || brief.firstDraft || '')
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+  // Filter to only approved FAQs and links (or those without status set, for backwards compatibility)
+  const approvedFaqs = brief.faqs?.filter(f => f.approvalStatus !== 'rejected') || []
+  const approvedInternalLinks = brief.internalLinks?.filter(l => l.approvalStatus !== 'rejected') || []
+  const approvedExternalLinks = brief.externalLinks?.filter(l => l.approvalStatus !== 'rejected') || []
+
+  // Build complete content for copy
+  const buildFullContent = () => {
+    let content = brief.finalDraft || brief.firstDraft || ''
+
+    // Add FAQs section if any approved
+    if (approvedFaqs.length > 0) {
+      content += '\n\n## Frequently Asked Questions\n\n'
+      approvedFaqs.forEach(faq => {
+        content += `**Q: ${faq.question}**\n${faq.answer}\n\n`
+      })
     }
+
+    // Add links section if any approved
+    if (approvedInternalLinks.length > 0 || approvedExternalLinks.length > 0) {
+      content += '\n\n## Related Resources\n\n'
+      if (approvedInternalLinks.length > 0) {
+        content += '### Internal Links\n'
+        approvedInternalLinks.forEach(link => {
+          content += `- [${link.title}](${link.url})\n`
+        })
+      }
+      if (approvedExternalLinks.length > 0) {
+        content += '\n### External Links\n'
+        approvedExternalLinks.forEach(link => {
+          content += `- [${link.title}](${link.url})\n`
+        })
+      }
+    }
+
+    return content
+  }
+
+  const handleCopy = async () => {
+    const fullContent = buildFullContent()
+    await navigator.clipboard.writeText(fullContent)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
@@ -592,7 +1062,7 @@ function FinalReview({
             className="text-[#407B9D]"
           >
             {copied ? <Check className="w-4 h-4 mr-1" /> : <Copy className="w-4 h-4 mr-1" />}
-            {copied ? 'Copied!' : 'Copy to Clipboard'}
+            {copied ? 'Copied All!' : 'Copy All Content'}
           </Button>
         </div>
         <div className="p-4 max-h-48 overflow-y-auto">
@@ -606,6 +1076,61 @@ function FinalReview({
           </div>
         </div>
       </div>
+
+      {/* Approved FAQs Summary */}
+      {approvedFaqs.length > 0 && (
+        <div className="border rounded-lg overflow-hidden">
+          <div className="bg-amber-50 px-4 py-2 border-b flex items-center gap-2">
+            <HelpCircle className="w-4 h-4 text-amber-600" />
+            <span className="text-sm font-medium text-[#463939]">
+              Approved FAQs ({approvedFaqs.length})
+            </span>
+          </div>
+          <div className="p-3 space-y-2 max-h-32 overflow-y-auto">
+            {approvedFaqs.map(faq => (
+              <div key={faq.id} className="text-sm">
+                <p className="font-medium text-[#463939]">{faq.question}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Approved Links Summary */}
+      {(approvedInternalLinks.length > 0 || approvedExternalLinks.length > 0) && (
+        <div className="grid grid-cols-2 gap-4">
+          {approvedInternalLinks.length > 0 && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-blue-50 px-4 py-2 border-b flex items-center gap-2">
+                <Link className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-[#463939]">
+                  Internal ({approvedInternalLinks.length})
+                </span>
+              </div>
+              <div className="p-2 space-y-1 text-sm">
+                {approvedInternalLinks.map(link => (
+                  <p key={link.id} className="text-[#407B9D] truncate">{link.title}</p>
+                ))}
+              </div>
+            </div>
+          )}
+          {approvedExternalLinks.length > 0 && (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-purple-50 px-4 py-2 border-b flex items-center gap-2">
+                <ExternalLink className="w-4 h-4 text-purple-600" />
+                <span className="text-sm font-medium text-[#463939]">
+                  External ({approvedExternalLinks.length})
+                </span>
+              </div>
+              <div className="p-2 space-y-1 text-sm">
+                {approvedExternalLinks.map(link => (
+                  <p key={link.id} className="text-purple-600 truncate">{link.title}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex justify-end pt-4">
         <Button onClick={onApproveForPublish} className="bg-[#407B9D] hover:bg-[#407B9D]/90">
@@ -718,6 +1243,7 @@ export function BriefBuilderModal({
   onCreateNew,
   onCreateFromIdea,
   onApproveFinalDraft,
+  onNavigateToFinalDrafts,
   initialBriefId,
 }: BriefBuilderModalProps) {
   const [viewMode, setViewMode] = useState<'list' | 'source_selection' | 'workflow'>('list')
@@ -725,6 +1251,9 @@ export function BriefBuilderModal({
   const [workflowStep, setWorkflowStep] = useState<BriefStep>('format_selection')
   const [isGenerating, setIsGenerating] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  // Track recently completed brief IDs to filter them immediately (before props update)
+  const [completedBriefIds, setCompletedBriefIds] = useState<Set<string>>(new Set())
 
   // Workflow state for new brief creation
   const [newBriefData, setNewBriefData] = useState<Partial<ContentBrief>>({
@@ -735,6 +1264,10 @@ export function BriefBuilderModal({
   // Reset state when modal opens/closes
   useEffect(() => {
     if (open) {
+      // Clear the completed briefs tracking when modal opens
+      // (the actual data should be in sync with localStorage now)
+      setCompletedBriefIds(new Set())
+
       // If we have an initial brief ID, load it
       if (initialBriefId) {
         const brief = briefs.find(b => b.id === initialBriefId)
@@ -799,16 +1332,55 @@ export function BriefBuilderModal({
     // Trigger outline generation
     setIsGenerating(true)
     setTimeout(() => {
-      // Generate outline
+      // Generate format-specific outline
       const baseId = Date.now()
-      const outline: OutlineSection[] = [
-        { id: `section-${baseId}-1`, title: `Introduction - Why ${idea.topic.split(':')[0]} matters`, description: 'Hook readers with a compelling problem statement.' },
-        { id: `section-${baseId}-2`, title: 'The Core Challenge', description: 'Define the problem your audience faces.' },
-        { id: `section-${baseId}-3`, title: 'Key Insights and Solutions', description: 'Present your main points with supporting evidence.' },
-        { id: `section-${baseId}-4`, title: 'Practical Steps', description: 'Actionable advice readers can implement.' },
-        { id: `section-${baseId}-5`, title: 'Common Mistakes to Avoid', description: 'What not to do - prevents errors.' },
-        { id: `section-${baseId}-6`, title: 'Conclusion and Next Steps', description: 'Summarize key points and include CTA.' },
-      ]
+      const format = idea.suggestedFormat
+      let outline: OutlineSection[] = []
+
+      if (format === 'youtube') {
+        outline = [
+          { id: `section-${baseId}-1`, title: 'Hook (0:00-0:30)', description: 'Attention-grabbing opener that makes viewers want to keep watching' },
+          { id: `section-${baseId}-2`, title: 'Intro & Context (0:30-1:30)', description: 'Introduce yourself and set up the topic' },
+          { id: `section-${baseId}-3`, title: 'Main Content (1:30-5:00)', description: 'Core value delivery - the meat of your video' },
+          { id: `section-${baseId}-4`, title: 'Key Takeaways (5:00-6:00)', description: 'Summarize the main points viewers should remember' },
+          { id: `section-${baseId}-5`, title: 'CTA & Outro (6:00-6:30)', description: 'Subscribe, comment, next video preview' },
+        ]
+      } else if (format === 'linkedin') {
+        outline = [
+          { id: `section-${baseId}-1`, title: 'Hook Line', description: 'First line that stops the scroll - make it count' },
+          { id: `section-${baseId}-2`, title: 'The Story/Problem', description: 'Share context or a relatable challenge' },
+          { id: `section-${baseId}-3`, title: 'Key Insight', description: 'Your main point or lesson learned' },
+          { id: `section-${baseId}-4`, title: 'Call to Action', description: 'Engage your audience - question or action step' },
+        ]
+      } else if (format === 'case_study') {
+        outline = [
+          { id: `section-${baseId}-1`, title: 'Executive Summary', description: 'Quick overview of client, challenge, and results' },
+          { id: `section-${baseId}-2`, title: 'The Client', description: 'Background on the company and their situation' },
+          { id: `section-${baseId}-3`, title: 'The Challenge', description: 'What problem were they facing?' },
+          { id: `section-${baseId}-4`, title: 'The Solution', description: 'How we approached solving the problem' },
+          { id: `section-${baseId}-5`, title: 'The Results', description: 'Measurable outcomes and impact' },
+          { id: `section-${baseId}-6`, title: 'Key Takeaways', description: 'Lessons that apply to similar businesses' },
+        ]
+      } else if (format === 'website_page') {
+        outline = [
+          { id: `section-${baseId}-1`, title: 'Hero Section', description: 'Main headline and value proposition' },
+          { id: `section-${baseId}-2`, title: 'Problem Statement', description: 'What challenge does this page address?' },
+          { id: `section-${baseId}-3`, title: 'Solution Overview', description: 'How we solve the problem' },
+          { id: `section-${baseId}-4`, title: 'Benefits/Features', description: 'Key benefits or features to highlight' },
+          { id: `section-${baseId}-5`, title: 'Social Proof', description: 'Testimonials, logos, or stats' },
+          { id: `section-${baseId}-6`, title: 'Call to Action', description: 'What should visitors do next?' },
+        ]
+      } else {
+        // Default blog format
+        outline = [
+          { id: `section-${baseId}-1`, title: `Introduction - Why ${idea.topic.split(':')[0]} matters`, description: 'Hook readers with a compelling problem statement.' },
+          { id: `section-${baseId}-2`, title: 'The Core Challenge', description: 'Define the problem your audience faces.' },
+          { id: `section-${baseId}-3`, title: 'Key Insights and Solutions', description: 'Present your main points with supporting evidence.' },
+          { id: `section-${baseId}-4`, title: 'Practical Steps', description: 'Actionable advice readers can implement.' },
+          { id: `section-${baseId}-5`, title: 'Common Mistakes to Avoid', description: 'What not to do - prevents errors.' },
+          { id: `section-${baseId}-6`, title: 'Conclusion and Next Steps', description: 'Summarize key points and include CTA.' },
+        ]
+      }
 
       setNewBriefData(prev => ({ ...prev, outline }))
       setIsGenerating(false)
@@ -850,8 +1422,11 @@ export function BriefBuilderModal({
         currentStep: workflowStep,
       } as ContentBrief)
     }
+    // Reset state directly without calling handleBackToList (which could save again)
     setHasUnsavedChanges(false)
-    handleBackToList()
+    setViewMode('list')
+    setSelectedBrief(null)
+    setNewBriefData({})
   }
 
   const getWorkflowSteps = (): { key: BriefStep; label: string; completed: boolean }[] => {
@@ -889,14 +1464,59 @@ export function BriefBuilderModal({
       setIsGenerating(true)
       setTimeout(() => {
         const baseId = Date.now()
-        const outline: OutlineSection[] = [
-          { id: `section-${baseId}-1`, title: `Introduction - Why ${brief.title?.split(':')[0] || 'this topic'} matters`, description: 'Hook readers.' },
-          { id: `section-${baseId}-2`, title: 'The Core Challenge', description: 'Define the problem.' },
-          { id: `section-${baseId}-3`, title: 'Key Solutions', description: 'Main points.' },
-          { id: `section-${baseId}-4`, title: 'Practical Steps', description: 'Actionable advice.' },
-          { id: `section-${baseId}-5`, title: 'Mistakes to Avoid', description: 'What not to do.' },
-          { id: `section-${baseId}-6`, title: 'Conclusion', description: 'Summary and CTA.' },
-        ]
+        const format = brief.targetFormat || 'blog'
+
+        // Generate format-specific outlines
+        let outline: OutlineSection[] = []
+
+        if (format === 'youtube') {
+          // YouTube video script format
+          outline = [
+            { id: `section-${baseId}-1`, title: 'Hook (0:00-0:30)', description: 'Attention-grabbing opener that makes viewers want to keep watching' },
+            { id: `section-${baseId}-2`, title: 'Intro & Context (0:30-1:30)', description: 'Introduce yourself and set up the topic' },
+            { id: `section-${baseId}-3`, title: 'Main Content (1:30-5:00)', description: 'Core value delivery - the meat of your video' },
+            { id: `section-${baseId}-4`, title: 'Key Takeaways (5:00-6:00)', description: 'Summarize the main points viewers should remember' },
+            { id: `section-${baseId}-5`, title: 'CTA & Outro (6:00-6:30)', description: 'Subscribe, comment, next video preview' },
+          ]
+        } else if (format === 'linkedin') {
+          // LinkedIn post format (shorter)
+          outline = [
+            { id: `section-${baseId}-1`, title: 'Hook Line', description: 'First line that stops the scroll - make it count' },
+            { id: `section-${baseId}-2`, title: 'The Story/Problem', description: 'Share context or a relatable challenge' },
+            { id: `section-${baseId}-3`, title: 'Key Insight', description: 'Your main point or lesson learned' },
+            { id: `section-${baseId}-4`, title: 'Call to Action', description: 'Engage your audience - question or action step' },
+          ]
+        } else if (format === 'case_study') {
+          // Case study format
+          outline = [
+            { id: `section-${baseId}-1`, title: 'Executive Summary', description: 'Quick overview of client, challenge, and results' },
+            { id: `section-${baseId}-2`, title: 'The Client', description: 'Background on the company and their situation' },
+            { id: `section-${baseId}-3`, title: 'The Challenge', description: 'What problem were they facing?' },
+            { id: `section-${baseId}-4`, title: 'The Solution', description: 'How we approached solving the problem' },
+            { id: `section-${baseId}-5`, title: 'The Results', description: 'Measurable outcomes and impact' },
+            { id: `section-${baseId}-6`, title: 'Key Takeaways', description: 'Lessons that apply to similar businesses' },
+          ]
+        } else if (format === 'website_page') {
+          // Website page format
+          outline = [
+            { id: `section-${baseId}-1`, title: 'Hero Section', description: 'Main headline and value proposition' },
+            { id: `section-${baseId}-2`, title: 'Problem Statement', description: 'What challenge does this page address?' },
+            { id: `section-${baseId}-3`, title: 'Solution Overview', description: 'How we solve the problem' },
+            { id: `section-${baseId}-4`, title: 'Benefits/Features', description: 'Key benefits or features to highlight' },
+            { id: `section-${baseId}-5`, title: 'Social Proof', description: 'Testimonials, logos, or stats' },
+            { id: `section-${baseId}-6`, title: 'Call to Action', description: 'What should visitors do next?' },
+          ]
+        } else {
+          // Default blog format
+          outline = [
+            { id: `section-${baseId}-1`, title: `Introduction - Why ${brief.title?.split(':')[0] || 'this topic'} matters`, description: 'Hook readers with a compelling opening.' },
+            { id: `section-${baseId}-2`, title: 'The Core Challenge', description: 'Define the problem your audience faces.' },
+            { id: `section-${baseId}-3`, title: 'Key Solutions', description: 'Present your main points with evidence.' },
+            { id: `section-${baseId}-4`, title: 'Practical Steps', description: 'Actionable advice readers can implement.' },
+            { id: `section-${baseId}-5`, title: 'Mistakes to Avoid', description: 'Common pitfalls to watch out for.' },
+            { id: `section-${baseId}-6`, title: 'Conclusion', description: 'Summary and clear call to action.' },
+          ]
+        }
 
         if (selectedBrief) {
           setSelectedBrief({ ...selectedBrief, outline, currentStep: nextStep })
@@ -1040,9 +1660,9 @@ export function BriefBuilderModal({
 
         <div className="flex-1 overflow-y-auto py-4">
           {viewMode === 'list' ? (
-            // Brief List View
+            // Brief List View - filter out completed/published briefs AND recently completed ones
             <div className="space-y-4">
-              {briefs.map((brief) => (
+              {briefs.filter(b => b.status !== 'completed' && b.currentStep !== 'published' && !completedBriefIds.has(b.id)).map((brief) => (
                 <div
                   key={brief.id}
                   className="p-4 border rounded-lg bg-white hover:shadow-md transition-shadow"
@@ -1152,14 +1772,14 @@ export function BriefBuilderModal({
                 </div>
               ))}
 
-              {briefs.length === 0 && (
+              {briefs.filter(b => b.status !== 'completed' && b.currentStep !== 'published' && !completedBriefIds.has(b.id)).length === 0 && (
                 <div className="text-center py-12">
                   <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-lg font-medium text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-                    No Briefs Yet
+                    No Active Briefs
                   </p>
                   <p className="text-muted-foreground mb-4" style={{ fontFamily: 'var(--font-body)' }}>
-                    Create your first content brief to get started.
+                    Create a content brief to get started, or check Final Drafts for completed content.
                   </p>
                   <Button
                     onClick={handleStartNewBrief}
@@ -1247,14 +1867,53 @@ export function BriefBuilderModal({
                     setIsGenerating(true)
                     setTimeout(() => {
                       const baseId = Date.now()
-                      const outline: OutlineSection[] = [
-                        { id: `section-${baseId}-1`, title: `Introduction - Fresh take on ${currentBrief.title?.split(':')[0] || 'this topic'}`, description: 'New hook approach.' },
-                        { id: `section-${baseId}-2`, title: 'Problem Overview', description: 'Reframed challenge.' },
-                        { id: `section-${baseId}-3`, title: 'Alternative Solutions', description: 'Different angle.' },
-                        { id: `section-${baseId}-4`, title: 'Implementation Guide', description: 'Step by step.' },
-                        { id: `section-${baseId}-5`, title: 'Case Examples', description: 'Real scenarios.' },
-                        { id: `section-${baseId}-6`, title: 'Action Plan', description: 'What to do next.' },
-                      ]
+                      const format = currentBrief.targetFormat || 'blog'
+                      let outline: OutlineSection[] = []
+
+                      // Generate format-specific alternative outlines
+                      if (format === 'youtube') {
+                        outline = [
+                          { id: `section-${baseId}-1`, title: 'Pattern Interrupt (0:00-0:20)', description: 'Start with something unexpected' },
+                          { id: `section-${baseId}-2`, title: 'Big Promise (0:20-1:00)', description: 'What will viewers learn?' },
+                          { id: `section-${baseId}-3`, title: 'Quick Win (1:00-2:30)', description: 'Give immediate value upfront' },
+                          { id: `section-${baseId}-4`, title: 'Deep Dive (2:30-5:30)', description: 'The detailed breakdown' },
+                          { id: `section-${baseId}-5`, title: 'Recap & CTA (5:30-6:00)', description: 'Summarize and ask for engagement' },
+                        ]
+                      } else if (format === 'linkedin') {
+                        outline = [
+                          { id: `section-${baseId}-1`, title: 'Contrarian Take', description: 'Challenge conventional wisdom' },
+                          { id: `section-${baseId}-2`, title: 'Personal Experience', description: 'Share your perspective' },
+                          { id: `section-${baseId}-3`, title: 'The Lesson', description: 'What you learned' },
+                          { id: `section-${baseId}-4`, title: 'Engage', description: 'Ask for opinions or shares' },
+                        ]
+                      } else if (format === 'case_study') {
+                        outline = [
+                          { id: `section-${baseId}-1`, title: 'The Transformation', description: 'Before vs after snapshot' },
+                          { id: `section-${baseId}-2`, title: 'Why They Came to Us', description: 'The breaking point' },
+                          { id: `section-${baseId}-3`, title: 'Our Approach', description: 'Methodology and process' },
+                          { id: `section-${baseId}-4`, title: 'Key Milestones', description: 'Timeline of progress' },
+                          { id: `section-${baseId}-5`, title: 'ROI & Impact', description: 'Numbers that matter' },
+                          { id: `section-${baseId}-6`, title: 'Client Testimonial', description: 'In their own words' },
+                        ]
+                      } else if (format === 'website_page') {
+                        outline = [
+                          { id: `section-${baseId}-1`, title: 'Bold Statement', description: 'Lead with your strongest claim' },
+                          { id: `section-${baseId}-2`, title: 'The Gap', description: 'What is missing in the market?' },
+                          { id: `section-${baseId}-3`, title: 'Our Difference', description: 'How we fill that gap' },
+                          { id: `section-${baseId}-4`, title: 'Proof Points', description: 'Evidence and credentials' },
+                          { id: `section-${baseId}-5`, title: 'FAQ Section', description: 'Address common objections' },
+                          { id: `section-${baseId}-6`, title: 'Next Step', description: 'Clear path forward' },
+                        ]
+                      } else {
+                        outline = [
+                          { id: `section-${baseId}-1`, title: `Fresh Angle on ${currentBrief.title?.split(':')[0] || 'this topic'}`, description: 'New hook approach.' },
+                          { id: `section-${baseId}-2`, title: 'Problem Reframed', description: 'Different perspective on the challenge.' },
+                          { id: `section-${baseId}-3`, title: 'Alternative Solutions', description: 'Explore different approaches.' },
+                          { id: `section-${baseId}-4`, title: 'Implementation Guide', description: 'Step by step walkthrough.' },
+                          { id: `section-${baseId}-5`, title: 'Real Examples', description: 'Case scenarios and applications.' },
+                          { id: `section-${baseId}-6`, title: 'Action Plan', description: 'What to do next.' },
+                        ]
+                      }
 
                       if (selectedBrief) {
                         setSelectedBrief({ ...selectedBrief, outline })
@@ -1274,6 +1933,14 @@ export function BriefBuilderModal({
                   isGenerating={isGenerating}
                   onApprove={() => handleNextStep('author_selection')}
                   onEdit={() => console.log('Edit draft')}
+                  onUpdateBrief={(updates) => {
+                    if (selectedBrief) {
+                      setSelectedBrief({ ...selectedBrief, ...updates })
+                    } else {
+                      setNewBriefData({ ...newBriefData, ...updates })
+                    }
+                    setHasUnsavedChanges(true)
+                  }}
                 />
               )}
 
@@ -1315,10 +1982,22 @@ export function BriefBuilderModal({
                       currentStep: 'published' as BriefStep,
                       finalDraft: currentBrief.firstDraft,
                     }
+                    // Save brief first, then create final draft
                     onSaveBrief(completedBrief)
                     onApproveFinalDraft?.(currentBrief.id)
+
+                    // Mark this brief as completed immediately so it's filtered from list
+                    // This prevents the "still showing" issue before props update
+                    setCompletedBriefIds(prev => new Set([...prev, currentBrief.id]))
+
+                    // Clear current selection
+                    setSelectedBrief(null)
+                    setNewBriefData({})
                     setHasUnsavedChanges(false)
-                    handleBackToList()
+
+                    // Close the modal and navigate to Final Drafts section
+                    onOpenChange(false)
+                    onNavigateToFinalDrafts?.()
                   }}
                   onCopy={() => console.log('Copy content')}
                 />
@@ -1330,7 +2009,7 @@ export function BriefBuilderModal({
         {viewMode === 'list' && (
           <div className="flex items-center justify-between pt-4 border-t">
             <p className="text-sm text-muted-foreground">
-              {briefs.length} brief{briefs.length !== 1 ? 's' : ''} total
+              {briefs.filter(b => b.status !== 'completed' && b.currentStep !== 'published' && !completedBriefIds.has(b.id)).length} active brief{briefs.filter(b => b.status !== 'completed' && b.currentStep !== 'published' && !completedBriefIds.has(b.id)).length !== 1 ? 's' : ''}
             </p>
             <Button
               variant="outline"

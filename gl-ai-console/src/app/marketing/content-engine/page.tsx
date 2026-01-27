@@ -24,7 +24,6 @@ import { BriefBuilderModal } from "@/components/marketing/brief-builder-modal"
 import { RepurposeModal } from "@/components/marketing/repurpose-modal"
 import { RefreshModal } from "@/components/marketing/refresh-modal"
 import { ContentLibrary } from "@/components/marketing/content-library"
-import { ContentChat } from "@/components/marketing/content-chat"
 import { FinalDraftsSection } from "@/components/marketing/final-drafts-section"
 
 // Test Data (for static content)
@@ -32,7 +31,6 @@ import {
   testContentLibrary,
   testRepurposeItems,
   testRefreshRecommendations,
-  testChatMessages,
   getDashboardStats,
 } from "@/lib/marketing-content-data"
 
@@ -43,6 +41,9 @@ import {
   removeTopicIdea,
   updateTopicIdea,
   generateTopicIdeasForCategory,
+  getApprovedIdeas,
+  addApprovedIdea,
+  removeApprovedIdea,
   getBriefs,
   saveBriefs,
   addBrief,
@@ -59,7 +60,6 @@ import {
 
 import {
   WorkflowContext,
-  ChatMessage,
   TopicCategory,
   TopicIdea,
   ContentBrief,
@@ -81,6 +81,7 @@ export default function ContentEnginePage() {
 
   // Data states (from localStorage)
   const [topicIdeas, setTopicIdeas] = useState<TopicIdea[]>([])
+  const [approvedIdeas, setApprovedIdeas] = useState<TopicIdea[]>([])
   const [briefs, setBriefs] = useState<ContentBrief[]>([])
   const [finalDrafts, setFinalDrafts] = useState<FinalDraft[]>([])
 
@@ -91,12 +92,10 @@ export default function ContentEnginePage() {
   // Brief builder state
   const [initialBriefId, setInitialBriefId] = useState<string | null>(null)
 
-  // Chat state
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(testChatMessages)
-
   // Load data from localStorage on mount
   useEffect(() => {
     setTopicIdeas(getTopicIdeas())
+    setApprovedIdeas(getApprovedIdeas())
     setBriefs(getBriefs())
     setFinalDrafts(getFinalDrafts())
   }, [])
@@ -107,27 +106,6 @@ export default function ContentEnginePage() {
   const finalDraftsReady = finalDrafts.filter(d => !d.publishedAt).length
 
   // Handlers
-  const handleSendMessage = (message: string) => {
-    const newMessage: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      role: 'user',
-      content: message,
-      timestamp: new Date().toISOString(),
-    }
-    setChatMessages((prev) => [...prev, newMessage])
-
-    // Simulate assistant response
-    setTimeout(() => {
-      const response: ChatMessage = {
-        id: `msg-${Date.now() + 1}`,
-        role: 'assistant',
-        content: getSimulatedResponse(message, workflowContext),
-        timestamp: new Date().toISOString(),
-      }
-      setChatMessages((prev) => [...prev, response])
-    }, 1000)
-  }
-
   const handleOpenModal = (modal: 'topic' | 'brief' | 'repurpose' | 'refresh') => {
     switch (modal) {
       case 'topic':
@@ -195,18 +173,18 @@ export default function ContentEnginePage() {
   const handleApproveIdea = (ideaId: string) => {
     console.log('Approving idea:', ideaId)
 
-    // Get the idea
+    // Get the idea from topicIdeas
     const idea = topicIdeas.find(i => i.id === ideaId)
     if (!idea) return
 
-    // Create a brief from this idea
-    const newBrief = createBriefFromTopicIdea(idea)
-    const updatedBriefs = addBrief(newBrief)
-    setBriefs(updatedBriefs)
+    // Move idea from Topic Radar to Approved Ideas list
+    // 1. Add to approved ideas (stores with status 'approved')
+    const updatedApproved = addApprovedIdea(idea)
+    setApprovedIdeas(updatedApproved)
 
-    // Remove from topic ideas
-    const updatedIdeas = removeTopicIdea(ideaId)
-    setTopicIdeas(updatedIdeas)
+    // 2. Remove from topic radar ideas
+    const updatedTopicIdeas = removeTopicIdea(ideaId)
+    setTopicIdeas(updatedTopicIdeas)
   }
 
   const handleRejectIdea = (ideaId: string) => {
@@ -220,17 +198,26 @@ export default function ContentEnginePage() {
   const handleCreateBriefFromIdea = (ideaId: string) => {
     console.log('Creating brief from idea:', ideaId)
 
-    // This is called when user clicks "Create Brief" on an approved idea
-    // The idea should already be in briefs, so just open the modal
-    const idea = topicIdeas.find(i => i.id === ideaId)
+    // This is called when user clicks "Create Brief" on an approved idea in Topic Radar
+    // Look for the idea in approved ideas list (primary) or topic ideas (fallback)
+    let idea = approvedIdeas.find(i => i.id === ideaId)
+    if (!idea) {
+      idea = topicIdeas.find(i => i.id === ideaId)
+    }
+
     if (idea) {
-      // Create brief from idea and remove from topic ideas
+      // Create brief from idea
       const newBrief = createBriefFromTopicIdea(idea)
       const updatedBriefs = addBrief(newBrief)
       setBriefs(updatedBriefs)
 
-      const updatedIdeas = removeTopicIdea(ideaId)
-      setTopicIdeas(updatedIdeas)
+      // Remove from approved ideas (primary storage for approved)
+      const updatedApproved = removeApprovedIdea(ideaId)
+      setApprovedIdeas(updatedApproved)
+
+      // Also try to remove from topic ideas (in case it was there)
+      const updatedTopicIdeas = removeTopicIdea(ideaId)
+      setTopicIdeas(updatedTopicIdeas)
 
       // Open brief builder with this brief
       setInitialBriefId(newBrief.id)
@@ -243,35 +230,41 @@ export default function ContentEnginePage() {
   }
 
   const handleSaveBrief = (brief: ContentBrief) => {
-    console.log('Saving brief:', brief.id)
+    console.log('Saving brief:', brief.id, 'status:', brief.status)
 
-    // Check if brief exists
-    const existing = briefs.find(b => b.id === brief.id)
-    if (existing) {
-      const updatedBriefs = updateBrief(brief.id, brief)
-      setBriefs(updatedBriefs)
-    } else {
-      const updatedBriefs = addBrief(brief)
-      setBriefs(updatedBriefs)
-    }
+    // Always use addBrief which now handles duplicates safely
+    // This prevents race conditions between state and localStorage
+    const updatedBriefs = addBrief(brief)
+    setBriefs(updatedBriefs)
   }
 
   const handleApproveFinalDraft = (briefId: string) => {
     console.log('Approving final draft for brief:', briefId)
 
-    // Get the brief
-    const brief = briefs.find(b => b.id === briefId)
-    if (!brief) return
+    // Get the brief from localStorage (more reliable than React state during async updates)
+    const brief = getBriefById(briefId)
+    if (!brief) {
+      // Fallback to React state if not in localStorage yet
+      const stateBrief = briefs.find(b => b.id === briefId)
+      if (!stateBrief) {
+        console.error('Brief not found:', briefId)
+        return
+      }
+      // Create final draft from state brief
+      const authorName = stateBrief.assignedTo || 'Unknown Author'
+      const newFinalDraft = createFinalDraftFromBrief(stateBrief, authorName)
+      const updatedFinalDrafts = addFinalDraft(newFinalDraft)
+      setFinalDrafts(updatedFinalDrafts)
+    } else {
+      // Create final draft from localStorage brief
+      const authorName = brief.assignedTo || 'Unknown Author'
+      const newFinalDraft = createFinalDraftFromBrief(brief, authorName)
+      const updatedFinalDrafts = addFinalDraft(newFinalDraft)
+      setFinalDrafts(updatedFinalDrafts)
+    }
 
-    // Create final draft
-    const authorName = brief.assignedTo || 'Unknown Author'
-    const newFinalDraft = createFinalDraftFromBrief(brief, authorName)
-    const updatedFinalDrafts = addFinalDraft(newFinalDraft)
-    setFinalDrafts(updatedFinalDrafts)
-
-    // Update brief status
-    const updatedBriefs = updateBrief(briefId, { status: 'completed', currentStep: 'published' })
-    setBriefs(updatedBriefs)
+    // Refresh briefs from localStorage to ensure sync
+    setBriefs(getBriefs())
   }
 
   const handlePublishDraft = (draftId: string) => {
@@ -283,9 +276,6 @@ export default function ContentEnginePage() {
     })
     setFinalDrafts(updatedFinalDrafts)
   }
-
-  // Get approved ideas for brief builder (status === 'approved')
-  const approvedTopicIdeas = topicIdeas.filter(i => i.status === 'approved')
 
   return (
     <div className="min-h-screen bg-[#FAF9F9]">
@@ -361,41 +351,34 @@ export default function ContentEnginePage() {
 
         {/* Content Lifecycle Pipeline (only on workflows view) */}
         {viewMode === 'workflows' && (
-          <div className="mb-8 p-4 bg-white rounded-xl border shadow-sm">
-            <p
-              className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide"
-              style={{ fontFamily: 'var(--font-heading)' }}
-            >
-              Content Lifecycle
-            </p>
-            <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2">
+          <div className="mb-6 flex items-center justify-center">
+            <div className="inline-flex items-center bg-gradient-to-r from-slate-50 to-white rounded-full border border-slate-200/80 shadow-sm px-2 py-1.5">
               {[
-                { icon: Lightbulb, label: 'Ideate', color: '#407B9D', action: () => handleOpenModal('topic') },
-                { icon: FileText, label: 'Brief', color: '#95CBD7', action: () => handleOpenModal('brief') },
-                { icon: PenTool, label: 'Create', color: '#C8E4BB', action: () => {} },
-                { icon: RefreshCw, label: 'Repurpose', color: '#C8E4BB', action: () => handleOpenModal('repurpose') },
-                { icon: TrendingUp, label: 'Refresh', color: '#F59E0B', action: () => handleOpenModal('refresh') },
+                { icon: Lightbulb, label: 'Ideate', color: '#407B9D', bgColor: 'bg-[#407B9D]/10', action: () => handleOpenModal('topic') },
+                { icon: FileText, label: 'Brief', color: '#407B9D', bgColor: 'bg-[#95CBD7]/20', action: () => handleOpenModal('brief') },
+                { icon: RefreshCw, label: 'Repurpose', color: '#407B9D', bgColor: 'bg-[#C8E4BB]/30', action: () => handleOpenModal('repurpose') },
+                { icon: TrendingUp, label: 'Refresh', color: '#407B9D', bgColor: 'bg-amber-100', action: () => handleOpenModal('refresh') },
               ].map((step, index, arr) => (
                 <div key={step.label} className="flex items-center">
                   <button
                     onClick={step.action}
-                    className="flex flex-col items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors group"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-[#407B9D]/10 transition-all duration-200 group"
                   >
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-110"
-                      style={{ backgroundColor: `${step.color}20` }}
-                    >
-                      <step.icon className="w-5 h-5" style={{ color: step.color }} />
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center ${step.bgColor} transition-all duration-200 group-hover:scale-110 group-hover:shadow-sm`}>
+                      <step.icon className="w-3.5 h-3.5 text-[#407B9D]" />
                     </div>
                     <span
-                      className="text-sm font-medium text-[#463939]"
+                      className="text-sm font-medium text-slate-600 group-hover:text-[#407B9D] transition-colors"
                       style={{ fontFamily: 'var(--font-body)' }}
                     >
                       {step.label}
                     </span>
                   </button>
                   {index < arr.length - 1 && (
-                    <ArrowRight className="w-5 h-5 text-slate-300 mx-2 flex-shrink-0" />
+                    <div className="flex items-center mx-1">
+                      <div className="w-4 h-px bg-gradient-to-r from-slate-300 to-slate-200" />
+                      <div className="w-1 h-1 rounded-full bg-slate-300" />
+                    </div>
                   )}
                 </div>
               ))}
@@ -430,13 +413,6 @@ export default function ContentEnginePage() {
                 onRunAnalysis={() => console.log('Running refresh analysis...')}
               />
             </div>
-
-            {/* Chat Panel */}
-            <ContentChat
-              messages={chatMessages}
-              workflowContext={workflowContext}
-              onSendMessage={handleSendMessage}
-            />
           </>
         ) : viewMode === 'final_drafts' ? (
           /* Final Drafts View */
@@ -468,17 +444,22 @@ export default function ContentEnginePage() {
           open={briefBuilderOpen}
           onOpenChange={(open) => !open && handleCloseModal('brief')}
           briefs={briefs}
-          approvedTopicIdeas={approvedTopicIdeas}
+          approvedTopicIdeas={approvedIdeas}
           onSaveBrief={handleSaveBrief}
           onEditBrief={(briefId) => console.log('Editing brief:', briefId)}
           onViewBrief={(briefId) => console.log('Viewing brief:', briefId)}
           onCreateNew={() => console.log('Creating new brief')}
           onCreateFromIdea={(ideaId) => {
             // Remove from approved ideas when creating a brief
-            const updatedIdeas = removeTopicIdea(ideaId)
-            setTopicIdeas(updatedIdeas)
+            const updatedApproved = removeApprovedIdea(ideaId)
+            setApprovedIdeas(updatedApproved)
           }}
           onApproveFinalDraft={handleApproveFinalDraft}
+          onNavigateToFinalDrafts={() => {
+            // Switch to Final Drafts view after approving
+            setViewMode('final_drafts')
+            setWorkflowContext('dashboard')
+          }}
           initialBriefId={initialBriefId}
         />
 
@@ -501,27 +482,4 @@ export default function ContentEnginePage() {
       </div>
     </div>
   )
-}
-
-// Simulated response generator for demo
-function getSimulatedResponse(message: string, context: WorkflowContext): string {
-  const lowerMessage = message.toLowerCase()
-
-  if (lowerMessage.includes('gap') || lowerMessage.includes('idea')) {
-    return "Based on your content library, I see a significant opportunity around \"Fractional CFO vs Full-Time CFO\" comparisons. This topic has high search volume and your competitors rank well for it. Your existing \"5 Signs You Need a Fractional CFO\" blog provides a good foundation, but a direct cost comparison piece would capture users at a different stage of their decision journey."
-  }
-
-  if (lowerMessage.includes('brief') || lowerMessage.includes('outline')) {
-    return "I can help you create a content brief. For best results, tell me: 1) The topic or title, 2) The target format (blog, video, LinkedIn post), and 3) Any specific keywords you want to target. I will generate an outline with sections, talking points, and SEO recommendations."
-  }
-
-  if (lowerMessage.includes('repurpose') || lowerMessage.includes('transform')) {
-    return "Your 13-Week Cash Flow blog would be excellent for repurposing. I recommend: 1) A LinkedIn carousel showing the key steps visually, 2) A short YouTube explainer (3-5 min), and 3) An email sequence for nurturing leads. Each format reaches different audience segments."
-  }
-
-  if (lowerMessage.includes('refresh') || lowerMessage.includes('update')) {
-    return "I have identified 2 high-priority pieces needing refresh: \"5 Signs You Need a Fractional CFO\" (ranking dropped from #8 to #15) and \"Tax Planning Strategies\" (needs 2025 updates). Both could benefit from updated statistics, new internal links, and refreshed meta descriptions."
-  }
-
-  return `I am here to help with your ${context === 'dashboard' ? 'content strategy' : context.replace('_', ' ')}. You can ask me about content gaps, brief creation, repurposing opportunities, or which content needs refreshing. What would you like to explore?`
 }

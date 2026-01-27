@@ -130,18 +130,23 @@ export interface OutlineSection {
   description?: string
 }
 
+// Approval status for FAQs and Links
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+
 export interface LinkRecommendation {
   id: string
   title: string
   url: string
   type: 'internal' | 'external'
   context?: string // Why this link is recommended
+  approvalStatus?: ApprovalStatus // For approve/deny workflow
 }
 
 export interface FAQ {
   id: string
   question: string
   answer: string
+  approvalStatus?: ApprovalStatus // For approve/deny workflow
 }
 
 export interface ContentBrief {

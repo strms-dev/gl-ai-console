@@ -42,7 +42,18 @@ export function FinalDraftsSection({
   const [typeFilter, setTypeFilter] = useState<ContentType | 'all'>('all')
 
   const handleCopy = async (draft: FinalDraft) => {
-    await navigator.clipboard.writeText(draft.content)
+    // Build complete content including FAQs
+    let fullContent = draft.content
+
+    // Add FAQs section if present
+    if (draft.faqs && draft.faqs.length > 0) {
+      fullContent += '\n\n## Frequently Asked Questions\n\n'
+      draft.faqs.forEach(faq => {
+        fullContent += `**Q: ${faq.question}**\n${faq.answer}\n\n`
+      })
+    }
+
+    await navigator.clipboard.writeText(fullContent)
     setCopiedId(draft.id)
     setTimeout(() => setCopiedId(null), 2000)
   }

@@ -15,6 +15,7 @@ import {
 
 // Storage keys
 const TOPIC_IDEAS_KEY = 'marketing_topic_ideas'
+const APPROVED_IDEAS_KEY = 'marketing_approved_ideas'
 const BRIEFS_KEY = 'marketing_briefs'
 const FINAL_DRAFTS_KEY = 'marketing_final_drafts'
 
@@ -62,6 +63,43 @@ export function clearTopicIdeas(): void {
 }
 
 // ===================
+// Approved Ideas Store
+// ===================
+// These are ideas approved from Topic Radar, waiting to be turned into briefs
+
+export function getApprovedIdeas(): TopicIdea[] {
+  if (typeof window === 'undefined') return []
+  const stored = localStorage.getItem(APPROVED_IDEAS_KEY)
+  return stored ? JSON.parse(stored) : []
+}
+
+export function saveApprovedIdeas(ideas: TopicIdea[]): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(APPROVED_IDEAS_KEY, JSON.stringify(ideas))
+}
+
+export function addApprovedIdea(idea: TopicIdea): TopicIdea[] {
+  const current = getApprovedIdeas()
+  // Update status to approved when adding
+  const approvedIdea = { ...idea, status: 'approved' as TopicIdeaStatus }
+  const updated = [...current, approvedIdea]
+  saveApprovedIdeas(updated)
+  return updated
+}
+
+export function removeApprovedIdea(ideaId: string): TopicIdea[] {
+  const current = getApprovedIdeas()
+  const updated = current.filter(idea => idea.id !== ideaId)
+  saveApprovedIdeas(updated)
+  return updated
+}
+
+export function clearApprovedIdeas(): void {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(APPROVED_IDEAS_KEY)
+}
+
+// ===================
 // Briefs Store
 // ===================
 
@@ -78,6 +116,14 @@ export function saveBriefs(briefs: ContentBrief[]): void {
 
 export function addBrief(brief: ContentBrief): ContentBrief[] {
   const current = getBriefs()
+  // Check if brief with this ID already exists - if so, update instead of adding
+  const existingIndex = current.findIndex(b => b.id === brief.id)
+  if (existingIndex >= 0) {
+    // Update existing brief instead of adding duplicate
+    const updated = current.map(b => b.id === brief.id ? { ...b, ...brief } : b)
+    saveBriefs(updated)
+    return updated
+  }
   const updated = [...current, brief]
   saveBriefs(updated)
   return updated
