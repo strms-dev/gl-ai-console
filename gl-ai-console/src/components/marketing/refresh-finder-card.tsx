@@ -25,7 +25,7 @@ export function RefreshFinderCard({ needsRefreshCount, onOpenModal, onRunAnalysi
                 className="text-xl text-[#463939]"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
-                Refresh Finder
+                Content Refresh
               </CardTitle>
               {needsRefreshCount > 0 && (
                 <Badge className="bg-red-100 text-red-800 hover:bg-red-100">

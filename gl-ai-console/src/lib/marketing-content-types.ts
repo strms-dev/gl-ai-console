@@ -1,7 +1,7 @@
 // Marketing Content Engine Types
 
 // Content type categories
-export type ContentType = 'blog' | 'linkedin' | 'youtube' | 'case_study' | 'website_page' | 'meeting_transcript'
+export type ContentType = 'blog' | 'linkedin' | 'youtube' | 'case_study' | 'website_page' | 'meeting_transcript' | 'external'
 
 // Content status
 export type ContentStatus = 'published' | 'draft' | 'archived'
@@ -9,8 +9,14 @@ export type ContentStatus = 'published' | 'draft' | 'archived'
 // Topic idea status
 export type TopicIdeaStatus = 'new' | 'approved' | 'in_progress' | 'completed' | 'rejected'
 
+// Topic category for analysis
+export type TopicCategory = 'generalized' | 'competitor' | 'market_trends'
+
 // Brief status
 export type BriefStatus = 'draft' | 'approved' | 'in_progress' | 'completed'
+
+// Brief workflow step
+export type BriefStep = 'format_selection' | 'outline' | 'first_draft' | 'author_selection' | 'final_review' | 'published'
 
 // Refresh priority
 export type RefreshPriority = 'low' | 'medium' | 'high'
@@ -56,6 +62,7 @@ export const contentTypeLabels: Record<ContentType, string> = {
   case_study: 'Case Study',
   website_page: 'Website Page',
   meeting_transcript: 'Meeting Transcript',
+  external: 'External Content',
 }
 
 export const contentTypeColors: Record<ContentType, string> = {
@@ -65,6 +72,7 @@ export const contentTypeColors: Record<ContentType, string> = {
   case_study: 'bg-green-100 text-green-800',
   website_page: 'bg-purple-100 text-purple-800',
   meeting_transcript: 'bg-amber-100 text-amber-800',
+  external: 'bg-indigo-100 text-indigo-800',
 }
 
 // ===================
@@ -79,6 +87,7 @@ export interface TopicIdea {
   suggestedFormat: ContentType
   relatedContentIds?: string[]
   status: TopicIdeaStatus
+  category: TopicCategory // generalized, competitor, or market_trends
   createdAt: string
   createdBy: string // 'ai' or user name
 }
@@ -99,22 +108,68 @@ export const topicIdeaStatusColors: Record<TopicIdeaStatus, string> = {
   rejected: 'bg-red-100 text-red-800',
 }
 
+export const topicCategoryLabels: Record<TopicCategory, string> = {
+  generalized: 'Content Gaps',
+  competitor: 'Competitor Research',
+  market_trends: 'Market Trends',
+}
+
+export const topicCategoryColors: Record<TopicCategory, string> = {
+  generalized: 'bg-blue-100 text-blue-800',
+  competitor: 'bg-orange-100 text-orange-800',
+  market_trends: 'bg-teal-100 text-teal-800',
+}
+
 // ===================
 // Brief Builder
 // ===================
+
+export interface OutlineSection {
+  id: string
+  title: string
+  description?: string
+}
+
+// Approval status for FAQs and Links
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+
+export interface LinkRecommendation {
+  id: string
+  title: string
+  url: string
+  type: 'internal' | 'external'
+  context?: string // Why this link is recommended
+  approvalStatus?: ApprovalStatus // For approve/deny workflow
+}
+
+export interface FAQ {
+  id: string
+  question: string
+  answer: string
+  approvalStatus?: ApprovalStatus // For approve/deny workflow
+}
 
 export interface ContentBrief {
   id: string
   title: string
   status: BriefStatus
+  currentStep: BriefStep
   targetFormat: ContentType
   targetKeywords: string[]
-  outline: string[]
+  outline: OutlineSection[]
+  outlineApproved?: boolean
+  firstDraft?: string
+  faqs?: FAQ[]
+  internalLinks?: LinkRecommendation[]
+  externalLinks?: LinkRecommendation[]
+  recommendedAuthor?: string
+  finalDraft?: string
   notes?: string
   sourceTopicId?: string
   assignedTo?: string
   createdAt: string
   updatedAt: string
+  publishedAt?: string
 }
 
 export const briefStatusLabels: Record<BriefStatus, string> = {
@@ -131,8 +186,35 @@ export const briefStatusColors: Record<BriefStatus, string> = {
   completed: 'bg-emerald-100 text-emerald-800',
 }
 
+export const briefStepLabels: Record<BriefStep, string> = {
+  format_selection: 'Select Format',
+  outline: 'Create Outline',
+  first_draft: 'First Draft',
+  author_selection: 'Assign Author',
+  final_review: 'Final Review',
+  published: 'Published',
+}
+
+export const briefStepColors: Record<BriefStep, string> = {
+  format_selection: 'bg-slate-100 text-slate-800',
+  outline: 'bg-blue-100 text-blue-800',
+  first_draft: 'bg-amber-100 text-amber-800',
+  author_selection: 'bg-purple-100 text-purple-800',
+  final_review: 'bg-teal-100 text-teal-800',
+  published: 'bg-green-100 text-green-800',
+}
+
+// Authors list for recommendations
+export const availableAuthors = [
+  { id: 'dan', name: 'Dan Fennessy', role: 'CEO', expertise: ['accounting', 'finance', 'leadership'] },
+  { id: 'alison', name: 'Alison Bulmer', role: 'Marketing', expertise: ['marketing', 'content', 'branding'] },
+  { id: 'nick-s', name: 'Nick Sementilli', role: 'Operations', expertise: ['operations', 'technology', 'automation'] },
+  { id: 'nick-g', name: 'Nick Gualandi', role: 'FP&A', expertise: ['fpa', 'financial-planning', 'analysis'] },
+  { id: 'guest', name: 'Guest Author', role: 'Guest', expertise: [] },
+]
+
 // ===================
-// Repurpose Factory
+// Repurpose Content
 // ===================
 
 export interface RepurposeItem {
@@ -216,4 +298,21 @@ export interface ChatSession {
   workflowContext: WorkflowContext
   messages: ChatMessage[]
   createdAt: string
+}
+
+// ===================
+// Final Drafts
+// ===================
+
+export interface FinalDraft {
+  id: string
+  briefId: string
+  title: string
+  targetFormat: ContentType
+  content: string
+  faqs?: FAQ[]
+  author: string
+  approvedAt: string
+  publishedAt?: string
+  keywords: string[]
 }

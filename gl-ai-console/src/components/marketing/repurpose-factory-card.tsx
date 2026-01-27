@@ -24,7 +24,7 @@ export function RepurposeFactoryCard({ readyToRepurposeCount, onOpenModal }: Rep
                 className="text-xl text-[#463939]"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
-                Repurpose Factory
+                Repurpose Content
               </CardTitle>
               {readyToRepurposeCount > 0 && (
                 <Badge className="bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]">
