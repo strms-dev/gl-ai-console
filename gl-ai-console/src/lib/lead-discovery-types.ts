@@ -6,7 +6,7 @@
 export type InfluencerPlatform = 'linkedin' | 'twitter' | 'youtube' | 'podcast' | 'newsletter'
 
 // Influencer status in pipeline
-export type InfluencerStatus = 'discovered' | 'reviewing' | 'added_to_trigify' | 'tracking' | 'rejected'
+export type InfluencerStatus = 'discovered' | 'approved' | 'added_to_trigify' | 'rejected'
 
 // Lead source (which pipeline)
 export type LeadSource = 'influencer_engagement' | 'hypothesis'
@@ -52,17 +52,15 @@ export interface Influencer {
 // Status labels and colors
 export const influencerStatusLabels: Record<InfluencerStatus, string> = {
   discovered: 'Discovered',
-  reviewing: 'Under Review',
+  approved: 'Approved',
   added_to_trigify: 'In Trigify',
-  tracking: 'Tracking',
   rejected: 'Rejected',
 }
 
 export const influencerStatusColors: Record<InfluencerStatus, string> = {
   discovered: 'bg-blue-100 text-blue-800',
-  reviewing: 'bg-amber-100 text-amber-800',
-  added_to_trigify: 'bg-green-100 text-green-800',
-  tracking: 'bg-purple-100 text-purple-800',
+  approved: 'bg-green-100 text-green-800',
+  added_to_trigify: 'bg-purple-100 text-purple-800',
   rejected: 'bg-red-100 text-red-800',
 }
 

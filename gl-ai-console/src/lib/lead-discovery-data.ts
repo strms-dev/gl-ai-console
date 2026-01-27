@@ -22,7 +22,7 @@ export const testInfluencers: Influencer[] = [
     niche: ['fractional CFO', 'SaaS finance', 'startup growth'],
     icpMatch: 'high',
     icpMatchReason: 'Audience is primarily SaaS founders and finance leaders - direct match to GrowthLab ICP.',
-    status: 'tracking',
+    status: 'added_to_trigify',
     addedToTrigifyAt: '2025-01-15',
     discoveredAt: '2025-01-10',
     discoveredBy: 'ai',
@@ -30,15 +30,14 @@ export const testInfluencers: Influencer[] = [
   {
     id: 'inf-2',
     name: 'Mike Rodriguez',
-    platform: 'youtube',
-    profileUrl: 'https://youtube.com/@mikefinance',
-    followerCount: 120000,
-    averageEngagement: 6.8,
+    platform: 'linkedin',
+    profileUrl: 'https://linkedin.com/in/mikefinance',
+    followerCount: 32000,
+    averageEngagement: 5.8,
     niche: ['small business finance', 'bookkeeping tips', 'cash flow'],
     icpMatch: 'high',
     icpMatchReason: 'Content focuses on financial challenges faced by growing businesses. High engagement from our target market.',
-    status: 'added_to_trigify',
-    addedToTrigifyAt: '2025-01-20',
+    status: 'approved',
     discoveredAt: '2025-01-18',
     discoveredBy: 'ai',
   },
@@ -52,34 +51,48 @@ export const testInfluencers: Influencer[] = [
     niche: ['startup operations', 'fundraising', 'scaling'],
     icpMatch: 'medium',
     icpMatchReason: 'Startup-focused audience, but more operations than finance. Still valuable for awareness.',
-    status: 'reviewing',
+    status: 'approved',
     discoveredAt: '2025-01-22',
     discoveredBy: 'ai',
   },
   {
     id: 'inf-4',
-    name: 'The CFO Playbook',
-    platform: 'podcast',
-    profileUrl: 'https://cfoplaybook.com',
-    followerCount: 15000,
-    averageEngagement: 8.5,
-    niche: ['CFO strategies', 'financial leadership', 'B2B SaaS'],
+    name: 'Dan Martell',
+    platform: 'linkedin',
+    profileUrl: 'https://linkedin.com/in/danmartell',
+    followerCount: 180000,
+    averageEngagement: 3.8,
+    niche: ['SaaS growth', 'entrepreneurship', 'business coaching'],
     icpMatch: 'high',
-    icpMatchReason: 'Podcast listeners are highly engaged finance decision-makers. Perfect for thought leadership.',
+    icpMatchReason: 'Massive SaaS founder audience. Great for awareness with decision-makers at growing companies.',
     status: 'discovered',
     discoveredAt: '2025-01-23',
     discoveredBy: 'ai',
   },
   {
     id: 'inf-5',
-    name: 'Alex Thompson',
-    platform: 'newsletter',
-    profileUrl: 'https://financeweekly.substack.com',
-    followerCount: 8500,
-    averageEngagement: 42.0, // open rate
-    niche: ['finance news', 'accounting trends', 'SMB finance'],
-    icpMatch: 'medium',
-    icpMatchReason: 'Newsletter reaches finance professionals but broader than our core ICP.',
+    name: 'Ben Murray',
+    platform: 'linkedin',
+    profileUrl: 'https://linkedin.com/in/benmurray',
+    followerCount: 52000,
+    averageEngagement: 6.2,
+    niche: ['SaaS metrics', 'CFO insights', 'financial planning'],
+    icpMatch: 'high',
+    icpMatchReason: 'Known as The SaaS CFO. Perfect alignment with GrowthLab services and target audience.',
+    status: 'discovered',
+    discoveredAt: '2025-01-24',
+    discoveredBy: 'ai',
+  },
+  {
+    id: 'inf-6',
+    name: 'Amanda Kline',
+    platform: 'linkedin',
+    profileUrl: 'https://linkedin.com/in/amandakline',
+    followerCount: 18000,
+    averageEngagement: 7.5,
+    niche: ['startup finance', 'fractional CFO', 'fundraising'],
+    icpMatch: 'high',
+    icpMatchReason: 'Highly engaged finance community. Frequently discusses pain points our services solve.',
     status: 'discovered',
     discoveredAt: '2025-01-24',
     discoveredBy: 'Alison',
@@ -384,7 +397,8 @@ export const testLeadChatMessages: LeadChatMessage[] = [
 
 export const getLeadDashboardStats = (): LeadDashboardStats => {
   const newInfluencers = testInfluencers.filter(i => i.status === 'discovered').length
-  const trackingInfluencers = testInfluencers.filter(i => i.status === 'tracking' || i.status === 'added_to_trigify').length
+  const approvedInfluencers = testInfluencers.filter(i => i.status === 'approved').length
+  const inTrigify = testInfluencers.filter(i => i.status === 'added_to_trigify').length
   const engagedLeads = testEngagedPeople.filter(e => !e.pushedToClayAt).length
   const activeHypotheses = testHypotheses.filter(h => h.status === 'active' || h.status === 'approved').length
   const leadsInClay = testClayLeads.length
@@ -392,7 +406,7 @@ export const getLeadDashboardStats = (): LeadDashboardStats => {
 
   return {
     newInfluencers,
-    trackingInfluencers,
+    trackingInfluencers: approvedInfluencers + inTrigify, // For backwards compatibility
     engagedLeads,
     activeHypotheses,
     leadsInClay,
