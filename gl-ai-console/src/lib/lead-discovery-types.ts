@@ -138,6 +138,124 @@ export interface LeadHypothesis {
   validatedBy?: string
 }
 
+// ===================
+// Hypothesis Workflow Types (Multi-Step)
+// ===================
+
+// Workflow step in hypothesis builder
+export type HypothesisStep = 'who_where' | 'how_what' | 'email_copy' | 'linkedin_copy'
+
+// Entry mode - how the hypothesis starts
+export type HypothesisEntryMode = 'general' | 'specific'
+
+// Lead source platform
+export type LeadSourcePlatform = 'clay' | 'trigify' | 'csv_upload' | 'other'
+
+// Approval status for copy
+export type CopyApprovalStatus = 'pending' | 'approved' | 'edited'
+
+// Filtering criteria for leads
+export interface FilterCriteria {
+  id: string
+  field: string           // e.g., "Industry", "$ Raised", "Year Raised"
+  operator: 'equals' | 'contains' | 'greater_than' | 'less_than' | 'in_range'
+  value: string
+  enabled: boolean
+}
+
+// Enrichment field configuration
+export interface EnrichmentField {
+  id: string
+  field: string           // e.g., "CEO Name", "Email", "LinkedIn URL", "Year Raised"
+  description?: string
+  enabled: boolean
+}
+
+// Email copy content
+export interface HypothesisEmailCopy {
+  id: string
+  subject: string
+  body: string
+  approvalStatus: CopyApprovalStatus
+}
+
+// LinkedIn message copy content
+export interface HypothesisLinkedInCopy {
+  id: string
+  message: string
+  approvalStatus: CopyApprovalStatus
+}
+
+// Extended hypothesis with workflow data
+export interface LeadHypothesisWorkflow extends LeadHypothesis {
+  // Workflow state
+  currentStep: HypothesisStep
+  entryMode: HypothesisEntryMode
+  workflowStartedAt?: string
+  workflowCompletedAt?: string
+
+  // Step 1: Who & Where
+  targetDescription: string           // "Companies who raised Series A"
+  leadSource: LeadSourcePlatform
+  leadSourceDetails?: string          // Custom details or CSV file name
+  whoWhereApproved: boolean
+
+  // Step 2: How & What
+  filterCriteria: FilterCriteria[]
+  enrichmentFields: EnrichmentField[]
+  howWhatApproved: boolean
+
+  // Step 3: Email Copy (for Instantly)
+  emailCopy: HypothesisEmailCopy | null
+  emailCopyApproved: boolean
+
+  // Step 4: LinkedIn Copy (for Heyreach)
+  linkedInCopy: HypothesisLinkedInCopy | null
+  linkedInCopyApproved: boolean
+}
+
+// Labels for workflow steps
+export const hypothesisStepLabels: Record<HypothesisStep, string> = {
+  who_where: 'Who & Where',
+  how_what: 'How & What',
+  email_copy: 'Email Copy',
+  linkedin_copy: 'LinkedIn Copy',
+}
+
+// Labels for lead source platforms
+export const leadSourcePlatformLabels: Record<LeadSourcePlatform, string> = {
+  clay: 'Clay',
+  trigify: 'Trigify',
+  csv_upload: 'CSV Upload',
+  other: 'Other',
+}
+
+// Labels for entry modes
+export const hypothesisEntryModeLabels: Record<HypothesisEntryMode, string> = {
+  general: 'General',
+  specific: 'Specific',
+}
+
+// Default filter criteria options
+export const defaultFilterFields = [
+  'Industry',
+  '$ Raised',
+  'Year Raised',
+  'Company Size',
+  'Location',
+  'Revenue',
+]
+
+// Default enrichment fields
+export const defaultEnrichmentFields = [
+  { id: 'ceo_name', field: 'CEO Name', description: 'Name of the CEO or founder' },
+  { id: 'email', field: 'Email', description: 'Business email address' },
+  { id: 'linkedin', field: 'LinkedIn URL', description: 'Personal LinkedIn profile' },
+  { id: 'year_raised', field: 'Year Raised', description: 'Year of last funding round' },
+  { id: 'phone', field: 'Phone Number', description: 'Direct phone number' },
+  { id: 'company_linkedin', field: 'Company LinkedIn', description: 'Company LinkedIn page' },
+]
+
 export const hypothesisStatusLabels: Record<HypothesisStatus, string> = {
   draft: 'Draft',
   validating: 'Validating',

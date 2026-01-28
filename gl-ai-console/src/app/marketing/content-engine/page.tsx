@@ -92,6 +92,9 @@ export default function ContentEnginePage() {
   // Brief builder state
   const [initialBriefId, setInitialBriefId] = useState<string | null>(null)
 
+  // Repurpose modal state
+  const [repurposeInitialView, setRepurposeInitialView] = useState<'list' | 'workflow'>('list')
+
   // Load data from localStorage on mount
   useEffect(() => {
     setTopicIdeas(getTopicIdeas())
@@ -118,6 +121,7 @@ export default function ContentEnginePage() {
         setWorkflowContext('brief_builder')
         break
       case 'repurpose':
+        setRepurposeInitialView('list')
         setRepurposeOpen(true)
         setWorkflowContext('repurpose')
         break
@@ -406,6 +410,11 @@ export default function ContentEnginePage() {
               <RepurposeFactoryCard
                 readyToRepurposeCount={staticStats.readyToRepurpose}
                 onOpenModal={() => handleOpenModal('repurpose')}
+                onStartRepurposing={() => {
+                  setRepurposeInitialView('workflow')
+                  setRepurposeOpen(true)
+                  setWorkflowContext('repurpose')
+                }}
               />
               <RefreshFinderCard
                 needsRefreshCount={staticStats.needsRefresh}
@@ -466,10 +475,13 @@ export default function ContentEnginePage() {
         <RepurposeModal
           open={repurposeOpen}
           onOpenChange={(open) => !open && handleCloseModal('repurpose')}
-          items={testRepurposeItems}
+          items={[]}
+          libraryContent={testContentLibrary}
+          readyToRepurpose={finalDrafts.filter(d => d.publishedAt)}
           onRepurpose={(itemId, format) =>
             console.log('Repurposing item:', itemId, 'to format:', format)
           }
+          initialView={repurposeInitialView}
         />
 
         <RefreshModal

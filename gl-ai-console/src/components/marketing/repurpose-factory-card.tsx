@@ -3,14 +3,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, ArrowRight, Layers } from "lucide-react"
+import { RefreshCw, ArrowRight, Layers, Sparkles } from "lucide-react"
 
 interface RepurposeFactoryCardProps {
   readyToRepurposeCount: number
   onOpenModal: () => void
+  onStartRepurposing?: () => void
 }
 
-export function RepurposeFactoryCard({ readyToRepurposeCount, onOpenModal }: RepurposeFactoryCardProps) {
+export function RepurposeFactoryCard({ readyToRepurposeCount, onOpenModal, onStartRepurposing }: RepurposeFactoryCardProps) {
   return (
     <Card className="bg-white border-none shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
       <CardHeader className="pb-4">
@@ -46,14 +47,25 @@ export function RepurposeFactoryCard({ readyToRepurposeCount, onOpenModal }: Rep
               Multiply content value
             </span>
           </div>
-          <Button
-            size="sm"
-            onClick={onOpenModal}
-            className="bg-[#407B9D] hover:bg-[#407B9D]/90"
-          >
-            View Content
-            <ArrowRight className="w-4 h-4 ml-1" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onStartRepurposing}
+              className="border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D] hover:text-white"
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              Start Repurposing
+            </Button>
+            <Button
+              size="sm"
+              onClick={onOpenModal}
+              className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+            >
+              View Content
+              <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

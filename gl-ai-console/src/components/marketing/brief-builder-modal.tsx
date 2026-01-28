@@ -140,12 +140,12 @@ function ContentTypeSelector({
   selected?: ContentType
   onSelect: (type: ContentType) => void
 }) {
+  // Website Page removed per 1/28 standup - not frequently used
   const contentTypes: { value: ContentType; icon: React.ReactNode; description: string }[] = [
     { value: 'blog', icon: <BookOpen className="w-5 h-5" />, description: 'Long-form article for website' },
     { value: 'youtube', icon: <Youtube className="w-5 h-5" />, description: 'Video script and description' },
     { value: 'linkedin', icon: <LinkedinIcon className="w-5 h-5" />, description: 'Post or article for LinkedIn' },
     { value: 'case_study', icon: <FileQuestion className="w-5 h-5" />, description: 'Client success story' },
-    { value: 'website_page', icon: <Globe className="w-5 h-5" />, description: 'Static page content' },
   ]
 
   return (
@@ -448,9 +448,17 @@ function DraftViewer({
   }
 
   // Count items needing decisions (no approvalStatus or status is 'pending')
-  const pendingFaqs = brief.faqs?.filter(f => !f.approvalStatus || f.approvalStatus === 'pending').length || 0
-  const pendingInternalLinks = brief.internalLinks?.filter(l => !l.approvalStatus || l.approvalStatus === 'pending').length || 0
-  const pendingExternalLinks = brief.externalLinks?.filter(l => !l.approvalStatus || l.approvalStatus === 'pending').length || 0
+  // For LinkedIn and YouTube formats, FAQs and Links are not shown, so don't count them
+  const showFaqsAndLinks = brief.targetFormat !== 'linkedin' && brief.targetFormat !== 'youtube'
+  const pendingFaqs = showFaqsAndLinks
+    ? (brief.faqs?.filter(f => !f.approvalStatus || f.approvalStatus === 'pending').length || 0)
+    : 0
+  const pendingInternalLinks = showFaqsAndLinks
+    ? (brief.internalLinks?.filter(l => !l.approvalStatus || l.approvalStatus === 'pending').length || 0)
+    : 0
+  const pendingExternalLinks = showFaqsAndLinks
+    ? (brief.externalLinks?.filter(l => !l.approvalStatus || l.approvalStatus === 'pending').length || 0)
+    : 0
 
   // Total pending items that need a decision
   const totalPendingDecisions = pendingFaqs + pendingInternalLinks + pendingExternalLinks
@@ -520,8 +528,8 @@ function DraftViewer({
         </div>
       </div>
 
-      {/* FAQs with Approve/Deny */}
-      {brief.faqs && brief.faqs.length > 0 && (
+      {/* FAQs with Approve/Deny - Only for Blog and Case Study formats (not LinkedIn or YouTube) */}
+      {brief.faqs && brief.faqs.length > 0 && brief.targetFormat !== 'linkedin' && brief.targetFormat !== 'youtube' && (
         <div className="border rounded-lg overflow-hidden">
           <div className="bg-amber-50 px-4 py-2 border-b flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -592,7 +600,8 @@ function DraftViewer({
         </div>
       )}
 
-      {/* Links with Approve/Deny/Add */}
+      {/* Links with Approve/Deny/Add - Only for Blog and Case Study formats (not LinkedIn or YouTube) */}
+      {brief.targetFormat !== 'linkedin' && brief.targetFormat !== 'youtube' && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Internal Links */}
         <div className="border rounded-lg overflow-hidden">
@@ -791,6 +800,7 @@ function DraftViewer({
           </div>
         </div>
       </div>
+      )}
 
       {/* AI Refinement Chat */}
       <div className="border rounded-lg overflow-hidden">
@@ -975,10 +985,19 @@ function FinalReview({
   const [copied, setCopied] = useState(false)
   const author = availableAuthors.find(a => a.id === brief.assignedTo)
 
+  // Only show FAQs and Links for Blog and Case Study formats (not LinkedIn or YouTube)
+  const showFaqsAndLinks = brief.targetFormat !== 'linkedin' && brief.targetFormat !== 'youtube'
+
   // Filter to only approved FAQs and links (or those without status set, for backwards compatibility)
-  const approvedFaqs = brief.faqs?.filter(f => f.approvalStatus !== 'rejected') || []
-  const approvedInternalLinks = brief.internalLinks?.filter(l => l.approvalStatus !== 'rejected') || []
-  const approvedExternalLinks = brief.externalLinks?.filter(l => l.approvalStatus !== 'rejected') || []
+  const approvedFaqs = showFaqsAndLinks
+    ? (brief.faqs?.filter(f => f.approvalStatus !== 'rejected') || [])
+    : []
+  const approvedInternalLinks = showFaqsAndLinks
+    ? (brief.internalLinks?.filter(l => l.approvalStatus !== 'rejected') || [])
+    : []
+  const approvedExternalLinks = showFaqsAndLinks
+    ? (brief.externalLinks?.filter(l => l.approvalStatus !== 'rejected') || [])
+    : []
 
   // Build complete content for copy
   const buildFullContent = () => {

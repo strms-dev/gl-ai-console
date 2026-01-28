@@ -12,10 +12,9 @@ import { HypothesisLabModal } from "@/components/marketing/lead-discovery/hypoth
 // Test Data
 import {
   testInfluencers,
-  testHypotheses,
 } from "@/lib/lead-discovery-data"
 
-import { Influencer, LeadHypothesis } from "@/lib/lead-discovery-types"
+import { Influencer, LeadHypothesis, HypothesisEntryMode } from "@/lib/lead-discovery-types"
 
 export default function LeadDiscoveryPage() {
   // Modal states
@@ -28,7 +27,7 @@ export default function LeadDiscoveryPage() {
 
   // Hypothesis state - start with empty array
   const [hypotheses, setHypotheses] = useState<LeadHypothesis[]>([])
-  const [isGeneratingHypotheses, setIsGeneratingHypotheses] = useState(false)
+  const [hypothesisEntryMode, setHypothesisEntryMode] = useState<HypothesisEntryMode | null>(null)
 
   // Calculate stats from state
   const stats = {
@@ -104,25 +103,17 @@ export default function LeadDiscoveryPage() {
     ))
   }
 
-  // Hypothesis generation handler
-  const handleNewHypothesis = (type: 'general' | 'custom', customPrompt?: string) => {
-    console.log('Generating hypotheses:', type, customPrompt)
-    setIsGeneratingHypotheses(true)
+  // Hypothesis workflow handler - opens modal and starts workflow
+  const handleStartHypothesisWorkflow = (entryMode: HypothesisEntryMode) => {
+    console.log('Starting hypothesis workflow:', entryMode)
+    setHypothesisEntryMode(entryMode)
+    setHypothesisLabOpen(true)
+  }
 
-    // Simulate generation delay (3 seconds)
-    setTimeout(() => {
-      // Generate hypotheses from test data with unique IDs
-      const timestamp = Date.now()
-      const newHypotheses: LeadHypothesis[] = testHypotheses.map((hyp, index) => ({
-        ...hyp,
-        id: `${hyp.id}-${timestamp}-${index}`, // Unique ID for each generation run
-        status: 'draft' as const,
-        createdAt: new Date().toISOString(),
-        leadsGenerated: 0,
-      }))
-      setHypotheses(prev => [...prev, ...newHypotheses])
-      setIsGeneratingHypotheses(false)
-    }, 3000)
+  // Clear entry mode when modal closes
+  const handleHypothesisModalClose = () => {
+    setHypothesisLabOpen(false)
+    setHypothesisEntryMode(null)
   }
 
   // Hypothesis action handlers
@@ -179,9 +170,8 @@ export default function LeadDiscoveryPage() {
           />
           <HypothesisLabCard
             activeHypothesesCount={stats.activeHypotheses}
-            isGenerating={isGeneratingHypotheses}
             onOpenModal={() => handleOpenModal('hypothesis')}
-            onNewHypothesis={handleNewHypothesis}
+            onStartWorkflow={handleStartHypothesisWorkflow}
           />
         </div>
 
@@ -198,11 +188,12 @@ export default function LeadDiscoveryPage() {
 
         <HypothesisLabModal
           open={hypothesisLabOpen}
-          onOpenChange={(open) => !open && handleCloseModal('hypothesis')}
+          onOpenChange={(open) => !open && handleHypothesisModalClose()}
           hypotheses={hypotheses}
           onApprove={handleApproveHypothesis}
           onReject={handleRejectHypothesis}
           onMoveToPending={handleMoveToPending}
+          initialEntryMode={hypothesisEntryMode}
         />
       </div>
     </div>

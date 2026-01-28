@@ -1,0 +1,34 @@
+Hypothesis Builder Ideas
+
+2 ways to begin
+General idea generation 
+Specific idea prompts 
+
+Idea generation: 
+Who are we targeting? 
+Where are we finding them? 
+Ex: Clay, trigify, other lead lists?
+How will we filter the list down? 
+Ex: if we are targeting companies who raised $$
+Industry
+$ Raised 
+Year raised 
+What are we enriching?
+Year raised 
+CEO name 
+Email
+Personal Linkedin acct.
+Email copy 
+Heyreach copy
+
+
+Bot gives its idea including Who & Where→ Approve / Deny → Push to next step where it goes into detail on How & What → Approve / Edit → Push to next step where it creates Email Copy → Approve / Edit → Push to next step where it creates LinkedIn Message Copy → Approve / Edit → Finish 
+
+
+Who → Where → How → What → Email copy → (manual email campaign creation) → Linkedin 
+copy (Manual Heyreach campaign creation) 
+
+
+Specific idea prompts:
+Basically the same except I will give it the idea including Who & Where with as much context as possible and the bot will move on with the rest. 
+

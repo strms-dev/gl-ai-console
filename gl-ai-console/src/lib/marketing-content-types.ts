@@ -241,6 +241,106 @@ export const sourceOriginColors: Record<ContentSourceOrigin, string> = {
 }
 
 // ===================
+// Repurpose Workflow Types (Multi-Step)
+// ===================
+
+// Workflow step in repurpose factory
+export type RepurposeStep = 'source_selection' | 'format_selection' | 'content_review' | 'publish'
+
+// Source type for repurposing
+export type RepurposeSourceType = 'ready_content' | 'library_search' | 'external_input'
+
+// YouTube chapter structure
+export interface YouTubeChapter {
+  id: string
+  timestamp: string       // e.g., "0:00", "2:30"
+  title: string
+  description?: string
+}
+
+// Target format configuration
+export interface TargetFormatConfig {
+  id: string
+  format: ContentType
+  selected: boolean
+  variationCount?: number        // For LinkedIn/Instagram: 3-5 variations
+  includesFaqs?: boolean         // For Blog/Case Study
+  includesLinks?: boolean        // For Blog/Case Study
+  includesChapters?: boolean     // For YouTube instead of FAQs
+}
+
+// Generated content for a single format
+export interface GeneratedFormatContent {
+  id: string
+  formatId: string
+  format: ContentType
+  content: string                // Main content
+  variations?: string[]          // For LinkedIn/Instagram - multiple variations
+  chapters?: YouTubeChapter[]    // For YouTube
+  faqs?: FAQ[]                   // For Blog/Case Study
+  internalLinks?: LinkRecommendation[]
+  externalLinks?: LinkRecommendation[]
+  approvalStatus: ApprovalStatus
+}
+
+// Extended repurpose item with workflow data
+export interface RepurposeWorkflowItem extends RepurposeItem {
+  // Workflow state
+  currentStep: RepurposeStep
+  workflowStartedAt?: string
+  workflowCompletedAt?: string
+
+  // Step 1: Source selection
+  sourceType?: RepurposeSourceType
+  sourceContent?: string         // The actual content text
+  sourceUrl?: string             // For external input
+
+  // Step 2: Format selection
+  targetFormats: TargetFormatConfig[]
+
+  // Step 3: Generated content per format
+  generatedContent: GeneratedFormatContent[]
+
+  // Step 4: Publish status
+  publishedFormats: string[]     // IDs of formats published to library
+}
+
+// Labels for repurpose workflow steps
+export const repurposeStepLabels: Record<RepurposeStep, string> = {
+  source_selection: 'Select Source',
+  format_selection: 'Choose Formats',
+  content_review: 'Review Content',
+  publish: 'Publish',
+}
+
+// Labels for source types
+export const repurposeSourceTypeLabels: Record<RepurposeSourceType, string> = {
+  ready_content: 'Ready to Repurpose',
+  library_search: 'Search Library',
+  external_input: 'External Content',
+}
+
+// Format-specific features configuration
+export const formatFeatures: Record<ContentType, {
+  supportsFaqs: boolean
+  supportsLinks: boolean
+  supportsChapters: boolean
+  supportsVariations: boolean
+  defaultVariationCount?: number
+}> = {
+  blog: { supportsFaqs: true, supportsLinks: true, supportsChapters: false, supportsVariations: false },
+  case_study: { supportsFaqs: true, supportsLinks: true, supportsChapters: false, supportsVariations: false },
+  youtube: { supportsFaqs: false, supportsLinks: false, supportsChapters: true, supportsVariations: false },
+  linkedin: { supportsFaqs: false, supportsLinks: false, supportsChapters: false, supportsVariations: true, defaultVariationCount: 5 },
+  website_page: { supportsFaqs: false, supportsLinks: true, supportsChapters: false, supportsVariations: false },
+  meeting_transcript: { supportsFaqs: false, supportsLinks: false, supportsChapters: false, supportsVariations: false },
+  external: { supportsFaqs: false, supportsLinks: false, supportsChapters: false, supportsVariations: false },
+}
+
+// Content types available for repurposing (excluding some types)
+export const repurposeTargetFormats: ContentType[] = ['blog', 'case_study', 'youtube', 'linkedin']
+
+// ===================
 // Refresh Finder
 // ===================
 
@@ -315,4 +415,24 @@ export interface FinalDraft {
   approvedAt: string
   publishedAt?: string
   keywords: string[]
+}
+
+// ===================
+// Repurposed Content Tracking
+// ===================
+
+// Tracks a single repurposed output
+export interface RepurposedOutput {
+  id: string
+  format: ContentType
+  title: string
+  createdAt: string
+  content?: string
+  variations?: string[]      // For LinkedIn - multiple variations
+  chapters?: YouTubeChapter[] // For YouTube
+}
+
+// Extended RepurposeItem with created outputs tracking
+export interface RepurposeItemWithOutputs extends RepurposeItem {
+  createdOutputs: RepurposedOutput[]
 }
