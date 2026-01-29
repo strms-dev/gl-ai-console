@@ -33,9 +33,12 @@ import {
   X,
   FileSpreadsheet,
   Users,
-  MapPin,
   ChevronDown,
   ChevronUp,
+  Info,
+  Search,
+  Copy,
+  ExternalLink,
 } from "lucide-react"
 import {
   LeadHypothesis,
@@ -43,6 +46,7 @@ import {
   HypothesisStep,
   HypothesisEntryMode,
   LeadSourcePlatform,
+  SearchCriteria,
   FilterCriteria,
   EnrichmentField,
   HypothesisEmailCopy,
@@ -179,18 +183,17 @@ function LeadSourceSelector({
   selected,
   onSelect
 }: {
-  selected: LeadSourcePlatform
+  selected: LeadSourcePlatform | null
   onSelect: (source: LeadSourcePlatform) => void
 }) {
   const sources: { value: LeadSourcePlatform; icon: React.ReactNode; description: string }[] = [
     { value: 'clay', icon: <Database className="w-5 h-5" />, description: 'Build list in Clay' },
     { value: 'trigify', icon: <Users className="w-5 h-5" />, description: 'Track from Trigify' },
     { value: 'csv_upload', icon: <FileSpreadsheet className="w-5 h-5" />, description: 'Upload CSV file' },
-    { value: 'other', icon: <MapPin className="w-5 h-5" />, description: 'Other lead source' },
   ]
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-3 gap-3">
       {sources.map((source) => (
         <button
           key={source.value}
@@ -240,6 +243,88 @@ const getOperatorLabel = (operator: FilterCriteria['operator']): string => {
   return option?.label.toLowerCase() || operator
 }
 
+// Search criteria editor for Clay (building initial list)
+function SearchCriteriaEditor({
+  criteria,
+  onCriteriaChange,
+}: {
+  criteria: SearchCriteria[]
+  onCriteriaChange: (criteria: SearchCriteria[]) => void
+}) {
+  const handleValueChange = (id: string, value: string) => {
+    onCriteriaChange(
+      criteria.map(c => c.id === id ? { ...c, value } : c)
+    )
+  }
+
+  const handleDelete = (id: string) => {
+    onCriteriaChange(criteria.filter(c => c.id !== id))
+  }
+
+  const handleAdd = () => {
+    const newCriteria: SearchCriteria = {
+      id: `search-${Date.now()}`,
+      field: '',
+      value: '',
+      enabled: true,
+    }
+    onCriteriaChange([...criteria, newCriteria])
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-[#463939]" style={{ fontFamily: 'var(--font-heading)' }}>
+          Search Criteria
+        </h4>
+        <Button variant="outline" size="sm" onClick={handleAdd}>
+          <Plus className="w-3 h-3 mr-1" />
+          Add Criteria
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Use these criteria to build your initial lead list in Clay
+      </p>
+      <div className="space-y-2">
+        {criteria.filter(c => c.enabled).map((item) => (
+          <div
+            key={item.id}
+            className="flex items-center gap-2 p-3 rounded-lg border bg-white border-slate-200"
+          >
+            <Input
+              value={item.field}
+              onChange={(e) => onCriteriaChange(
+                criteria.map(c => c.id === item.id ? { ...c, field: e.target.value } : c)
+              )}
+              placeholder="Field (e.g., Industry)..."
+              className="w-40 text-sm"
+            />
+            <Input
+              value={item.value}
+              onChange={(e) => handleValueChange(item.id, e.target.value)}
+              placeholder="Value (e.g., SaaS, Healthcare)..."
+              className="flex-1 text-sm"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDelete(item.id)}
+              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        ))}
+        {criteria.filter(c => c.enabled).length === 0 && (
+          <div className="text-center py-6 text-muted-foreground text-sm">
+            No search criteria added yet. Click &quot;Add Criteria&quot; to start.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Filter criteria editor - simplified for add/remove only
 function FilterCriteriaEditor({
   criteria,
@@ -279,13 +364,16 @@ function FilterCriteriaEditor({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium text-[#463939]" style={{ fontFamily: 'var(--font-heading)' }}>
-          Filtering Criteria
+          Filter Criteria (After Enrichment)
         </h4>
         <Button variant="outline" size="sm" onClick={handleAdd}>
           <Plus className="w-3 h-3 mr-1" />
           Add Filter
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Apply these filters after enriching to narrow down your list
+      </p>
       <div className="space-y-2">
         {criteria.filter(f => f.enabled).map((filter) => (
           <div
@@ -451,39 +539,45 @@ function EnrichmentFieldsEditor({
   )
 }
 
-// Email copy editor
+// Email copy editor - handles multiple emails in a sequence
 function EmailCopyEditor({
-  emailCopy,
-  onEmailCopyChange,
+  emailCopies,
+  onEmailCopiesChange,
   onRegenerate,
   isGenerating,
 }: {
-  emailCopy: HypothesisEmailCopy | null
-  onEmailCopyChange: (copy: HypothesisEmailCopy) => void
+  emailCopies: HypothesisEmailCopy[]
+  onEmailCopiesChange: (copies: HypothesisEmailCopy[]) => void
   onRegenerate: () => void
   isGenerating: boolean
 }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editSubject, setEditSubject] = useState(emailCopy?.subject || '')
-  const [editBody, setEditBody] = useState(emailCopy?.body || '')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editSubject, setEditSubject] = useState('')
+  const [editBody, setEditBody] = useState('')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (emailCopy) {
-      setEditSubject(emailCopy.subject)
-      setEditBody(emailCopy.body)
-    }
-  }, [emailCopy])
+  const handleStartEdit = (email: HypothesisEmailCopy) => {
+    setEditingId(email.id)
+    setEditSubject(email.subject)
+    setEditBody(email.body)
+  }
 
-  const handleSave = () => {
-    if (emailCopy) {
-      onEmailCopyChange({
-        ...emailCopy,
-        subject: editSubject,
-        body: editBody,
-        approvalStatus: 'edited',
-      })
-    }
-    setIsEditing(false)
+  const handleSave = (emailId: string) => {
+    onEmailCopiesChange(
+      emailCopies.map(e =>
+        e.id === emailId
+          ? { ...e, subject: editSubject, body: editBody, approvalStatus: 'edited' as const }
+          : e
+      )
+    )
+    setEditingId(null)
+  }
+
+  const handleCopy = (email: HypothesisEmailCopy) => {
+    const text = `Subject: ${email.subject}\n\n${email.body}`
+    navigator.clipboard.writeText(text)
+    setCopiedId(email.id)
+    setTimeout(() => setCopiedId(null), 2000)
   }
 
   if (isGenerating) {
@@ -496,23 +590,23 @@ function EmailCopyEditor({
           </div>
         </div>
         <p className="text-lg font-medium text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-          Generating Email Copy...
+          Generating Email Sequence...
         </p>
         <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-          AI is crafting personalized email copy for your campaign.
+          AI is crafting a 4-email sequence for your campaign.
         </p>
       </div>
     )
   }
 
-  if (!emailCopy) {
+  if (emailCopies.length === 0) {
     return (
       <div className="text-center py-12">
         <Mail className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-        <p className="text-muted-foreground">No email copy generated yet.</p>
+        <p className="text-muted-foreground">No email sequence generated yet.</p>
         <Button onClick={onRegenerate} className="mt-4 bg-[#407B9D] hover:bg-[#407B9D]/90">
           <Sparkles className="w-4 h-4 mr-2" />
-          Generate Email Copy
+          Generate Email Sequence
         </Button>
       </div>
     )
@@ -524,115 +618,146 @@ function EmailCopyEditor({
         <div className="flex items-center gap-2">
           <Mail className="w-5 h-5 text-[#407B9D]" />
           <h4 className="text-sm font-medium text-[#463939]" style={{ fontFamily: 'var(--font-heading)' }}>
-            Email Copy for Instantly
+            Email Sequence for Instantly ({emailCopies.length} emails)
           </h4>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRegenerate}
-            className="text-[#407B9D] border-[#407B9D]"
-          >
-            <RefreshCw className="w-4 h-4 mr-1" />
-            Regenerate
-          </Button>
-          {!isEditing && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditing(true)}
-            >
-              <Edit3 className="w-4 h-4 mr-1" />
-              Edit
-            </Button>
-          )}
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRegenerate}
+          className="text-[#407B9D] border-[#407B9D]"
+        >
+          <RefreshCw className="w-4 h-4 mr-1" />
+          Regenerate All
+        </Button>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
-        <div className="bg-slate-50 px-4 py-2 border-b">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">Subject Line</p>
-        </div>
-        {isEditing ? (
-          <Input
-            value={editSubject}
-            onChange={(e) => setEditSubject(e.target.value)}
-            className="border-0 border-b rounded-none focus:ring-0"
-            placeholder="Email subject..."
-          />
-        ) : (
-          <p className="px-4 py-3 font-medium text-[#463939]">{emailCopy.subject}</p>
-        )}
+      <div className="space-y-4">
+        {emailCopies.sort((a, b) => a.sequenceNumber - b.sequenceNumber).map((email) => (
+          <div key={email.id} className="border rounded-lg overflow-hidden">
+            <div className="bg-[#407B9D]/10 px-4 py-2 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-[#407B9D] text-white flex items-center justify-center text-xs font-medium">
+                  {email.sequenceNumber}
+                </div>
+                <p className="text-sm font-medium text-[#463939]">Email {email.sequenceNumber}</p>
+                {email.approvalStatus === 'edited' && (
+                  <Badge className="bg-amber-100 text-amber-800 text-xs">
+                    <Edit3 className="w-3 h-3 mr-1" />
+                    Edited
+                  </Badge>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleCopy(email)}
+                  className="h-7 px-2"
+                >
+                  {copiedId === email.id ? (
+                    <><Check className="w-3 h-3 mr-1 text-green-600" />Copied</>
+                  ) : (
+                    <><Copy className="w-3 h-3 mr-1" />Copy</>
+                  )}
+                </Button>
+                {editingId !== email.id && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleStartEdit(email)}
+                    className="h-7 px-2"
+                  >
+                    <Edit3 className="w-3 h-3 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+            </div>
 
-        <div className="bg-slate-50 px-4 py-2 border-b">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">Email Body</p>
-        </div>
-        {isEditing ? (
-          <Textarea
-            value={editBody}
-            onChange={(e) => setEditBody(e.target.value)}
-            className="border-0 rounded-none min-h-[200px] focus:ring-0"
-            placeholder="Email body..."
-          />
-        ) : (
-          <div className="px-4 py-3 whitespace-pre-wrap text-sm text-[#463939]">
-            {emailCopy.body}
+            {editingId === email.id ? (
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wide">Subject</label>
+                  <Input
+                    value={editSubject}
+                    onChange={(e) => setEditSubject(e.target.value)}
+                    className="mt-1"
+                    placeholder="Email subject..."
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground uppercase tracking-wide">Body</label>
+                  <Textarea
+                    value={editBody}
+                    onChange={(e) => setEditBody(e.target.value)}
+                    className="mt-1 min-h-[150px]"
+                    placeholder="Email body..."
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={() => handleSave(email.id)} className="bg-[#407B9D] hover:bg-[#407B9D]/90">
+                    Save
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="bg-slate-50 px-4 py-2 border-b">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Subject</p>
+                </div>
+                <p className="px-4 py-2 font-medium text-sm text-[#463939] border-b">{email.subject}</p>
+                <div className="px-4 py-3 whitespace-pre-wrap text-sm text-[#463939] max-h-[200px] overflow-y-auto">
+                  {email.body}
+                </div>
+              </>
+            )}
           </div>
-        )}
+        ))}
       </div>
-
-      {isEditing && (
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setIsEditing(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} className="bg-[#407B9D] hover:bg-[#407B9D]/90">
-            Save Changes
-          </Button>
-        </div>
-      )}
-
-      {emailCopy.approvalStatus === 'edited' && (
-        <Badge className="bg-amber-100 text-amber-800">
-          <Edit3 className="w-3 h-3 mr-1" />
-          Edited
-        </Badge>
-      )}
     </div>
   )
 }
 
-// LinkedIn copy editor
+// LinkedIn copy editor - handles multiple messages
 function LinkedInCopyEditor({
-  linkedInCopy,
-  onLinkedInCopyChange,
+  linkedInCopies,
+  onLinkedInCopiesChange,
   onRegenerate,
   isGenerating,
 }: {
-  linkedInCopy: HypothesisLinkedInCopy | null
-  onLinkedInCopyChange: (copy: HypothesisLinkedInCopy) => void
+  linkedInCopies: HypothesisLinkedInCopy[]
+  onLinkedInCopiesChange: (copies: HypothesisLinkedInCopy[]) => void
   onRegenerate: () => void
   isGenerating: boolean
 }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editMessage, setEditMessage] = useState(linkedInCopy?.message || '')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editMessage, setEditMessage] = useState('')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (linkedInCopy) {
-      setEditMessage(linkedInCopy.message)
-    }
-  }, [linkedInCopy])
+  const handleStartEdit = (message: HypothesisLinkedInCopy) => {
+    setEditingId(message.id)
+    setEditMessage(message.message)
+  }
 
-  const handleSave = () => {
-    if (linkedInCopy) {
-      onLinkedInCopyChange({
-        ...linkedInCopy,
-        message: editMessage,
-        approvalStatus: 'edited',
-      })
-    }
-    setIsEditing(false)
+  const handleSave = (messageId: string) => {
+    onLinkedInCopiesChange(
+      linkedInCopies.map(m =>
+        m.id === messageId
+          ? { ...m, message: editMessage, approvalStatus: 'edited' as const }
+          : m
+      )
+    )
+    setEditingId(null)
+  }
+
+  const handleCopy = (message: HypothesisLinkedInCopy) => {
+    navigator.clipboard.writeText(message.message)
+    setCopiedId(message.id)
+    setTimeout(() => setCopiedId(null), 2000)
   }
 
   if (isGenerating) {
@@ -645,23 +770,23 @@ function LinkedInCopyEditor({
           </div>
         </div>
         <p className="text-lg font-medium text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-          Generating LinkedIn Copy...
+          Generating LinkedIn Messages...
         </p>
         <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-          AI is crafting a personalized LinkedIn message.
+          AI is crafting 2 LinkedIn messages for your campaign.
         </p>
       </div>
     )
   }
 
-  if (!linkedInCopy) {
+  if (linkedInCopies.length === 0) {
     return (
       <div className="text-center py-12">
         <Linkedin className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-        <p className="text-muted-foreground">No LinkedIn copy generated yet.</p>
+        <p className="text-muted-foreground">No LinkedIn messages generated yet.</p>
         <Button onClick={onRegenerate} className="mt-4 bg-[#407B9D] hover:bg-[#407B9D]/90">
           <Sparkles className="w-4 h-4 mr-2" />
-          Generate LinkedIn Copy
+          Generate LinkedIn Messages
         </Button>
       </div>
     )
@@ -673,67 +798,88 @@ function LinkedInCopyEditor({
         <div className="flex items-center gap-2">
           <Linkedin className="w-5 h-5 text-[#0A66C2]" />
           <h4 className="text-sm font-medium text-[#463939]" style={{ fontFamily: 'var(--font-heading)' }}>
-            LinkedIn Message for Heyreach
+            LinkedIn Messages for Heyreach ({linkedInCopies.length} messages)
           </h4>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRegenerate}
-            className="text-[#407B9D] border-[#407B9D]"
-          >
-            <RefreshCw className="w-4 h-4 mr-1" />
-            Regenerate
-          </Button>
-          {!isEditing && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditing(true)}
-            >
-              <Edit3 className="w-4 h-4 mr-1" />
-              Edit
-            </Button>
-          )}
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRegenerate}
+          className="text-[#407B9D] border-[#407B9D]"
+        >
+          <RefreshCw className="w-4 h-4 mr-1" />
+          Regenerate All
+        </Button>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
-        <div className="bg-slate-50 px-4 py-2 border-b">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">LinkedIn Message</p>
-        </div>
-        {isEditing ? (
-          <Textarea
-            value={editMessage}
-            onChange={(e) => setEditMessage(e.target.value)}
-            className="border-0 rounded-none min-h-[150px] focus:ring-0"
-            placeholder="LinkedIn message..."
-          />
-        ) : (
-          <div className="px-4 py-3 whitespace-pre-wrap text-sm text-[#463939]">
-            {linkedInCopy.message}
+      <div className="space-y-4">
+        {linkedInCopies.sort((a, b) => a.sequenceNumber - b.sequenceNumber).map((message) => (
+          <div key={message.id} className="border rounded-lg overflow-hidden">
+            <div className="bg-[#0A66C2]/10 px-4 py-2 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-[#0A66C2] text-white flex items-center justify-center text-xs font-medium">
+                  {message.sequenceNumber}
+                </div>
+                <p className="text-sm font-medium text-[#463939]">Message {message.sequenceNumber}</p>
+                {message.approvalStatus === 'edited' && (
+                  <Badge className="bg-amber-100 text-amber-800 text-xs">
+                    <Edit3 className="w-3 h-3 mr-1" />
+                    Edited
+                  </Badge>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleCopy(message)}
+                  className="h-7 px-2"
+                >
+                  {copiedId === message.id ? (
+                    <><Check className="w-3 h-3 mr-1 text-green-600" />Copied</>
+                  ) : (
+                    <><Copy className="w-3 h-3 mr-1" />Copy</>
+                  )}
+                </Button>
+                {editingId !== message.id && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleStartEdit(message)}
+                    className="h-7 px-2"
+                  >
+                    <Edit3 className="w-3 h-3 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {editingId === message.id ? (
+              <div className="p-4 space-y-3">
+                <Textarea
+                  value={editMessage}
+                  onChange={(e) => setEditMessage(e.target.value)}
+                  className="min-h-[120px]"
+                  placeholder="LinkedIn message..."
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>
+                    Cancel
+                  </Button>
+                  <Button size="sm" onClick={() => handleSave(message.id)} className="bg-[#407B9D] hover:bg-[#407B9D]/90">
+                    Save
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="px-4 py-3 whitespace-pre-wrap text-sm text-[#463939]">
+                {message.message}
+              </div>
+            )}
           </div>
-        )}
+        ))}
       </div>
-
-      {isEditing && (
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setIsEditing(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} className="bg-[#407B9D] hover:bg-[#407B9D]/90">
-            Save Changes
-          </Button>
-        </div>
-      )}
-
-      {linkedInCopy.approvalStatus === 'edited' && (
-        <Badge className="bg-amber-100 text-amber-800">
-          <Edit3 className="w-3 h-3 mr-1" />
-          Edited
-        </Badge>
-      )}
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <p className="text-xs text-blue-800">
@@ -757,10 +903,11 @@ function WorkflowCard({
     id: string
     targetDescription: string
     leadSource: LeadSourcePlatform
+    searchCriteria: SearchCriteria[]
     filterCriteria: FilterCriteria[]
     enrichmentFields: EnrichmentField[]
-    emailCopy: HypothesisEmailCopy | null
-    linkedInCopy: HypothesisLinkedInCopy | null
+    emailCopies: HypothesisEmailCopy[]
+    linkedInCopies: HypothesisLinkedInCopy[]
     status: WorkflowCardStatus
     approvedAt: string
     completedAt?: string
@@ -769,24 +916,20 @@ function WorkflowCard({
   onMoveBackToApproved?: (id: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [copiedEmail, setCopiedEmail] = useState(false)
-  const [copiedLinkedIn, setCopiedLinkedIn] = useState(false)
+  const [copiedEmailId, setCopiedEmailId] = useState<string | null>(null)
+  const [copiedLinkedInId, setCopiedLinkedInId] = useState<string | null>(null)
 
-  const handleCopyEmail = () => {
-    if (workflow.emailCopy) {
-      const text = `Subject: ${workflow.emailCopy.subject}\n\n${workflow.emailCopy.body}`
-      navigator.clipboard.writeText(text)
-      setCopiedEmail(true)
-      setTimeout(() => setCopiedEmail(false), 2000)
-    }
+  const handleCopyEmail = (email: HypothesisEmailCopy) => {
+    const text = `Subject: ${email.subject}\n\n${email.body}`
+    navigator.clipboard.writeText(text)
+    setCopiedEmailId(email.id)
+    setTimeout(() => setCopiedEmailId(null), 2000)
   }
 
-  const handleCopyLinkedIn = () => {
-    if (workflow.linkedInCopy) {
-      navigator.clipboard.writeText(workflow.linkedInCopy.message)
-      setCopiedLinkedIn(true)
-      setTimeout(() => setCopiedLinkedIn(false), 2000)
-    }
+  const handleCopyLinkedIn = (message: HypothesisLinkedInCopy) => {
+    navigator.clipboard.writeText(message.message)
+    setCopiedLinkedInId(message.id)
+    setTimeout(() => setCopiedLinkedInId(null), 2000)
   }
 
   const isApproved = workflow.status === 'approved'
@@ -876,64 +1019,28 @@ function WorkflowCard({
             </Button>
           )}
 
-          {/* Quick copy buttons */}
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleCopyEmail()
-              }}
-              disabled={!workflow.emailCopy}
-              className="flex-1"
-            >
-              {copiedEmail ? (
-                <>
-                  <Check className="w-4 h-4 mr-2 text-green-600" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Mail className="w-4 h-4 mr-2" />
-                  Copy Email
-                </>
-              )}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleCopyLinkedIn()
-              }}
-              disabled={!workflow.linkedInCopy}
-              className="flex-1"
-            >
-              {copiedLinkedIn ? (
-                <>
-                  <Check className="w-4 h-4 mr-2 text-green-600" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Linkedin className="w-4 h-4 mr-2" />
-                  Copy LinkedIn
-                </>
-              )}
-            </Button>
+          {/* Email and LinkedIn count summary */}
+          <div className="flex gap-4 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Mail className="w-4 h-4" />
+              {workflow.emailCopies.length} emails
+            </span>
+            <span className="flex items-center gap-1">
+              <Linkedin className="w-4 h-4" />
+              {workflow.linkedInCopies.length} messages
+            </span>
           </div>
 
-          {/* Filter criteria summary */}
-          {workflow.filterCriteria.length > 0 && (
+          {/* Search criteria summary (Clay only) */}
+          {workflow.searchCriteria.length > 0 && (
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                Filter Criteria
+                Search Criteria (Clay)
               </p>
               <div className="flex flex-wrap gap-2">
-                {workflow.filterCriteria.map((filter) => (
-                  <Badge key={filter.id} className="bg-[#407B9D]/10 text-[#407B9D] text-xs">
-                    {filter.field} {getOperatorLabel(filter.operator)} {filter.value}
+                {workflow.searchCriteria.map((item) => (
+                  <Badge key={item.id} className="bg-[#407B9D]/10 text-[#407B9D] text-xs">
+                    {item.field}: {item.value}
                   </Badge>
                 ))}
               </div>
@@ -956,33 +1063,105 @@ function WorkflowCard({
             </div>
           )}
 
-          {/* Email preview */}
-          {workflow.emailCopy && (
+          {/* Filter criteria summary (after enrichment) */}
+          {workflow.filterCriteria.length > 0 && (
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                Email Copy (Instantly)
+                Filter Criteria (After Enrichment)
               </p>
-              <div className="bg-white border rounded-lg p-3">
-                <p className="text-sm font-medium text-[#463939] mb-1">
-                  {workflow.emailCopy.subject}
-                </p>
-                <p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">
-                  {workflow.emailCopy.body}
-                </p>
+              <div className="flex flex-wrap gap-2">
+                {workflow.filterCriteria.map((filter) => (
+                  <Badge key={filter.id} className="bg-slate-100 text-slate-700 text-xs">
+                    {filter.field} {getOperatorLabel(filter.operator)} {filter.value}
+                  </Badge>
+                ))}
               </div>
             </div>
           )}
 
-          {/* LinkedIn preview */}
-          {workflow.linkedInCopy && (
+          {/* Email sequence preview */}
+          {workflow.emailCopies.length > 0 && (
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                LinkedIn Message (Heyreach)
+                Email Sequence (Instantly) - {workflow.emailCopies.length} emails
               </p>
-              <div className="bg-white border rounded-lg p-3">
-                <p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">
-                  {workflow.linkedInCopy.message}
-                </p>
+              <div className="space-y-2">
+                {workflow.emailCopies.sort((a, b) => a.sequenceNumber - b.sequenceNumber).map((email) => (
+                  <div key={email.id} className="bg-white border rounded-lg p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge className="bg-[#407B9D]/10 text-[#407B9D] text-xs">
+                            Email {email.sequenceNumber}
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-medium text-[#463939] mb-1 truncate">
+                          {email.subject}
+                        </p>
+                        <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap">
+                          {email.body}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCopyEmail(email)
+                        }}
+                        className="h-7 px-2 flex-shrink-0"
+                      >
+                        {copiedEmailId === email.id ? (
+                          <Check className="w-3 h-3 text-green-600" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LinkedIn messages preview */}
+          {workflow.linkedInCopies.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                LinkedIn Messages (Heyreach) - {workflow.linkedInCopies.length} messages
+              </p>
+              <div className="space-y-2">
+                {workflow.linkedInCopies.sort((a, b) => a.sequenceNumber - b.sequenceNumber).map((message) => (
+                  <div key={message.id} className="bg-white border rounded-lg p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge className="bg-[#0A66C2]/10 text-[#0A66C2] text-xs">
+                            Message {message.sequenceNumber}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2 whitespace-pre-wrap">
+                          {message.message}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCopyLinkedIn(message)
+                        }}
+                        className="h-7 px-2 flex-shrink-0"
+                      >
+                        {copiedLinkedInId === message.id ? (
+                          <Check className="w-3 h-3 text-green-600" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -1010,25 +1189,32 @@ export function HypothesisLabModal({
   const [entryMode, setEntryMode] = useState<HypothesisEntryMode>('general')
   const [currentStep, setCurrentStep] = useState<HypothesisStep>('who_where')
   const [targetDescription, setTargetDescription] = useState('')
-  const [leadSource, setLeadSource] = useState<LeadSourcePlatform>('clay')
+  const [leadSource, setLeadSource] = useState<LeadSourcePlatform | null>('clay')
   const [leadSourceDetails, setLeadSourceDetails] = useState('')
   const [whoWhereApproved, setWhoWhereApproved] = useState(false)
 
+  // Search criteria for Clay (building initial list)
+  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria[]>([
+    { id: 'search-1', field: 'Industry', value: '', enabled: true },
+    { id: 'search-2', field: 'Funding Raised', value: '', enabled: true },
+    { id: 'search-3', field: 'Company Size', value: '', enabled: true },
+  ])
+
+  // Filter criteria (applied after enrichment)
   const [filterCriteria, setFilterCriteria] = useState<FilterCriteria[]>([
-    { id: 'filter-1', field: 'Industry', operator: 'equals', value: '', enabled: true },
-    { id: 'filter-2', field: '$ Raised', operator: 'greater_than', value: '', enabled: true },
-    { id: 'filter-3', field: 'Year Raised', operator: 'equals', value: '', enabled: true },
+    { id: 'filter-1', field: 'Year Raised', operator: 'greater_than', value: '', enabled: true },
+    { id: 'filter-2', field: 'CEO Found', operator: 'equals', value: 'Yes', enabled: true },
   ])
   const [enrichmentFields, setEnrichmentFields] = useState<EnrichmentField[]>(
     defaultEnrichmentFields.map(f => ({ ...f, enabled: false }))
   )
   const [howWhatApproved, setHowWhatApproved] = useState(false)
 
-  const [emailCopy, setEmailCopy] = useState<HypothesisEmailCopy | null>(null)
+  const [emailCopies, setEmailCopies] = useState<HypothesisEmailCopy[]>([])
   const [emailCopyApproved, setEmailCopyApproved] = useState(false)
   const [isGeneratingEmail, setIsGeneratingEmail] = useState(false)
 
-  const [linkedInCopy, setLinkedInCopy] = useState<HypothesisLinkedInCopy | null>(null)
+  const [linkedInCopies, setLinkedInCopies] = useState<HypothesisLinkedInCopy[]>([])
   const [linkedInCopyApproved, setLinkedInCopyApproved] = useState(false)
   const [isGeneratingLinkedIn, setIsGeneratingLinkedIn] = useState(false)
 
@@ -1046,10 +1232,11 @@ export function HypothesisLabModal({
     id: string
     targetDescription: string
     leadSource: LeadSourcePlatform
+    searchCriteria: SearchCriteria[]
     filterCriteria: FilterCriteria[]
     enrichmentFields: EnrichmentField[]
-    emailCopy: HypothesisEmailCopy | null
-    linkedInCopy: HypothesisLinkedInCopy | null
+    emailCopies: HypothesisEmailCopy[]
+    linkedInCopies: HypothesisLinkedInCopy[]
     status: WorkflowStatus
     approvedAt: string
     completedAt?: string
@@ -1071,21 +1258,25 @@ export function HypothesisLabModal({
   const resetWorkflow = () => {
     setCurrentStep('who_where')
     setTargetDescription('')
-    setLeadSource('clay')
+    setLeadSource(null)
     setLeadSourceDetails('')
     setWhoWhereApproved(false)
+    setSearchCriteria([
+      { id: 'search-1', field: 'Industry', value: '', enabled: true },
+      { id: 'search-2', field: 'Funding Raised', value: '', enabled: true },
+      { id: 'search-3', field: 'Company Size', value: '', enabled: true },
+    ])
     setFilterCriteria([
-      { id: 'filter-1', field: 'Industry', operator: 'equals', value: '', enabled: true },
-      { id: 'filter-2', field: '$ Raised', operator: 'greater_than', value: '', enabled: true },
-      { id: 'filter-3', field: 'Year Raised', operator: 'equals', value: '', enabled: true },
+      { id: 'filter-1', field: 'Year Raised', operator: 'greater_than', value: '', enabled: true },
+      { id: 'filter-2', field: 'CEO Found', operator: 'equals', value: 'Yes', enabled: true },
     ])
     setEnrichmentFields(defaultEnrichmentFields.map(f => ({ ...f, enabled: false })))
     setHowWhatApproved(false)
     setHowWhatGenerated(false)
     setIsEditingHowWhat(false)
-    setEmailCopy(null)
+    setEmailCopies([])
     setEmailCopyApproved(false)
-    setLinkedInCopy(null)
+    setLinkedInCopies([])
     setLinkedInCopyApproved(false)
   }
 
@@ -1096,13 +1287,17 @@ export function HypothesisLabModal({
     setView('workflow')
     onStartWorkflow?.(mode)
 
-    // If general mode, simulate AI generating an idea
+    // If general mode, simulate AI generating an idea and set default lead source
     if (mode === 'general') {
+      setLeadSource('clay')
       setIsGeneratingIdea(true)
       setTimeout(() => {
         setTargetDescription('Companies that recently raised Series A funding in the CPG industry, looking for fractional CFO services to scale their financial operations.')
         setIsGeneratingIdea(false)
       }, 2000)
+    } else {
+      // Specific mode: don't pre-select lead source
+      setLeadSource(null)
     }
   }
 
@@ -1124,20 +1319,22 @@ export function HypothesisLabModal({
     }, 2000)
   }
 
-  // Generate How & What (filtering criteria and enrichment suggestions)
+  // Generate How & What (search criteria, enrichment suggestions, and filter criteria)
   const handleGenerateHowWhat = () => {
     setIsGeneratingHowWhat(true)
     setHowWhatGenerated(false)
     setIsEditingHowWhat(false)
 
     setTimeout(() => {
-      // AI generates filter criteria based on the target description
-      setFilterCriteria([
-        { id: 'filter-1', field: 'Industry', operator: 'equals', value: 'CPG / Consumer Goods', enabled: true },
-        { id: 'filter-2', field: '$ Raised', operator: 'equals', value: '$1M - $10M', enabled: true },
-        { id: 'filter-3', field: 'Year Raised', operator: 'equals', value: '2024 or later', enabled: true },
-        { id: 'filter-4', field: 'Company Size', operator: 'equals', value: '10-50 employees', enabled: true },
-      ])
+      // AI generates search criteria for Clay (only for Clay lead source)
+      if (leadSource === 'clay') {
+        setSearchCriteria([
+          { id: 'search-1', field: 'Industry', value: 'CPG / Consumer Goods', enabled: true },
+          { id: 'search-2', field: 'Funding Raised', value: '$1M - $10M (Series A)', enabled: true },
+          { id: 'search-3', field: 'Company Size', value: '10-50 employees', enabled: true },
+          { id: 'search-4', field: 'Location', value: 'United States', enabled: true },
+        ])
+      }
 
       // AI suggests which fields need enrichment
       setEnrichmentFields([
@@ -1149,6 +1346,13 @@ export function HypothesisLabModal({
         { id: 'company_linkedin', field: 'Company LinkedIn', description: 'Company LinkedIn page', enabled: false },
       ])
 
+      // AI generates filter criteria to apply AFTER enrichment
+      setFilterCriteria([
+        { id: 'filter-1', field: 'Year Raised', operator: 'greater_than', value: '2024', enabled: true },
+        { id: 'filter-2', field: 'CEO Found', operator: 'equals', value: 'Yes', enabled: true },
+        { id: 'filter-3', field: 'Email Found', operator: 'equals', value: 'Yes', enabled: true },
+      ])
+
       setIsGeneratingHowWhat(false)
       setHowWhatGenerated(true)
     }, 2500)
@@ -1158,10 +1362,12 @@ export function HypothesisLabModal({
   const handleGenerateEmail = () => {
     setIsGeneratingEmail(true)
     setTimeout(() => {
-      setEmailCopy({
-        id: `email-${Date.now()}`,
-        subject: 'Quick question about {{company_name}}\'s financial scaling',
-        body: `Hi {{first_name}},
+      const emails: HypothesisEmailCopy[] = [
+        {
+          id: `email-1-${Date.now()}`,
+          sequenceNumber: 1,
+          subject: 'Quick question about {{company_name}}\'s financial scaling',
+          body: `Hi {{first_name}},
 
 Congrats on the recent Series A raise! That's an exciting milestone for {{company_name}}.
 
@@ -1173,25 +1379,87 @@ Open to a quick 15-min call this week?
 
 Best,
 {{sender_name}}`,
-        approvalStatus: 'pending',
-      })
+          approvalStatus: 'pending',
+        },
+        {
+          id: `email-2-${Date.now()}`,
+          sequenceNumber: 2,
+          subject: 'Following up - {{company_name}} financial planning',
+          body: `Hi {{first_name}},
+
+Just wanted to follow up on my previous note. I know things get busy after a funding round!
+
+I came across a case study that might be relevant - we helped a similar CPG brand reduce their close time by 40% while preparing for their Series B.
+
+Would you be open to a quick call to explore if we could help {{company_name}} in a similar way?
+
+Best,
+{{sender_name}}`,
+          approvalStatus: 'pending',
+        },
+        {
+          id: `email-3-${Date.now()}`,
+          sequenceNumber: 3,
+          subject: 'One more thought for {{company_name}}',
+          body: `Hi {{first_name}},
+
+I don't want to be a pest, so this will be my last note for now.
+
+One thing I've seen work well for CPG founders post-Series A: getting a fractional CFO involved early to set up proper financial infrastructure before the chaos of scaling hits.
+
+If you're ever curious about what that looks like, I'm happy to share some insights - no strings attached.
+
+Best,
+{{sender_name}}`,
+          approvalStatus: 'pending',
+        },
+        {
+          id: `email-4-${Date.now()}`,
+          sequenceNumber: 4,
+          subject: 'Quick resource for {{company_name}}',
+          body: `Hi {{first_name}},
+
+Final follow-up! I put together a quick guide on "5 Financial Pitfalls CPG Brands Face Post-Series A" - thought it might be useful for {{company_name}}.
+
+Happy to send it over if you're interested. Just reply "send it" and I'll get it to you.
+
+Best,
+{{sender_name}}`,
+          approvalStatus: 'pending',
+        },
+      ]
+      setEmailCopies(emails)
       setIsGeneratingEmail(false)
     }, 2500)
   }
 
-  // Generate LinkedIn copy
+  // Generate LinkedIn copy (2 messages)
   const handleGenerateLinkedIn = () => {
     setIsGeneratingLinkedIn(true)
     setTimeout(() => {
-      setLinkedInCopy({
-        id: `linkedin-${Date.now()}`,
-        message: `Hi {{first_name}}, saw the news about {{company_name}}'s Series A - congrats! 🎉
+      const linkedIns: HypothesisLinkedInCopy[] = [
+        {
+          id: `linkedin-1-${Date.now()}`,
+          sequenceNumber: 1,
+          message: `Hi {{first_name}}, saw the news about {{company_name}}'s Series A - congrats!
 
 As you scale, financial planning can get tricky. We help CPG founders like you get strategic CFO support without the full-time commitment.
 
 Would love to connect and share some insights if helpful!`,
-        approvalStatus: 'pending',
-      })
+          approvalStatus: 'pending',
+        },
+        {
+          id: `linkedin-2-${Date.now()}`,
+          sequenceNumber: 2,
+          message: `Hi {{first_name}}, hope you're doing well!
+
+Following up on my earlier message - I work with a lot of CPG founders who've recently raised and I'd love to share what's working for them financially.
+
+No pitch, just happy to connect with fellow CPG folks. Open to a quick chat?`,
+          approvalStatus: 'pending',
+        },
+      ]
+      setLinkedInCopies(linkedIns)
       setIsGeneratingLinkedIn(false)
     }, 2000)
   }
@@ -1207,9 +1475,9 @@ Would love to connect and share some insights if helpful!`,
       // Auto-generate content when entering each step
       if (nextStep === 'how_what' && !howWhatGenerated) {
         handleGenerateHowWhat()
-      } else if (nextStep === 'email_copy' && !emailCopy) {
+      } else if (nextStep === 'email_copy' && emailCopies.length === 0) {
         handleGenerateEmail()
-      } else if (nextStep === 'linkedin_copy' && !linkedInCopy) {
+      } else if (nextStep === 'linkedin_copy' && linkedInCopies.length === 0) {
         handleGenerateLinkedIn()
       }
     }
@@ -1225,15 +1493,18 @@ Would love to connect and share some insights if helpful!`,
 
   // Finish workflow - adds to approved list
   const handleFinish = () => {
+    if (!leadSource) return // Safety check
+
     // Save the workflow as approved (ready to action)
     const newWorkflow = {
       id: `workflow-${Date.now()}`,
       targetDescription,
       leadSource,
+      searchCriteria: leadSource === 'clay' ? searchCriteria.filter(c => c.enabled) : [],
       filterCriteria: filterCriteria.filter(f => f.enabled),
       enrichmentFields: enrichmentFields.filter(f => f.enabled),
-      emailCopy,
-      linkedInCopy,
+      emailCopies,
+      linkedInCopies,
       status: 'approved' as WorkflowStatus,
       approvedAt: new Date().toISOString(),
     }
@@ -1338,15 +1609,6 @@ Would love to connect and share some insights if helpful!`,
                       </Button>
                     </div>
                   )}
-
-                  {leadSource === 'other' && (
-                    <Input
-                      value={leadSourceDetails}
-                      onChange={(e) => setLeadSourceDetails(e.target.value)}
-                      placeholder="Describe the lead source..."
-                      className="mt-3"
-                    />
-                  )}
                 </div>
               </>
             )}
@@ -1390,14 +1652,50 @@ Would love to connect and share some insights if helpful!`,
                   Done Editing
                 </Button>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <FilterCriteriaEditor
-                  criteria={filterCriteria}
-                  onCriteriaChange={setFilterCriteria}
-                />
+
+              {/* Triggerfy info note */}
+              {leadSource === 'trigify' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-blue-800 font-medium mb-1">
+                      Triggerfy leads come from tracking influencer engagement
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      Use the <strong>Influencer Finder</strong> workflow first to identify influencers to track. Once you have influencers in Triggerfy, their engaged followers will flow into Clay for enrichment.
+                    </p>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="text-blue-700 p-0 h-auto mt-2"
+                      onClick={() => {
+                        // Could navigate to Influencer Finder
+                      }}
+                    >
+                      <ExternalLink className="w-3 h-3 mr-1" />
+                      Go to Influencer Finder
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-6">
+                {/* Search Criteria (Clay only) */}
+                {leadSource === 'clay' && (
+                  <SearchCriteriaEditor
+                    criteria={searchCriteria}
+                    onCriteriaChange={setSearchCriteria}
+                  />
+                )}
+
                 <EnrichmentFieldsEditor
                   fields={enrichmentFields}
                   onFieldsChange={setEnrichmentFields}
+                />
+
+                <FilterCriteriaEditor
+                  criteria={filterCriteria}
+                  onCriteriaChange={setFilterCriteria}
                 />
               </div>
             </div>
@@ -1426,66 +1724,128 @@ Would love to connect and share some insights if helpful!`,
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Filtering Criteria Summary */}
+            {/* Triggerfy info note */}
+            {leadSource === 'trigify' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-blue-800 font-medium mb-1">
+                    Triggerfy leads come from tracking influencer engagement
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Use the <strong>Influencer Finder</strong> workflow first to identify influencers to track. Once you have influencers in Triggerfy, their engaged followers will flow into Clay for enrichment.
+                  </p>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="text-blue-700 p-0 h-auto mt-2"
+                    onClick={() => {
+                      // Could navigate to Influencer Finder
+                    }}
+                  >
+                    <ExternalLink className="w-3 h-3 mr-1" />
+                    Go to Influencer Finder
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 1: Search Criteria (Clay only) */}
+            {leadSource === 'clay' && (
               <div className="border rounded-lg overflow-hidden">
-                <div className="bg-slate-50 px-4 py-3 border-b flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-[#407B9D]" />
-                  <h4 className="font-medium text-sm text-[#463939]">How to Filter</h4>
+                <div className="bg-[#407B9D]/10 px-4 py-3 border-b flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-[#407B9D] text-white flex items-center justify-center text-xs font-medium">1</div>
+                  <Search className="w-4 h-4 text-[#407B9D]" />
+                  <h4 className="font-medium text-sm text-[#463939]">Search Criteria (Build Initial List in Clay)</h4>
                 </div>
                 <div className="p-4 space-y-3">
                   <p className="text-xs text-muted-foreground mb-3">
-                    These filters will help narrow down your lead list in Clay:
+                    Use these criteria to find companies/people in Clay:
                   </p>
-                  {filterCriteria.filter(f => f.enabled).map((filter) => (
+                  {searchCriteria.filter(c => c.enabled).map((item) => (
                     <div
-                      key={filter.id}
+                      key={item.id}
                       className="flex items-center gap-2 p-2 bg-[#407B9D]/5 rounded-lg"
                     >
                       <CheckCircle className="w-4 h-4 text-[#407B9D] flex-shrink-0" />
                       <span className="text-sm text-[#463939]">
-                        <strong>{filter.field}</strong> {getOperatorLabel(filter.operator)} <strong>{filter.value}</strong>
+                        <strong>{item.field}:</strong> {item.value}
                       </span>
                     </div>
                   ))}
-                  {filterCriteria.filter(f => f.enabled).length === 0 && (
+                  {searchCriteria.filter(c => c.enabled).length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      No filters suggested
+                      No search criteria suggested
                     </p>
                   )}
                 </div>
               </div>
+            )}
 
-              {/* Enrichment Fields Summary */}
-              <div className="border rounded-lg overflow-hidden">
-                <div className="bg-slate-50 px-4 py-3 border-b flex items-center gap-2">
-                  <Database className="w-4 h-4 text-[#407B9D]" />
-                  <h4 className="font-medium text-sm text-[#463939]">What to Enrich</h4>
+            {/* Step 2: Enrichment Fields */}
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-[#C8E4BB]/30 px-4 py-3 border-b flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-[#407B9D] text-white flex items-center justify-center text-xs font-medium">
+                  {leadSource === 'clay' ? '2' : '1'}
                 </div>
-                <div className="p-4 space-y-3">
-                  <p className="text-xs text-muted-foreground mb-3">
-                    These data points should be enriched in Clay before outreach:
-                  </p>
-                  {enrichmentFields.filter(f => f.enabled).map((field) => (
-                    <div
-                      key={field.id}
-                      className="flex items-center gap-2 p-2 bg-[#C8E4BB]/30 rounded-lg"
-                    >
-                      <CheckCircle className="w-4 h-4 text-[#407B9D] flex-shrink-0" />
-                      <div>
-                        <span className="text-sm font-medium text-[#463939]">{field.field}</span>
-                        {field.description && (
-                          <span className="text-xs text-muted-foreground ml-2">- {field.description}</span>
-                        )}
-                      </div>
+                <Database className="w-4 h-4 text-[#407B9D]" />
+                <h4 className="font-medium text-sm text-[#463939]">What to Enrich</h4>
+              </div>
+              <div className="p-4 space-y-3">
+                <p className="text-xs text-muted-foreground mb-3">
+                  Enrich these data points in Clay before filtering:
+                </p>
+                {enrichmentFields.filter(f => f.enabled).map((field) => (
+                  <div
+                    key={field.id}
+                    className="flex items-center gap-2 p-2 bg-[#C8E4BB]/20 rounded-lg"
+                  >
+                    <CheckCircle className="w-4 h-4 text-[#407B9D] flex-shrink-0" />
+                    <div>
+                      <span className="text-sm font-medium text-[#463939]">{field.field}</span>
+                      {field.description && (
+                        <span className="text-xs text-muted-foreground ml-2">- {field.description}</span>
+                      )}
                     </div>
-                  ))}
-                  {enrichmentFields.filter(f => f.enabled).length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No enrichment needed
-                    </p>
-                  )}
+                  </div>
+                ))}
+                {enrichmentFields.filter(f => f.enabled).length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No enrichment needed
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Step 3: Filter Criteria (after enrichment) */}
+            <div className="border rounded-lg overflow-hidden">
+              <div className="bg-slate-100 px-4 py-3 border-b flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-[#407B9D] text-white flex items-center justify-center text-xs font-medium">
+                  {leadSource === 'clay' ? '3' : '2'}
                 </div>
+                <Filter className="w-4 h-4 text-[#407B9D]" />
+                <h4 className="font-medium text-sm text-[#463939]">How to Filter (After Enrichment)</h4>
+              </div>
+              <div className="p-4 space-y-3">
+                <p className="text-xs text-muted-foreground mb-3">
+                  Apply these filters after enriching to narrow down your list:
+                </p>
+                {filterCriteria.filter(f => f.enabled).map((filter) => (
+                  <div
+                    key={filter.id}
+                    className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg"
+                  >
+                    <CheckCircle className="w-4 h-4 text-[#407B9D] flex-shrink-0" />
+                    <span className="text-sm text-[#463939]">
+                      <strong>{filter.field}</strong> {getOperatorLabel(filter.operator)} <strong>{filter.value}</strong>
+                    </span>
+                  </div>
+                ))}
+                {filterCriteria.filter(f => f.enabled).length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No filters suggested
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1506,8 +1866,8 @@ Would love to connect and share some insights if helpful!`,
       case 'email_copy':
         return (
           <EmailCopyEditor
-            emailCopy={emailCopy}
-            onEmailCopyChange={setEmailCopy}
+            emailCopies={emailCopies}
+            onEmailCopiesChange={setEmailCopies}
             onRegenerate={handleGenerateEmail}
             isGenerating={isGeneratingEmail}
           />
@@ -1516,8 +1876,8 @@ Would love to connect and share some insights if helpful!`,
       case 'linkedin_copy':
         return (
           <LinkedInCopyEditor
-            linkedInCopy={linkedInCopy}
-            onLinkedInCopyChange={setLinkedInCopy}
+            linkedInCopies={linkedInCopies}
+            onLinkedInCopiesChange={setLinkedInCopies}
             onRegenerate={handleGenerateLinkedIn}
             isGenerating={isGeneratingLinkedIn}
           />
@@ -1689,7 +2049,7 @@ Would love to connect and share some insights if helpful!`,
                       handleNextStep()
                     }}
                     className="bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/80"
-                    disabled={!targetDescription.trim() || isGeneratingIdea}
+                    disabled={!targetDescription.trim() || !leadSource || isGeneratingIdea}
                   >
                     <CheckCircle className="w-4 h-4 mr-1" />
                     Approve & Continue
@@ -1718,7 +2078,7 @@ Would love to connect and share some insights if helpful!`,
                       handleNextStep()
                     }}
                     className="bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/80"
-                    disabled={!emailCopy || isGeneratingEmail}
+                    disabled={emailCopies.length === 0 || isGeneratingEmail}
                   >
                     <CheckCircle className="w-4 h-4 mr-1" />
                     Approve & Continue
@@ -1732,7 +2092,7 @@ Would love to connect and share some insights if helpful!`,
                       handleFinish()
                     }}
                     className="bg-[#407B9D] text-white hover:bg-[#407B9D]/90"
-                    disabled={!linkedInCopy || isGeneratingLinkedIn}
+                    disabled={linkedInCopies.length === 0 || isGeneratingLinkedIn}
                   >
                     <CheckCircle className="w-4 h-4 mr-1" />
                     Finish

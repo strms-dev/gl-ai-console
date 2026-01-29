@@ -149,15 +149,23 @@ export type HypothesisStep = 'who_where' | 'how_what' | 'email_copy' | 'linkedin
 export type HypothesisEntryMode = 'general' | 'specific'
 
 // Lead source platform
-export type LeadSourcePlatform = 'clay' | 'trigify' | 'csv_upload' | 'other'
+export type LeadSourcePlatform = 'clay' | 'trigify' | 'csv_upload'
 
 // Approval status for copy
 export type CopyApprovalStatus = 'pending' | 'approved' | 'edited'
 
-// Filtering criteria for leads
+// Search criteria for Clay (building initial list)
+export interface SearchCriteria {
+  id: string
+  field: string           // e.g., "Industry", "Company Size", "Funding"
+  value: string
+  enabled: boolean
+}
+
+// Filtering criteria for leads (applied AFTER enrichment)
 export interface FilterCriteria {
   id: string
-  field: string           // e.g., "Industry", "$ Raised", "Year Raised"
+  field: string           // e.g., "Year Raised", "CEO Found", etc.
   operator: 'equals' | 'contains' | 'greater_than' | 'less_than' | 'in_range'
   value: string
   enabled: boolean
@@ -171,11 +179,12 @@ export interface EnrichmentField {
   enabled: boolean
 }
 
-// Email copy content
+// Email copy content (single email in a sequence)
 export interface HypothesisEmailCopy {
   id: string
   subject: string
   body: string
+  sequenceNumber: number  // 1, 2, 3, 4 for email sequence
   approvalStatus: CopyApprovalStatus
 }
 
@@ -183,6 +192,7 @@ export interface HypothesisEmailCopy {
 export interface HypothesisLinkedInCopy {
   id: string
   message: string
+  sequenceNumber: number  // 1, 2 for LinkedIn sequence
   approvalStatus: CopyApprovalStatus
 }
 
@@ -227,7 +237,6 @@ export const leadSourcePlatformLabels: Record<LeadSourcePlatform, string> = {
   clay: 'Clay',
   trigify: 'Trigify',
   csv_upload: 'CSV Upload',
-  other: 'Other',
 }
 
 // Labels for entry modes
@@ -236,13 +245,23 @@ export const hypothesisEntryModeLabels: Record<HypothesisEntryMode, string> = {
   specific: 'Specific',
 }
 
-// Default filter criteria options
-export const defaultFilterFields = [
+// Default search criteria fields for Clay (finding initial list)
+export const defaultSearchFields = [
   'Industry',
-  '$ Raised',
+  'Company Size (Employees)',
+  'Annual Revenue',
+  'Funding Raised',
+  'Location (Country/State)',
+  'Company Type',
+  'Keywords',
+]
+
+// Default filter criteria options (applied after enrichment)
+export const defaultFilterFields = [
   'Year Raised',
+  'CEO Found',
+  'Email Found',
   'Company Size',
-  'Location',
   'Revenue',
 ]
 

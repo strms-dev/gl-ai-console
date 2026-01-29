@@ -27,6 +27,7 @@ import {
   BookOpen,
   Youtube,
   Linkedin as LinkedinIcon,
+  Instagram as InstagramIcon,
   FileQuestion,
   Clock,
   Sparkles,
@@ -39,6 +40,7 @@ import {
   Copy,
   ExternalLink,
   Plus,
+  Image,
 } from "lucide-react"
 import {
   RepurposeItem,
@@ -61,6 +63,10 @@ import {
   formatFeatures,
   repurposeTargetFormats,
   FinalDraft,
+  InProgressRepurpose,
+  RepurposeFormatProgress,
+  repurposeFormatStatusLabels,
+  repurposeFormatStatusColors,
 } from "@/lib/marketing-content-types"
 
 interface RepurposeModalProps {
@@ -133,6 +139,8 @@ function FormatIcon({ format, className = "w-5 h-5" }: { format: ContentType; cl
       return <Youtube className={className} />
     case 'linkedin':
       return <LinkedinIcon className={className} />
+    case 'instagram':
+      return <InstagramIcon className={className} />
     case 'case_study':
       return <FileQuestion className={className} />
     default:
@@ -665,6 +673,8 @@ function ContentReviewStep({
   const [variationIndex, setVariationIndex] = useState(0)
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
+  const [refinementPrompt, setRefinementPrompt] = useState('')
+  const [isRefining, setIsRefining] = useState(false)
 
   const activeContent = generatedContent.find(c => c.id === activeTab)
 
@@ -767,34 +777,97 @@ function ContentReviewStep({
             </div>
           </div>
 
-          {/* Variations carousel for LinkedIn */}
+          {/* Variations selection for LinkedIn/Instagram */}
           {activeContent.variations && activeContent.variations.length > 0 ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  Variation {variationIndex + 1} of {activeContent.variations.length}
+                  {activeContent.selectedVariations?.length || 0} of {activeContent.variations.length} selected
                 </p>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setVariationIndex(Math.max(0, variationIndex - 1))}
-                    disabled={variationIndex === 0}
+                    onClick={() => {
+                      // Select all
+                      onContentChange({
+                        ...activeContent,
+                        selectedVariations: activeContent.variations!.map((_, i) => i),
+                      })
+                    }}
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    Select All
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setVariationIndex(Math.min(activeContent.variations!.length - 1, variationIndex + 1))}
-                    disabled={variationIndex === activeContent.variations.length - 1}
+                    onClick={() => {
+                      // Clear all
+                      onContentChange({
+                        ...activeContent,
+                        selectedVariations: [],
+                      })
+                    }}
                   >
-                    <ChevronRightIcon className="w-4 h-4" />
+                    Clear
                   </Button>
                 </div>
               </div>
-              <div className="border rounded-lg p-4 bg-slate-50 whitespace-pre-wrap text-sm">
-                {activeContent.variations[variationIndex]}
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {activeContent.variations.map((variation, index) => {
+                  const isSelected = activeContent.selectedVariations?.includes(index) || false
+                  return (
+                    <div
+                      key={index}
+                      className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-[#407B9D] bg-[#407B9D]/5'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                      onClick={() => {
+                        const currentSelected = activeContent.selectedVariations || []
+                        const newSelected = isSelected
+                          ? currentSelected.filter(i => i !== index)
+                          : [...currentSelected, index]
+                        onContentChange({
+                          ...activeContent,
+                          selectedVariations: newSelected,
+                        })
+                      }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center mt-0.5 ${
+                          isSelected
+                            ? 'bg-[#407B9D] border-[#407B9D]'
+                            : 'border-slate-300'
+                        }`}>
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge className="bg-slate-100 text-slate-700 text-xs">
+                              Variation {index + 1}
+                            </Badge>
+                            {activeContent.format === 'instagram' && variation.includes('IMAGE:') && (
+                              <Badge className="bg-pink-100 text-pink-700 text-xs">
+                                <Image className="w-3 h-3 mr-1" />
+                                Has image desc
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="whitespace-pre-wrap text-sm text-[#463939] line-clamp-4">
+                            {variation.split('\n\n📸 IMAGE:')[0]}
+                          </p>
+                          {activeContent.format === 'instagram' && variation.includes('📸 IMAGE:') && (
+                            <div className="mt-2 p-2 bg-pink-50 rounded text-xs text-pink-800">
+                              <strong>Image:</strong> {variation.split('📸 IMAGE:')[1]?.trim()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ) : (
@@ -827,19 +900,29 @@ function ContentReviewStep({
           {/* YouTube Chapters */}
           {activeContent.chapters && activeContent.chapters.length > 0 && (
             <div className="border rounded-lg p-4">
-              <h5 className="text-sm font-medium text-[#463939] mb-3">Chapters</h5>
-              <div className="space-y-2">
+              <div className="flex items-center justify-between mb-3">
+                <h5 className="text-sm font-medium text-[#463939]">Chapters</h5>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const chaptersText = activeContent.chapters!
+                      .map(ch => `${ch.timestamp} – ${ch.title}`)
+                      .join('\n')
+                    navigator.clipboard.writeText(chaptersText)
+                  }}
+                  className="text-[#407B9D] border-[#407B9D] hover:bg-[#407B9D] hover:text-white"
+                >
+                  <Copy className="w-3.5 h-3.5 mr-1" />
+                  Copy Chapters
+                </Button>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-3 font-mono text-sm">
                 {activeContent.chapters.map((chapter) => (
-                  <div key={chapter.id} className="flex items-start gap-3 text-sm">
-                    <Badge className="bg-slate-100 text-slate-700 font-mono">
-                      {chapter.timestamp}
-                    </Badge>
-                    <div>
-                      <p className="font-medium text-[#463939]">{chapter.title}</p>
-                      {chapter.description && (
-                        <p className="text-xs text-muted-foreground">{chapter.description}</p>
-                      )}
-                    </div>
+                  <div key={chapter.id} className="py-1">
+                    <span className="text-[#407B9D]">{chapter.timestamp}</span>
+                    <span className="text-slate-400"> – </span>
+                    <span className="text-[#463939]">{chapter.title}</span>
                   </div>
                 ))}
               </div>
@@ -861,14 +944,84 @@ function ContentReviewStep({
             </div>
           )}
 
+          {/* AI Refinement Chat */}
+          {activeContent.approvalStatus !== 'approved' && !activeContent.variations && (
+            <div className="border rounded-lg p-4 bg-slate-50">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-4 h-4 text-[#407B9D]" />
+                <h5 className="text-sm font-medium text-[#463939]">Refine with AI</h5>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={refinementPrompt}
+                  onChange={(e) => setRefinementPrompt(e.target.value)}
+                  placeholder="e.g., Make it more concise, add a stronger CTA..."
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && refinementPrompt.trim() && !isRefining) {
+                      setIsRefining(true)
+                      setTimeout(() => {
+                        // Simulate AI refinement
+                        const refined = activeContent.content + `\n\n[AI Refined based on: "${refinementPrompt}"]`
+                        onContentChange({
+                          ...activeContent,
+                          content: refined,
+                        })
+                        setRefinementPrompt('')
+                        setIsRefining(false)
+                      }, 1500)
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (refinementPrompt.trim()) {
+                      setIsRefining(true)
+                      setTimeout(() => {
+                        // Simulate AI refinement
+                        const refined = activeContent.content + `\n\n[AI Refined based on: "${refinementPrompt}"]`
+                        onContentChange({
+                          ...activeContent,
+                          content: refined,
+                        })
+                        setRefinementPrompt('')
+                        setIsRefining(false)
+                      }, 1500)
+                    }
+                  }}
+                  disabled={!refinementPrompt.trim() || isRefining}
+                  className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                >
+                  {isRefining ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Wand2 className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Tell AI how to improve this content. Press Enter or click the button to apply.
+              </p>
+            </div>
+          )}
+
           {/* Approve button */}
           {activeContent.approvalStatus !== 'approved' && (
             <Button
               onClick={() => onContentChange({ ...activeContent, approvalStatus: 'approved' })}
               className="w-full bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/80"
+              disabled={
+                activeContent.variations && activeContent.variations.length > 0
+                  ? (activeContent.selectedVariations?.length || 0) === 0
+                  : false
+              }
             >
               <CheckCircle className="w-4 h-4 mr-2" />
-              Approve {contentTypeLabels[activeContent.format]}
+              {activeContent.variations && activeContent.variations.length > 0
+                ? `Approve ${activeContent.selectedVariations?.length || 0} Selected`
+                : `Approve ${contentTypeLabels[activeContent.format]}`
+              }
             </Button>
           )}
         </div>
@@ -920,7 +1073,10 @@ function PublishStep({
                 {contentTypeLabels[content.format]}
               </p>
               <p className="text-xs text-muted-foreground">
-                {content.variations ? `${content.variations.length} variations` : 'Ready'}
+                {content.variations
+                  ? `${content.selectedVariations?.length || 0} of ${content.variations.length} selected`
+                  : 'Ready'
+                }
               </p>
             </div>
             {content.approvalStatus === 'approved' ? (
@@ -950,6 +1106,153 @@ function PublishStep({
   )
 }
 
+// In Progress card component
+function InProgressCard({
+  item,
+  onToggleFormat,
+  onMoveToLibrary,
+}: {
+  item: InProgressRepurpose
+  onToggleFormat: (itemId: string, format: ContentType) => void
+  onMoveToLibrary: (itemId: string) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  const publishedCount = item.formats.filter(f => f.status === 'published').length
+  const totalCount = item.formats.length
+  const allPublished = publishedCount === totalCount
+  const progress = Math.round((publishedCount / totalCount) * 100)
+
+  return (
+    <div className="border rounded-lg bg-white overflow-hidden">
+      {/* Header - always visible */}
+      <div
+        className="p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <h3
+                className="font-semibold text-[#463939]"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                {item.sourceTitle}
+              </h3>
+              <Badge className={contentTypeColors[item.sourceType]}>
+                {contentTypeLabels[item.sourceType]}
+              </Badge>
+              <Badge className="bg-amber-100 text-amber-800">
+                <Clock className="w-3 h-3 mr-1" />
+                In Progress
+              </Badge>
+            </div>
+
+            {/* Progress bar */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#407B9D] transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {publishedCount}/{totalCount} published
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {expanded ? (
+              <ChevronUp className="w-5 h-5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-muted-foreground" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div className="border-t px-4 py-4 space-y-4 bg-slate-50/50">
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+              Format Checklist
+            </h4>
+            <div className="space-y-2">
+              {item.formats.map((format) => {
+                const isPublished = format.status === 'published'
+                return (
+                  <div
+                    key={format.format}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      isPublished
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-white border-slate-200 hover:border-[#407B9D]'
+                    }`}
+                    onClick={() => onToggleFormat(item.id, format.format)}
+                  >
+                    <div className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center ${
+                      isPublished
+                        ? 'bg-green-600 border-green-600'
+                        : 'border-slate-300'
+                    }`}>
+                      {isPublished && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border">
+                      <FormatIcon format={format.format} className="w-4 h-4 text-slate-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-[#463939]">
+                        {contentTypeLabels[format.format]}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {isPublished
+                          ? `Published ${format.publishedAt ? new Date(format.publishedAt).toLocaleDateString() : 'today'}`
+                          : format.variations
+                            ? `${format.selectedVariations?.length || format.variations.length} variation(s) ready`
+                            : 'Ready to publish'
+                        }
+                      </p>
+                    </div>
+                    <Badge className={isPublished ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
+                      {isPublished ? 'Published' : 'Ready'}
+                    </Badge>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground text-center">
+            Click a format to mark it as published (e.g., YouTube filmed, LinkedIn posted)
+          </p>
+
+          {/* Move to Library button - only shows when all are published */}
+          {allPublished && (
+            <Button
+              onClick={(e) => {
+                e.stopPropagation()
+                onMoveToLibrary(item.id)
+              }}
+              className="w-full bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/80"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Move to Library
+            </Button>
+          )}
+
+          {!allPublished && (
+            <p className="text-xs text-center text-muted-foreground">
+              Mark all formats as published to move this content to the library
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function RepurposeModal({
   open,
   onOpenChange,
@@ -960,8 +1263,9 @@ export function RepurposeModal({
   onPublishToLibrary,
   initialView = 'list',
 }: RepurposeModalProps) {
-  // View state
-  const [view, setView] = useState<'list' | 'workflow'>(initialView)
+  // View state - now includes 'in_progress'
+  const [view, setView] = useState<'list' | 'workflow' | 'in_progress'>(initialView === 'workflow' ? 'workflow' : 'list')
+  const [listTab, setListTab] = useState<'available' | 'in_progress'>('available')
 
   // Workflow state
   const [currentStep, setCurrentStep] = useState<RepurposeStep>('source_selection')
@@ -1017,13 +1321,80 @@ export function RepurposeModal({
     return initialMap
   })
 
+  // In-progress repurpose items (content being repurposed but not yet fully published)
+  const [inProgressItems, setInProgressItems] = useState<InProgressRepurpose[]>([
+    // Test data - one item in progress
+    {
+      id: 'in-progress-1',
+      sourceTitle: 'Q4 Financial Planning Guide',
+      sourceType: 'blog',
+      startedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+      formats: [
+        { format: 'linkedin', status: 'published', publishedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), variations: ['Post 1', 'Post 2', 'Post 3'], selectedVariations: [0, 1, 2] },
+        { format: 'youtube', status: 'in_progress', content: 'Script content here...' },
+        { format: 'instagram', status: 'pending', variations: ['Post 1', 'Post 2'], selectedVariations: [0, 1] },
+      ],
+    },
+  ])
+
+  // Handle toggling a format's published status
+  const handleToggleFormatStatus = (itemId: string, format: ContentType) => {
+    setInProgressItems(items =>
+      items.map(item => {
+        if (item.id !== itemId) return item
+        return {
+          ...item,
+          formats: item.formats.map(f => {
+            if (f.format !== format) return f
+            return {
+              ...f,
+              status: f.status === 'published' ? 'in_progress' : 'published',
+              publishedAt: f.status !== 'published' ? new Date().toISOString() : undefined,
+            }
+          }),
+        }
+      })
+    )
+  }
+
+  // Handle moving completed item to library
+  const handleMoveToLibrary = (itemId: string) => {
+    const item = inProgressItems.find(i => i.id === itemId)
+    if (!item) return
+
+    // Add to createdOutputsMap (simulate adding to library)
+    const newOutputs: RepurposedOutput[] = item.formats.map(f => ({
+      id: `output-${itemId}-${f.format}`,
+      format: f.format,
+      title: `${item.sourceTitle} - ${contentTypeLabels[f.format]}`,
+      createdAt: f.publishedAt || new Date().toISOString(),
+    }))
+
+    // Find a matching source item or create a synthetic one
+    const sourceItem = items.find(i => i.sourceTitle === item.sourceTitle)
+    if (sourceItem) {
+      setCreatedOutputsMap(prev => ({
+        ...prev,
+        [sourceItem.id]: [...(prev[sourceItem.id] || []), ...newOutputs],
+      }))
+    }
+
+    // Remove from in-progress
+    setInProgressItems(items => items.filter(i => i.id !== itemId))
+  }
+
   // Handle initial view mode when modal opens
   useEffect(() => {
     if (open) {
-      setView(initialView)
+      if (initialView === 'workflow') {
+        setView('workflow')
+      } else {
+        setView('list')
+      }
     } else {
       // Reset to list view when modal closes
       setView('list')
+      setListTab('available')
       resetWorkflow()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1085,19 +1456,21 @@ export function RepurposeModal({
 
         // Generate format-specific content
         if (config.format === 'linkedin') {
-          baseContent.variations = [
+          const variations = [
             `🚀 Just published a new piece on financial planning for growing businesses!\n\nKey takeaway: Cash flow management isn&apos;t just about tracking money - it&apos;s about strategic planning.\n\n3 things every founder should know:\n1. Forecast 13 weeks ahead\n2. Build a cash reserve buffer\n3. Know your burn rate by heart\n\nWhat&apos;s your biggest cash flow challenge? 👇\n\n#Finance #Startup #CFO`,
             `The #1 mistake I see founders make with their finances?\n\nWaiting too long to get professional help.\n\nBy the time most reach out, they&apos;ve already:\n- Missed tax deadlines\n- Lost track of expenses\n- Made costly accounting errors\n\nDon&apos;t wait until it&apos;s a crisis.\n\n#StartupFinance #GrowthTips`,
             `Hot take: Every startup over $1M ARR needs fractional CFO support.\n\nNot because you can&apos;t manage finances yourself.\n\nBut because your time is better spent on:\n• Product development\n• Customer relationships\n• Team building\n\nWhat do you think - agree or disagree?`,
             `Financial planning tip that changed everything for our clients:\n\nStop looking at monthly P&L.\nStart looking at weekly cash flow.\n\nMonthly is too slow for startups.\nWeekly keeps you agile.\n\nSimple shift, massive impact. 📈`,
             `"We&apos;ll figure out finances later."\n\nSaid every founder before their Series A due diligence.\n\nThen it&apos;s 3am organizing receipts.\n\nLesson: Finance is a feature, not a bug.\nBuild it into your startup from day one.`,
           ]
+          baseContent.variations = variations
+          baseContent.selectedVariations = variations.map((_, i) => i) // Select all by default
         } else if (config.format === 'youtube') {
           baseContent.content = `Welcome back to the channel! Today we&apos;re diving deep into financial planning strategies for growing businesses.\n\n[INTRO - 0:00]\nIf you&apos;re running a startup or scaling company, this video is for you. I&apos;m going to share the exact framework we use with our clients to manage cash flow and plan for growth.\n\n[MAIN CONTENT]\nLet&apos;s start with the fundamentals...`
           baseContent.chapters = [
-            { id: 'ch-1', timestamp: '0:00', title: 'Introduction', description: 'Overview of what we will cover' },
-            { id: 'ch-2', timestamp: '1:30', title: 'Cash Flow Basics', description: 'Understanding the fundamentals' },
-            { id: 'ch-3', timestamp: '5:00', title: 'Forecasting Framework', description: '13-week cash flow model' },
+            { id: 'ch-1', timestamp: '00:00', title: 'Introduction', description: 'Overview of what we will cover' },
+            { id: 'ch-2', timestamp: '01:30', title: 'Cash Flow Basics', description: 'Understanding the fundamentals' },
+            { id: 'ch-3', timestamp: '05:00', title: 'Forecasting Framework', description: '13-week cash flow model' },
             { id: 'ch-4', timestamp: '10:15', title: 'Common Mistakes', description: 'What to avoid' },
             { id: 'ch-5', timestamp: '15:00', title: 'Action Steps', description: 'What to do this week' },
           ]
@@ -1118,6 +1491,21 @@ export function RepurposeModal({
             { id: 'faq-1', question: 'How long did the engagement last?', answer: 'The initial engagement was 6 months, with ongoing fractional CFO support continuing.' },
             { id: 'faq-2', question: 'What tools were implemented?', answer: 'We implemented a custom financial dashboard using their existing tech stack.' },
           ]
+          baseContent.internalLinks = [
+            { id: 'link-1', title: 'Our Services', url: '/services', type: 'internal' },
+            { id: 'link-2', title: 'More Case Studies', url: '/case-studies', type: 'internal' },
+          ]
+        } else if (config.format === 'instagram') {
+          // Instagram posts: caption + image content description
+          const instagramVariations = [
+            `💡 Cash flow tip of the day:\n\nForget monthly reports.\nStart tracking WEEKLY.\n\nWhy? Because in a startup, a month is too long to course correct.\n\nSwipe for the 3-step weekly review process that our clients use ➡️\n\n📸 IMAGE: Create a carousel with:\n- Slide 1: Bold text "Weekly > Monthly" with cash flow graph icon\n- Slide 2: Step 1 - Review last week's actuals\n- Slide 3: Step 2 - Update 13-week forecast\n- Slide 4: Step 3 - Identify action items\n- Slide 5: CTA - "Follow for more finance tips"`,
+            `🎯 The 3 numbers every founder should know:\n\n1️⃣ Monthly burn rate\n2️⃣ Cash runway (in months)\n3️⃣ Revenue per employee\n\nKnow yours? Drop them in the comments 👇\n\n📸 IMAGE: Clean graphic with the 3 numbers displayed in a modern, minimalist style. Brand colors. Each number in a separate box/section.`,
+            `❌ Stop doing this with your finances:\n\nWaiting until year-end to organize receipts.\n\n✅ Do this instead:\n\n15 minutes every Friday.\nCategories expenses.\nUpdate your tracker.\n\nFuture you will thank you 🙏\n\n📸 IMAGE: Split image - left side shows messy pile of receipts, right side shows organized dashboard/spreadsheet. Use clean before/after visual style.`,
+            `The fractional CFO checklist:\n\n□ 13-week cash flow forecast\n□ Monthly close under 5 days\n□ KPI dashboard updated weekly\n□ Board deck template ready\n□ Tax calendar organized\n\nHow many can you check off? ✓\n\n📸 IMAGE: Aesthetic checklist graphic with checkboxes, some checked some unchecked. Professional but approachable style.`,
+            `🚀 Raised a round? Here's your 90-day finance plan:\n\nWeek 1-2: Set up proper accounting\nWeek 3-4: Build your forecast model\nMonth 2: Establish reporting cadence\nMonth 3: First board deck\n\nSave this for later! 📌\n\n📸 IMAGE: Timeline infographic showing the 90-day plan. Modern design with milestones clearly marked.`,
+          ]
+          baseContent.variations = instagramVariations
+          baseContent.selectedVariations = instagramVariations.map((_, i) => i) // Select all by default
         }
 
         return baseContent
@@ -1167,9 +1555,39 @@ export function RepurposeModal({
     }, 2000)
   }
 
-  // Handle publish
+  // Handle publish - now adds to in-progress instead of directly to library
   const handlePublish = () => {
-    // Here you would publish to library
+    // Get source title
+    let sourceTitle = 'Untitled Content'
+    let sourceType: ContentType = 'blog'
+    if (selectedSource) {
+      if ('title' in selectedSource) {
+        sourceTitle = selectedSource.title
+        sourceType = 'targetFormat' in selectedSource ? selectedSource.targetFormat : selectedSource.type
+      }
+    }
+
+    // Create in-progress item from generated content
+    const newInProgressItem: InProgressRepurpose = {
+      id: `in-progress-${Date.now()}`,
+      sourceTitle,
+      sourceType,
+      startedAt: new Date().toISOString(),
+      formats: generatedContent.map(content => ({
+        format: content.format,
+        status: 'in_progress' as const,
+        content: content.content,
+        variations: content.variations,
+        selectedVariations: content.selectedVariations,
+        chapters: content.chapters,
+      })),
+    }
+
+    // Add to in-progress items
+    setInProgressItems(prev => [newInProgressItem, ...prev])
+
+    // Switch to list view with in_progress tab selected
+    setListTab('in_progress')
     setView('list')
     resetWorkflow()
   }
@@ -1248,49 +1666,121 @@ export function RepurposeModal({
         {view === 'list' ? (
           // List view - show existing content with expandable cards
           <>
-            <div className="flex-1 overflow-y-auto py-4">
-              <div className="space-y-3">
-                {items.map((item) => (
-                  <SourceContentCard
-                    key={item.id}
-                    item={item}
-                    createdOutputs={createdOutputsMap[item.id] || []}
-                    onCreateNew={(itemId) => {
-                      // Select the item and start workflow
-                      const sourceItem = items.find(i => i.id === itemId)
-                      if (sourceItem) {
-                        setSelectedSource(sourceItem)
-                        setSourceSelected(true)
-                        setSourceType('library_search')
-                        setView('workflow')
-                        setCurrentStep('format_selection')
-                      }
-                    }}
-                    onRepurpose={onRepurpose}
-                  />
-                ))}
-
-                {items.length === 0 && (
-                  <div className="text-center py-12">
-                    <RefreshCw className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                      No content ready for repurposing. Add content to your library first.
-                    </p>
-                  </div>
+            {/* Tab navigation */}
+            <div className="flex gap-2 border-b pb-2">
+              <button
+                onClick={() => setListTab('available')}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                  listTab === 'available'
+                    ? 'bg-[#407B9D] text-white'
+                    : 'text-muted-foreground hover:text-[#463939] hover:bg-slate-100'
+                }`}
+              >
+                Available Content
+                <Badge className="ml-2 bg-white/20 text-inherit">{items.length}</Badge>
+              </button>
+              <button
+                onClick={() => setListTab('in_progress')}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                  listTab === 'in_progress'
+                    ? 'bg-[#407B9D] text-white'
+                    : 'text-muted-foreground hover:text-[#463939] hover:bg-slate-100'
+                }`}
+              >
+                In Progress
+                {inProgressItems.length > 0 && (
+                  <Badge className="ml-2 bg-amber-100 text-amber-800">{inProgressItems.length}</Badge>
                 )}
-              </div>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4">
+              {listTab === 'available' ? (
+                // Available content tab
+                <div className="space-y-3">
+                  {items.map((item) => (
+                    <SourceContentCard
+                      key={item.id}
+                      item={item}
+                      createdOutputs={createdOutputsMap[item.id] || []}
+                      onCreateNew={(itemId) => {
+                        // Select the item and start workflow
+                        const sourceItem = items.find(i => i.id === itemId)
+                        if (sourceItem) {
+                          setSelectedSource(sourceItem)
+                          setSourceSelected(true)
+                          setSourceType('library_search')
+                          setView('workflow')
+                          setCurrentStep('format_selection')
+                        }
+                      }}
+                      onRepurpose={onRepurpose}
+                    />
+                  ))}
+
+                  {items.length === 0 && (
+                    <div className="text-center py-12">
+                      <RefreshCw className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                        No content ready for repurposing. Add content to your library first.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // In Progress tab
+                <div className="space-y-3">
+                  {inProgressItems.map((item) => (
+                    <InProgressCard
+                      key={item.id}
+                      item={item}
+                      onToggleFormat={handleToggleFormatStatus}
+                      onMoveToLibrary={handleMoveToLibrary}
+                    />
+                  ))}
+
+                  {inProgressItems.length === 0 && (
+                    <div className="text-center py-12">
+                      <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>
+                        No content currently being repurposed.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Start a repurpose workflow to track your progress here.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                {items.length} piece{items.length !== 1 ? 's' : ''} of content available
+                {listTab === 'available'
+                  ? `${items.length} piece${items.length !== 1 ? 's' : ''} of content available`
+                  : `${inProgressItems.length} item${inProgressItems.length !== 1 ? 's' : ''} in progress`
+                }
               </p>
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Close
-              </Button>
+              <div className="flex gap-2">
+                {listTab === 'available' && (
+                  <Button
+                    onClick={() => {
+                      setView('workflow')
+                      setCurrentStep('source_selection')
+                    }}
+                    className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Start New Repurpose
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           </>
         ) : (

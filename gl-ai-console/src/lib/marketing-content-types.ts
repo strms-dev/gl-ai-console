@@ -1,7 +1,7 @@
 // Marketing Content Engine Types
 
 // Content type categories
-export type ContentType = 'blog' | 'linkedin' | 'youtube' | 'case_study' | 'website_page' | 'meeting_transcript' | 'external'
+export type ContentType = 'blog' | 'linkedin' | 'youtube' | 'case_study' | 'website_page' | 'meeting_transcript' | 'external' | 'instagram'
 
 // Content status
 export type ContentStatus = 'published' | 'draft' | 'archived'
@@ -63,6 +63,7 @@ export const contentTypeLabels: Record<ContentType, string> = {
   website_page: 'Website Page',
   meeting_transcript: 'Meeting Transcript',
   external: 'External Content',
+  instagram: 'Instagram Post',
 }
 
 export const contentTypeColors: Record<ContentType, string> = {
@@ -73,6 +74,7 @@ export const contentTypeColors: Record<ContentType, string> = {
   website_page: 'bg-purple-100 text-purple-800',
   meeting_transcript: 'bg-amber-100 text-amber-800',
   external: 'bg-indigo-100 text-indigo-800',
+  instagram: 'bg-pink-100 text-pink-800',
 }
 
 // ===================
@@ -276,6 +278,7 @@ export interface GeneratedFormatContent {
   format: ContentType
   content: string                // Main content
   variations?: string[]          // For LinkedIn/Instagram - multiple variations
+  selectedVariations?: number[]  // Indices of selected variations (for LinkedIn/Instagram)
   chapters?: YouTubeChapter[]    // For YouTube
   faqs?: FAQ[]                   // For Blog/Case Study
   internalLinks?: LinkRecommendation[]
@@ -332,13 +335,14 @@ export const formatFeatures: Record<ContentType, {
   case_study: { supportsFaqs: true, supportsLinks: true, supportsChapters: false, supportsVariations: false },
   youtube: { supportsFaqs: false, supportsLinks: false, supportsChapters: true, supportsVariations: false },
   linkedin: { supportsFaqs: false, supportsLinks: false, supportsChapters: false, supportsVariations: true, defaultVariationCount: 5 },
+  instagram: { supportsFaqs: false, supportsLinks: false, supportsChapters: false, supportsVariations: true, defaultVariationCount: 5 },
   website_page: { supportsFaqs: false, supportsLinks: true, supportsChapters: false, supportsVariations: false },
   meeting_transcript: { supportsFaqs: false, supportsLinks: false, supportsChapters: false, supportsVariations: false },
   external: { supportsFaqs: false, supportsLinks: false, supportsChapters: false, supportsVariations: false },
 }
 
 // Content types available for repurposing (excluding some types)
-export const repurposeTargetFormats: ContentType[] = ['blog', 'case_study', 'youtube', 'linkedin']
+export const repurposeTargetFormats: ContentType[] = ['blog', 'case_study', 'youtube', 'linkedin', 'instagram']
 
 // ===================
 // Refresh Finder
@@ -435,4 +439,44 @@ export interface RepurposedOutput {
 // Extended RepurposeItem with created outputs tracking
 export interface RepurposeItemWithOutputs extends RepurposeItem {
   createdOutputs: RepurposedOutput[]
+}
+
+// ===================
+// In Progress Repurpose Tracking
+// ===================
+
+// Status for each format being repurposed
+export type RepurposeFormatStatus = 'pending' | 'in_progress' | 'published'
+
+// Individual format progress tracking
+export interface RepurposeFormatProgress {
+  format: ContentType
+  status: RepurposeFormatStatus
+  content?: string
+  variations?: string[]
+  selectedVariations?: number[]
+  chapters?: YouTubeChapter[]
+  publishedAt?: string
+}
+
+// In-progress repurpose workflow item
+export interface InProgressRepurpose {
+  id: string
+  sourceTitle: string
+  sourceType: ContentType
+  startedAt: string
+  formats: RepurposeFormatProgress[]
+}
+
+// Labels for format status
+export const repurposeFormatStatusLabels: Record<RepurposeFormatStatus, string> = {
+  pending: 'Pending',
+  in_progress: 'Ready to Publish',
+  published: 'Published',
+}
+
+export const repurposeFormatStatusColors: Record<RepurposeFormatStatus, string> = {
+  pending: 'bg-slate-100 text-slate-800',
+  in_progress: 'bg-amber-100 text-amber-800',
+  published: 'bg-green-100 text-green-800',
 }
