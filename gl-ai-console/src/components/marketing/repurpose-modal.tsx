@@ -91,7 +91,7 @@ function RepurposeStepIndicator({
   onStepClick?: (step: RepurposeStep) => void
 }) {
   return (
-    <div className="flex items-center gap-1 overflow-x-auto py-2">
+    <div className="flex items-center gap-1 py-2 flex-shrink-0">
       {steps.map((step, index) => {
         const isCurrent = step.key === currentStep
         const isCompleted = step.completed
@@ -675,6 +675,15 @@ function ContentReviewStep({
   const [editContent, setEditContent] = useState('')
   const [refinementPrompt, setRefinementPrompt] = useState('')
   const [isRefining, setIsRefining] = useState(false)
+  // New state for variation editing and expand/collapse
+  const [expandedVariations, setExpandedVariations] = useState<number[]>([])
+  const [editingVariationIndex, setEditingVariationIndex] = useState<number | null>(null)
+  const [editingVariationContent, setEditingVariationContent] = useState('')
+  const [copiedVariationIndex, setCopiedVariationIndex] = useState<number | null>(null)
+  const [chaptersCopied, setChaptersCopied] = useState(false)
+  const [contentCopied, setContentCopied] = useState(false)
+  const [faqsCopied, setFaqsCopied] = useState(false)
+  const [linksCopied, setLinksCopied] = useState(false)
 
   const activeContent = generatedContent.find(c => c.id === activeTab)
 
@@ -727,7 +736,7 @@ function ContentReviewStep({
   return (
     <div className="space-y-4">
       {/* Format tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 border-b">
+      <div className="flex gap-2 overflow-x-auto pb-2 border-b scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {generatedContent.map((content) => (
           <button
             key={content.id}
@@ -764,7 +773,8 @@ function ContentReviewStep({
                 <RefreshCw className="w-4 h-4 mr-1" />
                 Regenerate
               </Button>
-              {!isEditing && (
+              {/* Only show Edit button for non-variation content (not LinkedIn/Instagram) */}
+              {!isEditing && !(activeContent.variations && activeContent.variations.length > 0) && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -780,84 +790,161 @@ function ContentReviewStep({
           {/* Variations selection for LinkedIn/Instagram */}
           {activeContent.variations && activeContent.variations.length > 0 ? (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {activeContent.selectedVariations?.length || 0} of {activeContent.variations.length} selected
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      // Select all
-                      onContentChange({
-                        ...activeContent,
-                        selectedVariations: activeContent.variations!.map((_, i) => i),
-                      })
-                    }}
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      // Clear all
-                      onContentChange({
-                        ...activeContent,
-                        selectedVariations: [],
-                      })
-                    }}
-                  >
-                    Clear
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              <p className="text-sm text-muted-foreground">
+                {activeContent.selectedVariations?.length || 0} of {activeContent.variations.length} selected
+              </p>
+              <div className="space-y-3">
                 {activeContent.variations.map((variation, index) => {
                   const isSelected = activeContent.selectedVariations?.includes(index) || false
+                  const isExpanded = expandedVariations.includes(index)
+                  const isEditingVar = editingVariationIndex === index
+                  const captionText = variation.split('\n\n📸 IMAGE:')[0]
+                  const shouldTruncate = captionText.length > 300
+
                   return (
                     <div
                       key={index}
-                      className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      className={`border rounded-lg p-4 transition-all ${
                         isSelected
                           ? 'border-[#407B9D] bg-[#407B9D]/5'
                           : 'border-slate-200 hover:border-slate-300'
                       }`}
-                      onClick={() => {
-                        const currentSelected = activeContent.selectedVariations || []
-                        const newSelected = isSelected
-                          ? currentSelected.filter(i => i !== index)
-                          : [...currentSelected, index]
-                        onContentChange({
-                          ...activeContent,
-                          selectedVariations: newSelected,
-                        })
-                      }}
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center mt-0.5 ${
-                          isSelected
-                            ? 'bg-[#407B9D] border-[#407B9D]'
-                            : 'border-slate-300'
-                        }`}>
+                        <div
+                          className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center mt-0.5 cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#407B9D] border-[#407B9D]'
+                              : 'border-slate-300'
+                          }`}
+                          onClick={() => {
+                            const currentSelected = activeContent.selectedVariations || []
+                            const newSelected = isSelected
+                              ? currentSelected.filter(i => i !== index)
+                              : [...currentSelected, index]
+                            onContentChange({
+                              ...activeContent,
+                              selectedVariations: newSelected,
+                            })
+                          }}
+                        >
                           {isSelected && <Check className="w-3 h-3 text-white" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge className="bg-slate-100 text-slate-700 text-xs">
-                              Variation {index + 1}
-                            </Badge>
-                            {activeContent.format === 'instagram' && variation.includes('IMAGE:') && (
-                              <Badge className="bg-pink-100 text-pink-700 text-xs">
-                                <Image className="w-3 h-3 mr-1" />
-                                Has image desc
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-slate-100 text-slate-700 text-xs">
+                                Variation {index + 1}
                               </Badge>
-                            )}
+                              {activeContent.format === 'instagram' && variation.includes('IMAGE:') && (
+                                <Badge className="bg-pink-100 text-pink-700 text-xs">
+                                  <Image className="w-3 h-3 mr-1" />
+                                  Has image desc
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (isEditingVar) {
+                                    // Save the edit
+                                    const newVariations = [...activeContent.variations!]
+                                    newVariations[index] = editingVariationContent
+                                    onContentChange({
+                                      ...activeContent,
+                                      variations: newVariations,
+                                    })
+                                    setEditingVariationIndex(null)
+                                    setEditingVariationContent('')
+                                  } else {
+                                    // Start editing
+                                    setEditingVariationIndex(index)
+                                    setEditingVariationContent(variation)
+                                  }
+                                }}
+                                className="h-7 px-2 text-[#407B9D]"
+                              >
+                                {isEditingVar ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 mr-1" />
+                                    Save
+                                  </>
+                                ) : (
+                                  <>
+                                    <Edit3 className="w-3.5 h-3.5 mr-1" />
+                                    Edit
+                                  </>
+                                )}
+                              </Button>
+                              {isEditingVar && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setEditingVariationIndex(null)
+                                    setEditingVariationContent('')
+                                  }}
+                                  className="h-7 px-2"
+                                >
+                                  Cancel
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  navigator.clipboard.writeText(variation)
+                                  setCopiedVariationIndex(index)
+                                  setTimeout(() => setCopiedVariationIndex(null), 2000)
+                                }}
+                                className="h-7 px-2"
+                              >
+                                {copiedVariationIndex === index ? (
+                                  <Check className="w-3.5 h-3.5 text-green-600" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </Button>
+                            </div>
                           </div>
-                          <p className="whitespace-pre-wrap text-sm text-[#463939] line-clamp-4">
-                            {variation.split('\n\n📸 IMAGE:')[0]}
-                          </p>
+
+                          {isEditingVar ? (
+                            <Textarea
+                              value={editingVariationContent}
+                              onChange={(e) => setEditingVariationContent(e.target.value)}
+                              className="min-h-[150px] text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <>
+                              <p className={`whitespace-pre-wrap text-sm text-[#463939] ${!isExpanded && shouldTruncate ? 'line-clamp-4' : ''}`}>
+                                {captionText}
+                              </p>
+                              {shouldTruncate && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setExpandedVariations(prev =>
+                                      isExpanded
+                                        ? prev.filter(i => i !== index)
+                                        : [...prev, index]
+                                    )
+                                  }}
+                                  className="h-auto p-0 mt-1 text-[#407B9D]"
+                                >
+                                  {isExpanded ? 'Show less' : 'Show more'}
+                                </Button>
+                              )}
+                            </>
+                          )}
+
                           {activeContent.format === 'instagram' && variation.includes('📸 IMAGE:') && (
                             <div className="mt-2 p-2 bg-pink-50 rounded text-xs text-pink-800">
                               <strong>Image:</strong> {variation.split('📸 IMAGE:')[1]?.trim()}
@@ -879,8 +966,26 @@ function ContentReviewStep({
                   className="min-h-[200px] border-0 rounded-none"
                 />
               ) : (
-                <div className="p-4 whitespace-pre-wrap text-sm">
-                  {activeContent.content}
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(activeContent.content)
+                      setContentCopied(true)
+                      setTimeout(() => setContentCopied(false), 2000)
+                    }}
+                    className="absolute top-2 right-2 h-7 px-2"
+                  >
+                    {contentCopied ? (
+                      <Check className="w-3.5 h-3.5 text-green-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                  <div className="p-4 whitespace-pre-wrap text-sm">
+                    {activeContent.content}
+                  </div>
                 </div>
               )}
             </div>
@@ -903,18 +1008,23 @@ function ContentReviewStep({
               <div className="flex items-center justify-between mb-3">
                 <h5 className="text-sm font-medium text-[#463939]">Chapters</h5>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={() => {
                     const chaptersText = activeContent.chapters!
                       .map(ch => `${ch.timestamp} – ${ch.title}`)
                       .join('\n')
                     navigator.clipboard.writeText(chaptersText)
+                    setChaptersCopied(true)
+                    setTimeout(() => setChaptersCopied(false), 2000)
                   }}
-                  className="text-[#407B9D] border-[#407B9D] hover:bg-[#407B9D] hover:text-white"
+                  className="h-7 px-2"
                 >
-                  <Copy className="w-3.5 h-3.5 mr-1" />
-                  Copy Chapters
+                  {chaptersCopied ? (
+                    <Check className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
                 </Button>
               </div>
               <div className="bg-slate-50 rounded-lg p-3 font-mono text-sm">
@@ -932,7 +1042,28 @@ function ContentReviewStep({
           {/* FAQs for Blog/Case Study */}
           {activeContent.faqs && activeContent.faqs.length > 0 && (
             <div className="border rounded-lg p-4">
-              <h5 className="text-sm font-medium text-[#463939] mb-3">FAQs</h5>
+              <div className="flex items-center justify-between mb-3">
+                <h5 className="text-sm font-medium text-[#463939]">FAQs</h5>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const faqsText = activeContent.faqs!
+                      .map(faq => `Q: ${faq.question}\nA: ${faq.answer}`)
+                      .join('\n\n')
+                    navigator.clipboard.writeText(faqsText)
+                    setFaqsCopied(true)
+                    setTimeout(() => setFaqsCopied(false), 2000)
+                  }}
+                  className="h-7 px-2"
+                >
+                  {faqsCopied ? (
+                    <Check className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </div>
               <div className="space-y-3">
                 {activeContent.faqs.map((faq) => (
                   <div key={faq.id} className="text-sm">
@@ -944,8 +1075,50 @@ function ContentReviewStep({
             </div>
           )}
 
-          {/* AI Refinement Chat */}
-          {activeContent.approvalStatus !== 'approved' && !activeContent.variations && (
+          {/* Link Suggestions for Blog/Case Study */}
+          {activeContent.internalLinks && activeContent.internalLinks.length > 0 && (
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h5 className="text-sm font-medium text-[#463939]">Suggested Links</h5>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const linksText = activeContent.internalLinks!
+                      .map(link => `${link.title}: ${link.url}`)
+                      .join('\n')
+                    navigator.clipboard.writeText(linksText)
+                    setLinksCopied(true)
+                    setTimeout(() => setLinksCopied(false), 2000)
+                  }}
+                  className="h-7 px-2"
+                >
+                  {linksCopied ? (
+                    <Check className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {activeContent.internalLinks.map((link) => (
+                  <div key={link.id} className="flex items-center justify-between text-sm p-2 bg-slate-50 rounded">
+                    <div className="flex items-center gap-2">
+                      <ExternalLink className="w-4 h-4 text-[#407B9D]" />
+                      <span className="text-[#463939]">{link.title}</span>
+                      <Badge className="bg-blue-100 text-blue-700 text-xs">
+                        {link.type === 'internal' ? 'Internal' : 'External'}
+                      </Badge>
+                    </div>
+                    <span className="text-muted-foreground text-xs">{link.url}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* AI Refinement Chat - shown for all formats */}
+          {activeContent.approvalStatus !== 'approved' && (
             <div className="border rounded-lg p-4 bg-slate-50">
               <div className="flex items-center gap-2 mb-3">
                 <Sparkles className="w-4 h-4 text-[#407B9D]" />
@@ -955,18 +1128,34 @@ function ContentReviewStep({
                 <Input
                   value={refinementPrompt}
                   onChange={(e) => setRefinementPrompt(e.target.value)}
-                  placeholder="e.g., Make it more concise, add a stronger CTA..."
+                  placeholder={activeContent.variations
+                    ? "e.g., Make all variations more concise, add emojis..."
+                    : "e.g., Make it more concise, add a stronger CTA..."}
                   className="flex-1"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && refinementPrompt.trim() && !isRefining) {
                       setIsRefining(true)
                       setTimeout(() => {
-                        // Simulate AI refinement
-                        const refined = activeContent.content + `\n\n[AI Refined based on: "${refinementPrompt}"]`
-                        onContentChange({
-                          ...activeContent,
-                          content: refined,
-                        })
+                        if (activeContent.variations && activeContent.variations.length > 0) {
+                          // For variations (LinkedIn/Instagram), refine all selected variations
+                          const refinedVariations = activeContent.variations.map((v, i) => {
+                            if (activeContent.selectedVariations?.includes(i)) {
+                              return v + `\n\n[AI Refined: "${refinementPrompt}"]`
+                            }
+                            return v
+                          })
+                          onContentChange({
+                            ...activeContent,
+                            variations: refinedVariations,
+                          })
+                        } else {
+                          // For regular content
+                          const refined = activeContent.content + `\n\n[AI Refined based on: "${refinementPrompt}"]`
+                          onContentChange({
+                            ...activeContent,
+                            content: refined,
+                          })
+                        }
                         setRefinementPrompt('')
                         setIsRefining(false)
                       }, 1500)
@@ -979,12 +1168,26 @@ function ContentReviewStep({
                     if (refinementPrompt.trim()) {
                       setIsRefining(true)
                       setTimeout(() => {
-                        // Simulate AI refinement
-                        const refined = activeContent.content + `\n\n[AI Refined based on: "${refinementPrompt}"]`
-                        onContentChange({
-                          ...activeContent,
-                          content: refined,
-                        })
+                        if (activeContent.variations && activeContent.variations.length > 0) {
+                          // For variations (LinkedIn/Instagram), refine all selected variations
+                          const refinedVariations = activeContent.variations.map((v, i) => {
+                            if (activeContent.selectedVariations?.includes(i)) {
+                              return v + `\n\n[AI Refined: "${refinementPrompt}"]`
+                            }
+                            return v
+                          })
+                          onContentChange({
+                            ...activeContent,
+                            variations: refinedVariations,
+                          })
+                        } else {
+                          // For regular content
+                          const refined = activeContent.content + `\n\n[AI Refined based on: "${refinementPrompt}"]`
+                          onContentChange({
+                            ...activeContent,
+                            content: refined,
+                          })
+                        }
                         setRefinementPrompt('')
                         setIsRefining(false)
                       }, 1500)
@@ -1001,7 +1204,9 @@ function ContentReviewStep({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Tell AI how to improve this content. Press Enter or click the button to apply.
+                {activeContent.variations
+                  ? "Tell AI how to improve selected variations. Press Enter or click the button to apply."
+                  : "Tell AI how to improve this content. Press Enter or click the button to apply."}
               </p>
             </div>
           )}
@@ -1109,11 +1314,11 @@ function PublishStep({
 // In Progress card component
 function InProgressCard({
   item,
-  onToggleFormat,
+  onPublishFormat,
   onMoveToLibrary,
 }: {
   item: InProgressRepurpose
-  onToggleFormat: (itemId: string, format: ContentType) => void
+  onPublishFormat: (itemId: string, format: ContentType) => void
   onMoveToLibrary: (itemId: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -1142,17 +1347,24 @@ function InProgressCard({
               <Badge className={contentTypeColors[item.sourceType]}>
                 {contentTypeLabels[item.sourceType]}
               </Badge>
-              <Badge className="bg-amber-100 text-amber-800">
-                <Clock className="w-3 h-3 mr-1" />
-                In Progress
-              </Badge>
+              {allPublished ? (
+                <Badge className="bg-green-100 text-green-800">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  All Published
+                </Badge>
+              ) : (
+                <Badge className="bg-amber-100 text-amber-800">
+                  <Clock className="w-3 h-3 mr-1" />
+                  In Progress
+                </Badge>
+              )}
             </div>
 
             {/* Progress bar */}
             <div className="flex items-center gap-3">
               <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#407B9D] transition-all duration-300"
+                  className={`h-full transition-all duration-300 ${allPublished ? 'bg-green-500' : 'bg-[#407B9D]'}`}
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -1177,7 +1389,7 @@ function InProgressCard({
         <div className="border-t px-4 py-4 space-y-4 bg-slate-50/50">
           <div>
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
-              Format Checklist
+              Formats to Publish
             </h4>
             <div className="space-y-2">
               {item.formats.map((format) => {
@@ -1185,20 +1397,12 @@ function InProgressCard({
                 return (
                   <div
                     key={format.format}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                    className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
                       isPublished
                         ? 'bg-green-50 border-green-200'
-                        : 'bg-white border-slate-200 hover:border-[#407B9D]'
+                        : 'bg-white border-slate-200'
                     }`}
-                    onClick={() => onToggleFormat(item.id, format.format)}
                   >
-                    <div className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center ${
-                      isPublished
-                        ? 'bg-green-600 border-green-600'
-                        : 'border-slate-300'
-                    }`}>
-                      {isPublished && <Check className="w-3 h-3 text-white" />}
-                    </div>
                     <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border">
                       <FormatIcon format={format.format} className="w-4 h-4 text-slate-600" />
                     </div>
@@ -1208,43 +1412,49 @@ function InProgressCard({
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {isPublished
-                          ? `Published ${format.publishedAt ? new Date(format.publishedAt).toLocaleDateString() : 'today'}`
+                          ? `Published ${format.publishedAt ? new Date(format.publishedAt).toLocaleDateString() : 'today'} • Added to library`
                           : format.variations
                             ? `${format.selectedVariations?.length || format.variations.length} variation(s) ready`
                             : 'Ready to publish'
                         }
                       </p>
                     </div>
-                    <Badge className={isPublished ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
-                      {isPublished ? 'Published' : 'Ready'}
-                    </Badge>
+                    {isPublished ? (
+                      <Badge className="bg-green-100 text-green-800">
+                        <Check className="w-3 h-3 mr-1" />
+                        In Library
+                      </Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onPublishFormat(item.id, format.format)
+                        }}
+                        className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                      >
+                        <Upload className="w-3.5 h-3.5 mr-1" />
+                        Publish
+                      </Button>
+                    )}
                   </div>
                 )
               })}
             </div>
           </div>
 
-          <p className="text-xs text-muted-foreground text-center">
-            Click a format to mark it as published (e.g., YouTube filmed, LinkedIn posted)
-          </p>
-
-          {/* Move to Library button - only shows when all are published */}
           {allPublished && (
-            <Button
-              onClick={(e) => {
-                e.stopPropagation()
-                onMoveToLibrary(item.id)
-              }}
-              className="w-full bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/80"
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Move to Library
-            </Button>
+            <div className="flex items-center justify-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <p className="text-sm font-medium text-green-800">
+                All formats published to library!
+              </p>
+            </div>
           )}
 
           {!allPublished && (
             <p className="text-xs text-center text-muted-foreground">
-              Mark all formats as published to move this content to the library
+              Click &quot;Publish&quot; on each format when you&apos;ve posted it (e.g., YouTube filmed, LinkedIn posted)
             </p>
           )}
         </div>
@@ -1265,7 +1475,7 @@ export function RepurposeModal({
 }: RepurposeModalProps) {
   // View state - now includes 'in_progress'
   const [view, setView] = useState<'list' | 'workflow' | 'in_progress'>(initialView === 'workflow' ? 'workflow' : 'list')
-  const [listTab, setListTab] = useState<'available' | 'in_progress'>('available')
+  // Note: onRepurpose is kept in props for backward compatibility but not used in new In Progress flow
 
   // Workflow state
   const [currentStep, setCurrentStep] = useState<RepurposeStep>('source_selection')
@@ -1337,21 +1547,36 @@ export function RepurposeModal({
     },
   ])
 
-  // Handle toggling a format's published status
-  const handleToggleFormatStatus = (itemId: string, format: ContentType) => {
+  // Handle publishing a specific format (adds to library immediately)
+  const handlePublishFormat = (itemId: string, format: ContentType) => {
+    const item = inProgressItems.find(i => i.id === itemId)
+    if (!item) return
+
+    const formatData = item.formats.find(f => f.format === format)
+    if (!formatData) return
+
+    // Call onPublishToLibrary if provided
+    // Pass the format ID and the content/title
+    if (onPublishToLibrary) {
+      const content = formatData.content || formatData.variations?.join('\n\n') || ''
+      onPublishToLibrary(`${itemId}-${format}`, content)
+    }
+
+    // Update the in-progress item to mark this format as published
     setInProgressItems(items =>
-      items.map(item => {
-        if (item.id !== itemId) return item
+      items.map(i => {
+        if (i.id !== itemId) return i
+        const updatedFormats = i.formats.map(f => {
+          if (f.format !== format) return f
+          return {
+            ...f,
+            status: 'published' as const,
+            publishedAt: new Date().toISOString(),
+          }
+        })
         return {
-          ...item,
-          formats: item.formats.map(f => {
-            if (f.format !== format) return f
-            return {
-              ...f,
-              status: f.status === 'published' ? 'in_progress' : 'published',
-              publishedAt: f.status !== 'published' ? new Date().toISOString() : undefined,
-            }
-          }),
+          ...i,
+          formats: updatedFormats,
         }
       })
     )
@@ -1394,7 +1619,6 @@ export function RepurposeModal({
     } else {
       // Reset to list view when modal closes
       setView('list')
-      setListTab('available')
       resetWorkflow()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1464,7 +1688,7 @@ export function RepurposeModal({
             `"We&apos;ll figure out finances later."\n\nSaid every founder before their Series A due diligence.\n\nThen it&apos;s 3am organizing receipts.\n\nLesson: Finance is a feature, not a bug.\nBuild it into your startup from day one.`,
           ]
           baseContent.variations = variations
-          baseContent.selectedVariations = variations.map((_, i) => i) // Select all by default
+          baseContent.selectedVariations = [] // None selected by default
         } else if (config.format === 'youtube') {
           baseContent.content = `Welcome back to the channel! Today we&apos;re diving deep into financial planning strategies for growing businesses.\n\n[INTRO - 0:00]\nIf you&apos;re running a startup or scaling company, this video is for you. I&apos;m going to share the exact framework we use with our clients to manage cash flow and plan for growth.\n\n[MAIN CONTENT]\nLet&apos;s start with the fundamentals...`
           baseContent.chapters = [
@@ -1494,6 +1718,8 @@ export function RepurposeModal({
           baseContent.internalLinks = [
             { id: 'link-1', title: 'Our Services', url: '/services', type: 'internal' },
             { id: 'link-2', title: 'More Case Studies', url: '/case-studies', type: 'internal' },
+            { id: 'link-3', title: 'Fractional CFO Services', url: '/services/fractional-cfo', type: 'internal' },
+            { id: 'link-4', title: 'SaaS Financial Best Practices (SAAS Metrics Guide)', url: 'https://www.saastr.com/saas-metrics/', type: 'external' },
           ]
         } else if (config.format === 'instagram') {
           // Instagram posts: caption + image content description
@@ -1505,7 +1731,7 @@ export function RepurposeModal({
             `🚀 Raised a round? Here's your 90-day finance plan:\n\nWeek 1-2: Set up proper accounting\nWeek 3-4: Build your forecast model\nMonth 2: Establish reporting cadence\nMonth 3: First board deck\n\nSave this for later! 📌\n\n📸 IMAGE: Timeline infographic showing the 90-day plan. Modern design with milestones clearly marked.`,
           ]
           baseContent.variations = instagramVariations
-          baseContent.selectedVariations = instagramVariations.map((_, i) => i) // Select all by default
+          baseContent.selectedVariations = [] // None selected by default
         }
 
         return baseContent
@@ -1586,8 +1812,7 @@ export function RepurposeModal({
     // Add to in-progress items
     setInProgressItems(prev => [newInProgressItem, ...prev])
 
-    // Switch to list view with in_progress tab selected
-    setListTab('in_progress')
+    // Switch to list view (now shows In Progress)
     setView('list')
     resetWorkflow()
   }
@@ -1664,124 +1889,60 @@ export function RepurposeModal({
         </DialogHeader>
 
         {view === 'list' ? (
-          // List view - show existing content with expandable cards
+          // List view - show In Progress content
           <>
-            {/* Tab navigation */}
-            <div className="flex gap-2 border-b pb-2">
-              <button
-                onClick={() => setListTab('available')}
-                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                  listTab === 'available'
-                    ? 'bg-[#407B9D] text-white'
-                    : 'text-muted-foreground hover:text-[#463939] hover:bg-slate-100'
-                }`}
-              >
-                Available Content
-                <Badge className="ml-2 bg-white/20 text-inherit">{items.length}</Badge>
-              </button>
-              <button
-                onClick={() => setListTab('in_progress')}
-                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                  listTab === 'in_progress'
-                    ? 'bg-[#407B9D] text-white'
-                    : 'text-muted-foreground hover:text-[#463939] hover:bg-slate-100'
-                }`}
-              >
+            {/* Header - In Progress only */}
+            <div className="flex items-center gap-2 border-b pb-3">
+              <Clock className="w-5 h-5 text-[#407B9D]" />
+              <h3 className="text-sm font-medium text-[#463939]" style={{ fontFamily: 'var(--font-heading)' }}>
                 In Progress
-                {inProgressItems.length > 0 && (
-                  <Badge className="ml-2 bg-amber-100 text-amber-800">{inProgressItems.length}</Badge>
-                )}
-              </button>
+              </h3>
+              {inProgressItems.length > 0 && (
+                <Badge className="bg-amber-100 text-amber-800">{inProgressItems.length}</Badge>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto py-4">
-              {listTab === 'available' ? (
-                // Available content tab
-                <div className="space-y-3">
-                  {items.map((item) => (
-                    <SourceContentCard
-                      key={item.id}
-                      item={item}
-                      createdOutputs={createdOutputsMap[item.id] || []}
-                      onCreateNew={(itemId) => {
-                        // Select the item and start workflow
-                        const sourceItem = items.find(i => i.id === itemId)
-                        if (sourceItem) {
-                          // Convert RepurposeItem to ContentItem format
-                          const contentItem: ContentItem = {
-                            id: sourceItem.sourceContentId,
-                            title: sourceItem.sourceTitle,
-                            type: sourceItem.sourceType,
-                            dateCreated: sourceItem.lastRepurposed || new Date().toISOString(),
-                            status: 'published',
-                          }
-                          setSelectedSource(contentItem)
-                          setSourceSelected(true)
-                          setSourceType('library_search')
-                          setView('workflow')
-                          setCurrentStep('format_selection')
-                        }
-                      }}
-                      onRepurpose={onRepurpose}
-                    />
-                  ))}
+              {/* In Progress content */}
+              <div className="space-y-3">
+                {inProgressItems.map((item) => (
+                  <InProgressCard
+                    key={item.id}
+                    item={item}
+                    onPublishFormat={handlePublishFormat}
+                    onMoveToLibrary={handleMoveToLibrary}
+                  />
+                ))}
 
-                  {items.length === 0 && (
-                    <div className="text-center py-12">
-                      <RefreshCw className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                        No content ready for repurposing. Add content to your library first.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                // In Progress tab
-                <div className="space-y-3">
-                  {inProgressItems.map((item) => (
-                    <InProgressCard
-                      key={item.id}
-                      item={item}
-                      onToggleFormat={handleToggleFormatStatus}
-                      onMoveToLibrary={handleMoveToLibrary}
-                    />
-                  ))}
-
-                  {inProgressItems.length === 0 && (
-                    <div className="text-center py-12">
-                      <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>
-                        No content currently being repurposed.
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Start a repurpose workflow to track your progress here.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+                {inProgressItems.length === 0 && (
+                  <div className="text-center py-12">
+                    <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>
+                      No content currently being repurposed.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Start a repurpose workflow to track your progress here.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                {listTab === 'available'
-                  ? `${items.length} piece${items.length !== 1 ? 's' : ''} of content available`
-                  : `${inProgressItems.length} item${inProgressItems.length !== 1 ? 's' : ''} in progress`
-                }
+                {inProgressItems.length} item{inProgressItems.length !== 1 ? 's' : ''} in progress
               </p>
               <div className="flex gap-2">
-                {listTab === 'available' && (
-                  <Button
-                    onClick={() => {
-                      setView('workflow')
-                      setCurrentStep('source_selection')
-                    }}
-                    className="bg-[#407B9D] hover:bg-[#407B9D]/90"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Start New Repurpose
-                  </Button>
-                )}
+                <Button
+                  onClick={() => {
+                    setView('workflow')
+                    setCurrentStep('source_selection')
+                  }}
+                  className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Start New Repurpose
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => onOpenChange(false)}
