@@ -1707,7 +1707,15 @@ export function RepurposeModal({
                         // Select the item and start workflow
                         const sourceItem = items.find(i => i.id === itemId)
                         if (sourceItem) {
-                          setSelectedSource(sourceItem)
+                          // Convert RepurposeItem to ContentItem format
+                          const contentItem: ContentItem = {
+                            id: sourceItem.sourceContentId,
+                            title: sourceItem.sourceTitle,
+                            type: sourceItem.sourceType,
+                            dateCreated: sourceItem.lastRepurposed || new Date().toISOString(),
+                            status: 'published',
+                          }
+                          setSelectedSource(contentItem)
                           setSourceSelected(true)
                           setSourceType('library_search')
                           setView('workflow')

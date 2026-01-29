@@ -294,7 +294,7 @@ export interface RepurposeWorkflowItem extends RepurposeItem {
   workflowCompletedAt?: string
 
   // Step 1: Source selection
-  sourceType?: RepurposeSourceType
+  selectionMethod?: RepurposeSourceType  // How source was selected (ready_content, library_search, external_input)
   sourceContent?: string         // The actual content text
   sourceUrl?: string             // For external input
 
