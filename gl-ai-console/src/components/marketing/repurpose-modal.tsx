@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Dialog,
   DialogContent,
@@ -77,6 +77,7 @@ interface RepurposeModalProps {
   readyToRepurpose?: FinalDraft[]  // Recently published briefs
   onRepurpose: (itemId: string, targetFormat: string) => void
   onPublishToLibrary?: (formatId: string, content: string) => void
+  onInProgressCountChange?: (count: number) => void  // Callback when in-progress count changes
   initialView?: 'list' | 'workflow'  // Start directly in workflow mode if specified
 }
 
@@ -685,8 +686,19 @@ function ContentReviewStep({
   const [faqsCopied, setFaqsCopied] = useState(false)
   const [linksCopied, setLinksCopied] = useState(false)
 
+  // Ref for scrolling to top when tab changes
+  const contentContainerRef = useRef<HTMLDivElement>(null)
+
   const activeContent = generatedContent.find(c => c.id === activeTab)
 
+  // Scroll to top when tab changes (not when content is modified)
+  useEffect(() => {
+    if (activeTab && contentContainerRef.current) {
+      contentContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [activeTab])
+
+  // Update edit content when active content changes
   useEffect(() => {
     if (activeContent) {
       setEditContent(activeContent.content)
@@ -734,7 +746,7 @@ function ContentReviewStep({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={contentContainerRef}>
       {/* Format tabs */}
       <div className="flex gap-2 overflow-x-auto pb-2 border-b scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {generatedContent.map((content) => (
@@ -1253,10 +1265,10 @@ function PublishStep({
           <CheckCircle className="w-8 h-8 text-[#407B9D]" />
         </div>
         <h3 className="text-lg font-medium text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-          Ready to Publish
+          Ready for In Progress
         </h3>
         <p className="text-muted-foreground text-sm">
-          {approvedContent.length} of {generatedContent.length} formats approved
+          {approvedContent.length} of {generatedContent.length} formats approved and ready to track
         </p>
       </div>
 
@@ -1298,14 +1310,356 @@ function PublishStep({
         disabled={!allApproved}
         className="w-full bg-[#407B9D] hover:bg-[#407B9D]/90"
       >
-        <CheckCircle className="w-4 h-4 mr-2" />
-        Publish to Library
+        <ArrowRight className="w-4 h-4 mr-2" />
+        Move to In Progress
       </Button>
 
       {!allApproved && (
         <p className="text-xs text-center text-muted-foreground">
-          Please approve all formats before publishing
+          Please approve all formats before proceeding
         </p>
+      )}
+    </div>
+  )
+}
+
+// Expandable format detail row for In Progress items
+function FormatDetailRow({
+  format,
+  itemId,
+  onPublish,
+}: {
+  format: RepurposeFormatProgress
+  itemId: string
+  onPublish: (itemId: string, format: ContentType) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [copiedContent, setCopiedContent] = useState(false)
+  const [copiedChapters, setCopiedChapters] = useState(false)
+  const [copiedFaqs, setCopiedFaqs] = useState(false)
+  const [copiedLinks, setCopiedLinks] = useState(false)
+  const [copiedVariationIndex, setCopiedVariationIndex] = useState<number | null>(null)
+
+  const isPublished = format.status === 'published'
+  const hasVariations = format.variations && format.variations.length > 0
+  const hasContent = format.content && format.content.trim() !== ''
+  const hasChapters = format.chapters && format.chapters.length > 0
+  const hasFaqs = format.faqs && format.faqs.length > 0
+  const hasLinks = format.internalLinks && format.internalLinks.length > 0
+
+  // Get the platform URL for each content type
+  const getPlatformUrl = (contentType: ContentType): string | null => {
+    const platformUrls: Partial<Record<ContentType, string>> = {
+      'youtube': 'https://studio.youtube.com/',
+      'linkedin': 'https://www.linkedin.com/feed/',
+      'instagram': 'https://www.instagram.com/',
+      'blog': 'https://wordpress.com/posts', // Generic - can be customized
+      'case_study': 'https://wordpress.com/posts', // Generic - can be customized
+    }
+    return platformUrls[contentType] || null
+  }
+
+  const getPlatformLabel = (contentType: ContentType): string => {
+    const labels: Partial<Record<ContentType, string>> = {
+      'youtube': 'YouTube Studio',
+      'linkedin': 'LinkedIn',
+      'instagram': 'Instagram',
+      'blog': 'CMS',
+      'case_study': 'CMS',
+    }
+    return labels[contentType] || 'Platform'
+  }
+
+  const handleCopyContent = (text: string, setter: (v: boolean) => void) => {
+    navigator.clipboard.writeText(text)
+    setter(true)
+    setTimeout(() => setter(false), 2000)
+  }
+
+  const handleCopyVariation = (text: string, index: number) => {
+    navigator.clipboard.writeText(text)
+    setCopiedVariationIndex(index)
+    setTimeout(() => setCopiedVariationIndex(null), 2000)
+  }
+
+  return (
+    <div
+      className={`rounded-lg border transition-all overflow-hidden ${
+        isPublished
+          ? 'bg-green-50 border-green-200'
+          : 'bg-white border-slate-200'
+      }`}
+    >
+      {/* Format header - clickable to expand */}
+      <div
+        className="flex items-center gap-3 p-3 cursor-pointer hover:bg-slate-50/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border flex-shrink-0">
+          <FormatIcon format={format.format} className="w-4 h-4 text-slate-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm text-[#463939]">
+            {contentTypeLabels[format.format]}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {isPublished
+              ? `Published ${format.publishedAt ? new Date(format.publishedAt).toLocaleDateString() : 'today'} • Added to library`
+              : hasVariations
+                ? `${format.selectedVariations?.length || format.variations!.length} variation(s) ready`
+                : 'Ready to publish'
+            }
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {isPublished ? (
+            <Badge className="bg-green-100 text-green-800">
+              <Check className="w-3 h-3 mr-1" />
+              In Library
+            </Badge>
+          ) : (
+            <>
+              {getPlatformUrl(format.format) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    window.open(getPlatformUrl(format.format)!, '_blank')
+                  }}
+                  className="border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D] hover:text-white"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                  {getPlatformLabel(format.format)}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onPublish(itemId, format.format)
+                }}
+                className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+              >
+                <Upload className="w-3.5 h-3.5 mr-1" />
+                Publish
+              </Button>
+            </>
+          )}
+          {expanded ? (
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          )}
+        </div>
+      </div>
+
+      {/* Expanded content details */}
+      {expanded && (
+        <div className="border-t bg-white p-4 space-y-4">
+          {/* Main content (for non-variation formats) */}
+          {hasContent && !hasVariations && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Content
+                </h5>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleCopyContent(format.content!, setCopiedContent)}
+                  className="h-7 px-2"
+                >
+                  {copiedContent ? (
+                    <Check className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-3 max-h-[300px] overflow-y-auto">
+                <p className="text-sm whitespace-pre-wrap text-[#463939]">
+                  {format.content}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Variations (for LinkedIn/Instagram) */}
+          {hasVariations && (
+            <div className="space-y-3">
+              <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Variations ({format.selectedVariations?.length || format.variations!.length} selected)
+              </h5>
+              <div className="space-y-2">
+                {format.variations!.map((variation, index) => {
+                  const isSelected = format.selectedVariations?.includes(index) ?? true
+                  if (!isSelected) return null
+
+                  const captionText = variation.split('\n\n📸 IMAGE:')[0]
+                  const imageDescription = variation.includes('📸 IMAGE:')
+                    ? variation.split('📸 IMAGE:')[1]?.trim()
+                    : null
+
+                  return (
+                    <div
+                      key={index}
+                      className="border rounded-lg p-3 bg-slate-50"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <Badge className="bg-slate-100 text-slate-700 text-xs">
+                          Variation {index + 1}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyVariation(variation, index)}
+                          className="h-6 px-2"
+                        >
+                          {copiedVariationIndex === index ? (
+                            <Check className="w-3 h-3 text-green-600" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap text-[#463939]">
+                        {captionText}
+                      </p>
+                      {imageDescription && (
+                        <div className="mt-2 p-2 bg-pink-50 rounded text-xs text-pink-800">
+                          <strong>Image:</strong> {imageDescription}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* YouTube Chapters */}
+          {hasChapters && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Chapters
+                </h5>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const chaptersText = format.chapters!
+                      .map(ch => `${ch.timestamp} – ${ch.title}`)
+                      .join('\n')
+                    handleCopyContent(chaptersText, setCopiedChapters)
+                  }}
+                  className="h-7 px-2"
+                >
+                  {copiedChapters ? (
+                    <Check className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-3 font-mono text-sm">
+                {format.chapters!.map((chapter) => (
+                  <div key={chapter.id} className="py-1">
+                    <span className="text-[#407B9D]">{chapter.timestamp}</span>
+                    <span className="text-slate-400"> – </span>
+                    <span className="text-[#463939]">{chapter.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* FAQs */}
+          {hasFaqs && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  FAQs
+                </h5>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const faqsText = format.faqs!
+                      .map(faq => `Q: ${faq.question}\nA: ${faq.answer}`)
+                      .join('\n\n')
+                    handleCopyContent(faqsText, setCopiedFaqs)
+                  }}
+                  className="h-7 px-2"
+                >
+                  {copiedFaqs ? (
+                    <Check className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </div>
+              <div className="space-y-3 bg-slate-50 rounded-lg p-3">
+                {format.faqs!.map((faq) => (
+                  <div key={faq.id} className="text-sm">
+                    <p className="font-medium text-[#463939]">{faq.question}</p>
+                    <p className="text-muted-foreground mt-1">{faq.answer}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Internal Links */}
+          {hasLinks && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Suggested Links
+                </h5>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const linksText = format.internalLinks!
+                      .map(link => `${link.title}: ${link.url}`)
+                      .join('\n')
+                    handleCopyContent(linksText, setCopiedLinks)
+                  }}
+                  className="h-7 px-2"
+                >
+                  {copiedLinks ? (
+                    <Check className="w-3.5 h-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </div>
+              <div className="space-y-2 bg-slate-50 rounded-lg p-3">
+                {format.internalLinks!.map((link) => (
+                  <div key={link.id} className="flex items-center justify-between text-sm p-2 bg-white rounded border">
+                    <div className="flex items-center gap-2">
+                      <ExternalLink className="w-4 h-4 text-[#407B9D]" />
+                      <span className="text-[#463939]">{link.title}</span>
+                      <Badge className="bg-blue-100 text-blue-700 text-xs">
+                        {link.type === 'internal' ? 'Internal' : 'External'}
+                      </Badge>
+                    </div>
+                    <span className="text-muted-foreground text-xs truncate max-w-[200px]">{link.url}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty state if no content */}
+          {!hasContent && !hasVariations && !hasChapters && !hasFaqs && !hasLinks && (
+            <div className="text-center py-4 text-muted-foreground text-sm">
+              No content details available.
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -1392,54 +1746,14 @@ function InProgressCard({
               Formats to Publish
             </h4>
             <div className="space-y-2">
-              {item.formats.map((format) => {
-                const isPublished = format.status === 'published'
-                return (
-                  <div
-                    key={format.format}
-                    className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                      isPublished
-                        ? 'bg-green-50 border-green-200'
-                        : 'bg-white border-slate-200'
-                    }`}
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center border">
-                      <FormatIcon format={format.format} className="w-4 h-4 text-slate-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-[#463939]">
-                        {contentTypeLabels[format.format]}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {isPublished
-                          ? `Published ${format.publishedAt ? new Date(format.publishedAt).toLocaleDateString() : 'today'} • Added to library`
-                          : format.variations
-                            ? `${format.selectedVariations?.length || format.variations.length} variation(s) ready`
-                            : 'Ready to publish'
-                        }
-                      </p>
-                    </div>
-                    {isPublished ? (
-                      <Badge className="bg-green-100 text-green-800">
-                        <Check className="w-3 h-3 mr-1" />
-                        In Library
-                      </Badge>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onPublishFormat(item.id, format.format)
-                        }}
-                        className="bg-[#407B9D] hover:bg-[#407B9D]/90"
-                      >
-                        <Upload className="w-3.5 h-3.5 mr-1" />
-                        Publish
-                      </Button>
-                    )}
-                  </div>
-                )
-              })}
+              {item.formats.map((format) => (
+                <FormatDetailRow
+                  key={format.format}
+                  format={format}
+                  itemId={item.id}
+                  onPublish={onPublishFormat}
+                />
+              ))}
             </div>
           </div>
 
@@ -1454,7 +1768,7 @@ function InProgressCard({
 
           {!allPublished && (
             <p className="text-xs text-center text-muted-foreground">
-              Click &quot;Publish&quot; on each format when you&apos;ve posted it (e.g., YouTube filmed, LinkedIn posted)
+              Click on each format to expand and view content details. Mark as published when posted.
             </p>
           )}
         </div>
@@ -1471,10 +1785,13 @@ export function RepurposeModal({
   readyToRepurpose = [],
   onRepurpose,
   onPublishToLibrary,
+  onInProgressCountChange,
   initialView = 'list',
 }: RepurposeModalProps) {
   // View state - now includes 'in_progress'
   const [view, setView] = useState<'list' | 'workflow' | 'in_progress'>(initialView === 'workflow' ? 'workflow' : 'list')
+  // Tab state for list view (in_progress or completed)
+  const [listTab, setListTab] = useState<'in_progress' | 'completed'>('in_progress')
   // Note: onRepurpose is kept in props for backward compatibility but not used in new In Progress flow
 
   // Workflow state
@@ -1532,20 +1849,16 @@ export function RepurposeModal({
   })
 
   // In-progress repurpose items (content being repurposed but not yet fully published)
-  const [inProgressItems, setInProgressItems] = useState<InProgressRepurpose[]>([
-    // Test data - one item in progress
-    {
-      id: 'in-progress-1',
-      sourceTitle: 'Q4 Financial Planning Guide',
-      sourceType: 'blog',
-      startedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-      formats: [
-        { format: 'linkedin', status: 'published', publishedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), variations: ['Post 1', 'Post 2', 'Post 3'], selectedVariations: [0, 1, 2] },
-        { format: 'youtube', status: 'in_progress', content: 'Script content here...' },
-        { format: 'instagram', status: 'pending', variations: ['Post 1', 'Post 2'], selectedVariations: [0, 1] },
-      ],
-    },
-  ])
+  // In-progress items start empty - items are added when completing the repurpose workflow
+  const [inProgressItems, setInProgressItems] = useState<InProgressRepurpose[]>([])
+
+  // Completed repurpose items (all formats published)
+  const [completedItems, setCompletedItems] = useState<InProgressRepurpose[]>([])
+
+  // Notify parent when in-progress count changes
+  useEffect(() => {
+    onInProgressCountChange?.(inProgressItems.length)
+  }, [inProgressItems.length, onInProgressCountChange])
 
   // Handle publishing a specific format (adds to library immediately)
   const handlePublishFormat = (itemId: string, format: ContentType) => {
@@ -1562,24 +1875,34 @@ export function RepurposeModal({
       onPublishToLibrary(`${itemId}-${format}`, content)
     }
 
-    // Update the in-progress item to mark this format as published
-    setInProgressItems(items =>
-      items.map(i => {
-        if (i.id !== itemId) return i
-        const updatedFormats = i.formats.map(f => {
-          if (f.format !== format) return f
-          return {
-            ...f,
-            status: 'published' as const,
-            publishedAt: new Date().toISOString(),
-          }
-        })
-        return {
-          ...i,
-          formats: updatedFormats,
-        }
-      })
-    )
+    // Update the format to published
+    const updatedFormats = item.formats.map(f => {
+      if (f.format !== format) return f
+      return {
+        ...f,
+        status: 'published' as const,
+        publishedAt: new Date().toISOString(),
+      }
+    })
+
+    const updatedItem = {
+      ...item,
+      formats: updatedFormats,
+    }
+
+    // Check if all formats are now published
+    const allPublished = updatedFormats.every(f => f.status === 'published')
+
+    if (allPublished) {
+      // Move to completed
+      setInProgressItems(items => items.filter(i => i.id !== itemId))
+      setCompletedItems(items => [updatedItem, ...items])
+    } else {
+      // Just update in place
+      setInProgressItems(items =>
+        items.map(i => i.id === itemId ? updatedItem : i)
+      )
+    }
   }
 
   // Handle moving completed item to library
@@ -1806,14 +2129,17 @@ export function RepurposeModal({
         variations: content.variations,
         selectedVariations: content.selectedVariations,
         chapters: content.chapters,
+        faqs: content.faqs,
+        internalLinks: content.internalLinks,
       })),
     }
 
     // Add to in-progress items
     setInProgressItems(prev => [newInProgressItem, ...prev])
 
-    // Switch to list view (now shows In Progress)
+    // Switch to list view and ensure In Progress tab is selected
     setView('list')
+    setListTab('in_progress')
     resetWorkflow()
   }
 
@@ -1889,48 +2215,97 @@ export function RepurposeModal({
         </DialogHeader>
 
         {view === 'list' ? (
-          // List view - show In Progress content
+          // List view - show In Progress or Completed content with tabs
           <>
-            {/* Header - In Progress only */}
-            <div className="flex items-center gap-2 border-b pb-3">
-              <Clock className="w-5 h-5 text-[#407B9D]" />
-              <h3 className="text-sm font-medium text-[#463939]" style={{ fontFamily: 'var(--font-heading)' }}>
+            {/* Tab Navigation */}
+            <div className="flex gap-1 border-b pb-0">
+              <button
+                onClick={() => setListTab('in_progress')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  listTab === 'in_progress'
+                    ? 'border-[#407B9D] text-[#407B9D]'
+                    : 'border-transparent text-muted-foreground hover:text-[#463939]'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
                 In Progress
-              </h3>
-              {inProgressItems.length > 0 && (
-                <Badge className="bg-amber-100 text-amber-800">{inProgressItems.length}</Badge>
-              )}
+                {inProgressItems.length > 0 && (
+                  <Badge className="bg-amber-100 text-amber-800 text-xs">{inProgressItems.length}</Badge>
+                )}
+              </button>
+              <button
+                onClick={() => setListTab('completed')}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  listTab === 'completed'
+                    ? 'border-[#407B9D] text-[#407B9D]'
+                    : 'border-transparent text-muted-foreground hover:text-[#463939]'
+                }`}
+              >
+                <CheckCircle className="w-4 h-4" />
+                Completed
+                {completedItems.length > 0 && (
+                  <Badge className="bg-green-100 text-green-800 text-xs">{completedItems.length}</Badge>
+                )}
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto py-4">
-              {/* In Progress content */}
-              <div className="space-y-3">
-                {inProgressItems.map((item) => (
-                  <InProgressCard
-                    key={item.id}
-                    item={item}
-                    onPublishFormat={handlePublishFormat}
-                    onMoveToLibrary={handleMoveToLibrary}
-                  />
-                ))}
+              {/* In Progress Tab Content */}
+              {listTab === 'in_progress' && (
+                <div className="space-y-3">
+                  {inProgressItems.map((item) => (
+                    <InProgressCard
+                      key={item.id}
+                      item={item}
+                      onPublishFormat={handlePublishFormat}
+                      onMoveToLibrary={handleMoveToLibrary}
+                    />
+                  ))}
 
-                {inProgressItems.length === 0 && (
-                  <div className="text-center py-12">
-                    <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>
-                      No content currently being repurposed.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Start a repurpose workflow to track your progress here.
-                    </p>
-                  </div>
-                )}
-              </div>
+                  {inProgressItems.length === 0 && (
+                    <div className="text-center py-12">
+                      <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>
+                        No content currently being repurposed.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Start a repurpose workflow to track your progress here.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Completed Tab Content */}
+              {listTab === 'completed' && (
+                <div className="space-y-3">
+                  {completedItems.map((item) => (
+                    <InProgressCard
+                      key={item.id}
+                      item={item}
+                      onPublishFormat={handlePublishFormat}
+                      onMoveToLibrary={handleMoveToLibrary}
+                    />
+                  ))}
+
+                  {completedItems.length === 0 && (
+                    <div className="text-center py-12">
+                      <CheckCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>
+                        No completed repurpose items yet.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Items will appear here once all formats have been published.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                {inProgressItems.length} item{inProgressItems.length !== 1 ? 's' : ''} in progress
+                {inProgressItems.length} in progress, {completedItems.length} completed
               </p>
               <div className="flex gap-2">
                 <Button
@@ -2062,7 +2437,7 @@ export function RepurposeModal({
                     className="bg-[#407B9D] hover:bg-[#407B9D]/90"
                     disabled={!generatedContent.every(c => c.approvalStatus === 'approved')}
                   >
-                    Review & Publish
+                    Review & Approve
                     <ArrowRight className="w-4 h-4 ml-1" />
                   </Button>
                 )}

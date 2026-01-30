@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,10 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Play,
+  FileText,
+  Copy,
+  Eye,
 } from "lucide-react"
 import {
   RefreshRecommendation,
@@ -41,6 +45,18 @@ interface RefreshModalProps {
   recommendations: RefreshRecommendation[]
   onStartRefresh: (recommendationId: string) => void
   onDismiss: (recommendationId: string) => void
+  triggerReport?: boolean
+  onReportTriggered?: () => void
+}
+
+// Completed refresh tracking
+interface CompletedRefresh {
+  id: string
+  title: string
+  contentType: string
+  completedAt: string
+  tasksCompleted: number
+  tasks: RefreshTask[]
 }
 
 // Task item for refresh workflow
@@ -55,20 +71,123 @@ interface RefreshTask {
 export function RefreshModal({
   open,
   onOpenChange,
-  recommendations,
   onStartRefresh,
   onDismiss,
+  triggerReport,
+  onReportTriggered,
 }: RefreshModalProps) {
-  // View state: 'list' shows all recommendations, 'tasks' shows task checklist for active refresh
-  const [view, setView] = useState<'list' | 'tasks'>('list')
+  // View state: 'list' shows all recommendations, 'tasks' shows task checklist for active refresh, 'completed' shows refreshed items
+  const [view, setView] = useState<'list' | 'tasks' | 'completed'>('list')
   const [activeRecommendation, setActiveRecommendation] = useState<RefreshRecommendation | null>(null)
   const [tasks, setTasks] = useState<RefreshTask[]>([])
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
+
+  // Internal state for recommendations - starts empty
+  const [internalRecommendations, setInternalRecommendations] = useState<RefreshRecommendation[]>([])
+  const [isRunningReport, setIsRunningReport] = useState(false)
+  const [completedRefreshes, setCompletedRefreshes] = useState<CompletedRefresh[]>([])
+  const [expandedCompletedItems, setExpandedCompletedItems] = useState<Set<string>>(new Set())
+
+  const toggleCompletedItemExpanded = (itemId: string) => {
+    setExpandedCompletedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId)
+      } else {
+        newSet.add(itemId)
+      }
+      return newSet
+    })
+  }
 
   const getRankingChange = (current?: number, previous?: number) => {
     if (!current || !previous) return null
     const change = previous - current // positive means improved (lower rank is better)
     return change
+  }
+
+  // Run Report - analyze content and generate recommendations
+  const handleRunReport = () => {
+    setIsRunningReport(true)
+
+    // Simulate report generation with delay
+    setTimeout(() => {
+      // Generate test recommendations
+      const testRecommendations: RefreshRecommendation[] = [
+        {
+          id: 'rec-1',
+          contentId: 'content-1',
+          title: 'The Complete Guide to Financial Planning for 2024',
+          contentType: 'blog',
+          currentRanking: 15,
+          previousRanking: 8,
+          trafficChange: -35,
+          lastUpdated: '2024-03-15',
+          recommendedActions: [
+            'Update year references from 2024 to 2025',
+            'Refresh statistics with latest industry data',
+            'Add new section on AI-powered financial tools',
+            'Update internal links to newer content',
+          ],
+          priority: 'high',
+          status: 'pending',
+          refreshTrigger: 'time_sensitive',
+          timeSensitiveDate: '2024',
+        },
+        {
+          id: 'rec-2',
+          contentId: 'content-2',
+          title: 'Cash Flow Management Best Practices',
+          contentType: 'blog',
+          currentRanking: 22,
+          previousRanking: 12,
+          trafficChange: -28,
+          lastUpdated: '2024-06-01',
+          recommendedActions: [
+            'Update case study examples with recent client wins',
+            'Refresh the 13-week forecast template',
+            'Add section on automated cash flow tools',
+          ],
+          priority: 'medium',
+          status: 'pending',
+          refreshTrigger: 'analytics_decay',
+        },
+        {
+          id: 'rec-3',
+          contentId: 'content-3',
+          title: 'Series A Preparation Checklist',
+          contentType: 'case_study',
+          trafficChange: -15,
+          lastUpdated: '2024-08-20',
+          recommendedActions: [
+            'Update valuation benchmarks for 2025',
+            'Add recent funding trends data',
+            'Refresh investor expectations section',
+          ],
+          priority: 'low',
+          status: 'pending',
+          refreshTrigger: 'time_sensitive',
+          timeSensitiveDate: '2024',
+        },
+      ]
+
+      setInternalRecommendations(testRecommendations)
+      setIsRunningReport(false)
+    }, 2500)
+  }
+
+  // Handle external trigger to run report
+  useEffect(() => {
+    if (triggerReport && open && !isRunningReport) {
+      handleRunReport()
+      onReportTriggered?.()
+    }
+  }, [triggerReport, open, isRunningReport, onReportTriggered])
+
+  // Dismiss a recommendation - removes it from the list
+  const handleDismissRecommendation = (recId: string) => {
+    setInternalRecommendations(prev => prev.filter(r => r.id !== recId))
+    onDismiss(recId)
   }
 
   // Start refresh and create task checklist
@@ -145,8 +264,25 @@ export function RefreshModal({
 
   // Mark all tasks complete and finish refresh
   const handleCompleteRefresh = () => {
-    // All tasks should be complete
-    setView('list')
+    if (activeRecommendation) {
+      // Add to completed refreshes with task details
+      const completedItem: CompletedRefresh = {
+        id: activeRecommendation.id,
+        title: activeRecommendation.title,
+        contentType: activeRecommendation.contentType,
+        completedAt: new Date().toISOString(),
+        tasksCompleted: tasks.length,
+        tasks: [...tasks],
+      }
+      setCompletedRefreshes(prev => [completedItem, ...prev])
+
+      // Remove from recommendations list
+      setInternalRecommendations(prev =>
+        prev.filter(r => r.id !== activeRecommendation.id)
+      )
+    }
+
+    setView('completed')
     setActiveRecommendation(null)
     setTasks([])
     setExpandedTasks(new Set())
@@ -175,12 +311,14 @@ export function RefreshModal({
                 className="text-xl text-[#463939]"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
-                {view === 'list' ? 'Refresh Finder' : 'Refresh Tasks'}
+                {view === 'list' ? 'Refresh Finder' : view === 'completed' ? 'Refreshed Content' : 'Refresh Tasks'}
               </DialogTitle>
               <DialogDescription style={{ fontFamily: 'var(--font-body)' }}>
                 {view === 'list'
                   ? 'Content that needs updating based on performance metrics'
-                  : `Working on: ${activeRecommendation?.title}`
+                  : view === 'completed'
+                    ? 'Content you have recently refreshed'
+                    : `Working on: ${activeRecommendation?.title}`
                 }
               </DialogDescription>
             </div>
@@ -190,16 +328,70 @@ export function RefreshModal({
         {view === 'list' ? (
           // List View - All recommendations
           <>
-            <div className="flex-1 overflow-y-auto py-4">
-              <div className="space-y-4">
-                {recommendations.map((rec) => {
-                  const rankingChange = getRankingChange(rec.currentRanking, rec.previousRanking)
+            {/* Tab bar for List vs Completed */}
+            <div className="flex gap-2 border-b pb-2 mb-4">
+              <button
+                className="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors bg-[#407B9D] text-white"
+              >
+                Needs Refresh
+                {internalRecommendations.length > 0 && (
+                  <Badge className="ml-2 bg-white/20 text-inherit">{internalRecommendations.length}</Badge>
+                )}
+              </button>
+              <button
+                onClick={() => setView('completed')}
+                className="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors text-muted-foreground hover:text-[#463939] hover:bg-slate-100"
+              >
+                Refreshed
+                {completedRefreshes.length > 0 && (
+                  <Badge className="ml-2 bg-green-100 text-green-800">{completedRefreshes.length}</Badge>
+                )}
+              </button>
+            </div>
 
-                  return (
-                    <div
-                      key={rec.id}
-                      className="p-4 border rounded-lg bg-white hover:shadow-md transition-shadow"
-                    >
+            <div className="flex-1 overflow-y-auto py-4">
+              {/* Empty state */}
+              {internalRecommendations.length === 0 && !isRunningReport && (
+                <div className="text-center py-12">
+                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                    No content needs refreshing at the moment.
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2" style={{ fontFamily: 'var(--font-body)' }}>
+                    Click &quot;Run Report&quot; on the Content Refresh card to analyze your library.
+                  </p>
+                </div>
+              )}
+
+              {/* Loading state while running report */}
+              {isRunningReport && (
+                <div className="text-center py-12">
+                  <div className="relative w-16 h-16 mx-auto mb-6">
+                    <div className="absolute inset-0 rounded-full bg-[#407B9D]/20 animate-ping" />
+                    <div className="relative w-16 h-16 rounded-full bg-[#407B9D]/10 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-[#407B9D] animate-spin" />
+                    </div>
+                  </div>
+                  <p className="text-lg font-medium text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                    Analyzing Content...
+                  </p>
+                  <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                    Checking performance metrics and identifying refresh opportunities.
+                  </p>
+                </div>
+              )}
+
+              {/* Recommendations list */}
+              {internalRecommendations.length > 0 && !isRunningReport && (
+                <div className="space-y-4">
+                  {internalRecommendations.map((rec) => {
+                    const rankingChange = getRankingChange(rec.currentRanking, rec.previousRanking)
+
+                    return (
+                      <div
+                        key={rec.id}
+                        className="p-4 border rounded-lg bg-white hover:shadow-md transition-shadow"
+                      >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -303,7 +495,7 @@ export function RefreshModal({
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => onDismiss(rec.id)}
+                                onClick={() => handleDismissRecommendation(rec.id)}
                                 className="text-muted-foreground hover:bg-slate-100"
                               >
                                 <XCircle className="w-4 h-4 mr-1" />
@@ -327,23 +519,157 @@ export function RefreshModal({
                     </div>
                   )
                 })}
-
-                {recommendations.length === 0 && (
-                  <div className="text-center py-12">
-                    <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                      No refresh recommendations yet. Run a report to analyze your content.
-                    </p>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                {recommendations.filter((r) => r.status === 'pending').length} item
-                {recommendations.filter((r) => r.status === 'pending').length !== 1 ? 's' : ''}{' '}
+                {internalRecommendations.filter((r) => r.status === 'pending').length} item
+                {internalRecommendations.filter((r) => r.status === 'pending').length !== 1 ? 's' : ''}{' '}
                 need attention
+              </p>
+              <div className="flex gap-2">
+                {internalRecommendations.length > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={handleRunReport}
+                    disabled={isRunningReport}
+                  >
+                    <Play className="w-4 h-4 mr-1" />
+                    Re-run Report
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : view === 'completed' ? (
+          // Completed View - Recently refreshed content
+          <>
+            {/* Tab bar for List vs Completed */}
+            <div className="flex gap-2 border-b pb-2 mb-4">
+              <button
+                onClick={() => setView('list')}
+                className="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors text-muted-foreground hover:text-[#463939] hover:bg-slate-100"
+              >
+                Needs Refresh
+                {internalRecommendations.length > 0 && (
+                  <Badge className="ml-2 bg-amber-100 text-amber-800">{internalRecommendations.length}</Badge>
+                )}
+              </button>
+              <button
+                className="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors bg-[#407B9D] text-white"
+              >
+                Refreshed
+                {completedRefreshes.length > 0 && (
+                  <Badge className="ml-2 bg-white/20 text-inherit">{completedRefreshes.length}</Badge>
+                )}
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4">
+              {completedRefreshes.length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
+                    No content has been refreshed yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {completedRefreshes.map((item) => {
+                    const isExpanded = expandedCompletedItems.has(item.id)
+                    return (
+                      <div
+                        key={item.id}
+                        className="border rounded-lg bg-green-50 border-green-200 overflow-hidden"
+                      >
+                        {/* Clickable header */}
+                        <div
+                          className="p-4 cursor-pointer hover:bg-green-100/50 transition-colors"
+                          onClick={() => toggleCompletedItemExpanded(item.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <h3
+                                  className="font-semibold text-[#463939]"
+                                  style={{ fontFamily: 'var(--font-heading)' }}
+                                >
+                                  {item.title}
+                                </h3>
+                                <Badge className={contentTypeColors[item.contentType as keyof typeof contentTypeColors]}>
+                                  {contentTypeLabels[item.contentType as keyof typeof contentTypeLabels]}
+                                </Badge>
+                                <Badge className="bg-green-100 text-green-800">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Complete
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                Refreshed {new Date(item.completedAt).toLocaleDateString()} • {item.tasksCompleted} tasks completed
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 ml-4">
+                              {isExpanded ? (
+                                <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expanded content showing completed tasks */}
+                        {isExpanded && item.tasks && item.tasks.length > 0 && (
+                          <div className="border-t border-green-200 bg-white p-4">
+                            <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                              Completed Tasks
+                            </h4>
+                            <div className="space-y-2">
+                              {item.tasks.map((task) => (
+                                <div
+                                  key={task.id}
+                                  className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg"
+                                >
+                                  <div className="w-5 h-5 rounded-md bg-[#C8E4BB] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <Check className="w-3 h-3 text-[#463939]" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-[#463939]">{task.action}</p>
+                                    {task.aiSuggestion && (
+                                      <div className="mt-2 p-2 bg-[#407B9D]/5 border border-[#407B9D]/20 rounded text-xs">
+                                        <div className="flex items-center gap-1 mb-1 text-[#407B9D]">
+                                          <Sparkles className="w-3 h-3" />
+                                          <span className="font-medium">AI Suggestion Used</span>
+                                        </div>
+                                        <p className="text-[#463939] whitespace-pre-wrap line-clamp-3">
+                                          {task.aiSuggestion}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                {completedRefreshes.length} item{completedRefreshes.length !== 1 ? 's' : ''} refreshed
               </p>
               <Button
                 variant="outline"
@@ -461,9 +787,35 @@ export function RefreshModal({
                         {/* AI Suggestion content */}
                         {task.aiSuggestion && isExpanded && (
                           <div className="mt-3 ml-9 p-3 bg-[#407B9D]/5 border border-[#407B9D]/20 rounded-lg">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Sparkles className="w-4 h-4 text-[#407B9D]" />
-                              <span className="text-xs font-medium text-[#407B9D]">AI Suggestion</span>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-[#407B9D]" />
+                                <span className="text-xs font-medium text-[#407B9D]">AI Suggestion</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(task.aiSuggestion || '')
+                                  }}
+                                  className="h-6 text-xs px-2"
+                                >
+                                  <Copy className="w-3 h-3 mr-1" />
+                                  Copy
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    // Apply suggestion = mark task as complete
+                                    handleToggleTask(task.id)
+                                  }}
+                                  className="h-6 text-xs px-2 bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]/80"
+                                >
+                                  <Check className="w-3 h-3 mr-1" />
+                                  Apply
+                                </Button>
+                              </div>
                             </div>
                             <div className="text-sm text-[#463939] whitespace-pre-wrap">
                               {task.aiSuggestion}

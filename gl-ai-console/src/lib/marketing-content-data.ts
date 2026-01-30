@@ -800,8 +800,9 @@ export const testChatMessages: ChatMessage[] = [
 export const getDashboardStats = () => {
   const newIdeas = testTopicIdeas.filter(t => t.status === 'new').length
   const briefsInProgress = testBriefs.filter(b => b.status === 'draft' || b.status === 'in_progress').length
-  const readyToRepurpose = testRepurposeItems.filter(r => r.repurposedCount === 0).length
-  const needsRefresh = testRefreshRecommendations.filter(r => r.priority === 'high').length
+  // Repurpose and Refresh start empty - items only appear as users complete workflows
+  const readyToRepurpose = 0
+  const needsRefresh = 0
 
   return {
     newIdeas,

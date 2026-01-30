@@ -94,6 +94,10 @@ export default function ContentEnginePage() {
 
   // Repurpose modal state
   const [repurposeInitialView, setRepurposeInitialView] = useState<'list' | 'workflow'>('list')
+  const [repurposeInProgressCount, setRepurposeInProgressCount] = useState(0)
+
+  // Refresh modal state
+  const [triggerRefreshReport, setTriggerRefreshReport] = useState(false)
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -409,6 +413,7 @@ export default function ContentEnginePage() {
               />
               <RepurposeFactoryCard
                 readyToRepurposeCount={staticStats.readyToRepurpose}
+                inProgressCount={repurposeInProgressCount}
                 onOpenModal={() => handleOpenModal('repurpose')}
                 onStartRepurposing={() => {
                   setRepurposeInitialView('workflow')
@@ -419,7 +424,10 @@ export default function ContentEnginePage() {
               <RefreshFinderCard
                 needsRefreshCount={staticStats.needsRefresh}
                 onOpenModal={() => handleOpenModal('refresh')}
-                onRunAnalysis={() => console.log('Running refresh analysis...')}
+                onRunAnalysis={() => {
+                  setTriggerRefreshReport(true)
+                  handleOpenModal('refresh')
+                }}
               />
             </div>
           </>
@@ -481,6 +489,7 @@ export default function ContentEnginePage() {
           onRepurpose={(itemId, format) =>
             console.log('Repurposing item:', itemId, 'to format:', format)
           }
+          onInProgressCountChange={setRepurposeInProgressCount}
           initialView={repurposeInitialView}
         />
 
@@ -490,6 +499,8 @@ export default function ContentEnginePage() {
           recommendations={testRefreshRecommendations}
           onStartRefresh={(recId) => console.log('Starting refresh:', recId)}
           onDismiss={(recId) => console.log('Dismissing:', recId)}
+          triggerReport={triggerRefreshReport}
+          onReportTriggered={() => setTriggerRefreshReport(false)}
         />
       </div>
     </div>

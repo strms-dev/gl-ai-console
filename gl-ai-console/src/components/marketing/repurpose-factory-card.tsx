@@ -7,11 +7,12 @@ import { RefreshCw, ArrowRight, Layers, Sparkles } from "lucide-react"
 
 interface RepurposeFactoryCardProps {
   readyToRepurposeCount: number
+  inProgressCount?: number
   onOpenModal: () => void
   onStartRepurposing?: () => void
 }
 
-export function RepurposeFactoryCard({ readyToRepurposeCount, onOpenModal, onStartRepurposing }: RepurposeFactoryCardProps) {
+export function RepurposeFactoryCard({ readyToRepurposeCount, inProgressCount = 0, onOpenModal, onStartRepurposing }: RepurposeFactoryCardProps) {
   return (
     <Card className="bg-white border-none shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
       <CardHeader className="pb-4">
@@ -27,6 +28,11 @@ export function RepurposeFactoryCard({ readyToRepurposeCount, onOpenModal, onSta
               >
                 Repurpose Content
               </CardTitle>
+              {inProgressCount > 0 && (
+                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                  {inProgressCount} In Progress
+                </Badge>
+              )}
               {readyToRepurposeCount > 0 && (
                 <Badge className="bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]">
                   {readyToRepurposeCount} Ready

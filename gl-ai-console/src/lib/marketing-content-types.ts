@@ -313,7 +313,7 @@ export const repurposeStepLabels: Record<RepurposeStep, string> = {
   source_selection: 'Select Source',
   format_selection: 'Choose Formats',
   content_review: 'Review Content',
-  publish: 'Publish',
+  publish: 'Approve',
 }
 
 // Labels for source types
@@ -456,6 +456,8 @@ export interface RepurposeFormatProgress {
   variations?: string[]
   selectedVariations?: number[]
   chapters?: YouTubeChapter[]
+  faqs?: FAQ[]
+  internalLinks?: LinkRecommendation[]
   publishedAt?: string
 }
 

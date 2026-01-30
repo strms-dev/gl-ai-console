@@ -1599,14 +1599,10 @@ No pitch, just happy to connect with fellow CPG folks. Open to a quick chat?`,
                   <LeadSourceSelector selected={leadSource} onSelect={setLeadSource} />
 
                   {leadSource === 'csv_upload' && (
-                    <div className="mt-3 p-4 border-2 border-dashed rounded-lg text-center">
-                      <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">
-                        Drop your CSV file here or click to upload
+                    <div className="mt-3 p-4 bg-slate-50 border rounded-lg">
+                      <p className="text-sm text-[#463939]">
+                        You&apos;ll upload your CSV directly into Clay. The workflow will guide you through enrichment and filtering after import.
                       </p>
-                      <Button variant="outline" size="sm" className="mt-2">
-                        Choose File
-                      </Button>
                     </div>
                   )}
                 </div>
@@ -1653,28 +1649,17 @@ No pitch, just happy to connect with fellow CPG folks. Open to a quick chat?`,
                 </Button>
               </div>
 
-              {/* Triggerfy info note */}
+              {/* Trigify info note */}
               {leadSource === 'trigify' && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
                   <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm text-blue-800 font-medium mb-1">
-                      Triggerfy leads come from tracking influencer engagement
+                      Trigify leads come from tracking influencer engagement
                     </p>
                     <p className="text-xs text-blue-700">
-                      Use the <strong>Influencer Finder</strong> workflow first to identify influencers to track. Once you have influencers in Triggerfy, their engaged followers will flow into Clay for enrichment.
+                      Use the Influencer Finder workflow first to identify influencers to track. Once you have influencers in Trigify, their engaged followers will flow into Clay for enrichment.
                     </p>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="text-blue-700 p-0 h-auto mt-2"
-                      onClick={() => {
-                        // Could navigate to Influencer Finder
-                      }}
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Go to Influencer Finder
-                    </Button>
                   </div>
                 </div>
               )}
@@ -1724,28 +1709,17 @@ No pitch, just happy to connect with fellow CPG folks. Open to a quick chat?`,
               </Button>
             </div>
 
-            {/* Triggerfy info note */}
+            {/* Trigify info note */}
             {leadSource === 'trigify' && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
                 <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm text-blue-800 font-medium mb-1">
-                    Triggerfy leads come from tracking influencer engagement
+                    Trigify leads come from tracking influencer engagement
                   </p>
                   <p className="text-xs text-blue-700">
-                    Use the <strong>Influencer Finder</strong> workflow first to identify influencers to track. Once you have influencers in Triggerfy, their engaged followers will flow into Clay for enrichment.
+                    Use the Influencer Finder workflow first to identify influencers to track. Once you have influencers in Trigify, their engaged followers will flow into Clay for enrichment.
                   </p>
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="text-blue-700 p-0 h-auto mt-2"
-                    onClick={() => {
-                      // Could navigate to Influencer Finder
-                    }}
-                  >
-                    <ExternalLink className="w-3 h-3 mr-1" />
-                    Go to Influencer Finder
-                  </Button>
                 </div>
               </div>
             )}

@@ -2,6 +2,31 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 
+// Central configuration of all optimized processes across the console
+// Update this when adding new processes to any department
+const CONSOLE_PROCESSES = {
+  strms: [
+    { name: "Sales Pipeline", status: "active" },
+    { name: "Offboarding", status: "active" },
+    { name: "Project Management", status: "active" },
+  ],
+  revops: [
+    { name: "Sales Funnel", status: "active" },
+    { name: "Sales Pipeline", status: "active" },
+  ],
+  marketing: [
+    { name: "Content Engine", status: "active" },
+    { name: "Lead Discovery", status: "active" },
+  ],
+} as const
+
+// Calculate totals dynamically
+const DEPARTMENTS = Object.keys(CONSOLE_PROCESSES).length
+const TOTAL_PROCESSES = Object.values(CONSOLE_PROCESSES).reduce(
+  (total, processes) => total + processes.length,
+  0
+)
+
 export default function HomePage() {
 
   return (
@@ -38,7 +63,7 @@ export default function HomePage() {
                   className="text-4xl font-bold text-[#407B9D]"
                   style={{fontFamily: 'var(--font-heading)'}}
                 >
-                  3
+                  {DEPARTMENTS}
                 </p>
               </div>
             </CardContent>
@@ -57,7 +82,7 @@ export default function HomePage() {
                   className="text-4xl font-bold text-[#407B9D]"
                   style={{fontFamily: 'var(--font-heading)'}}
                 >
-                  5
+                  {TOTAL_PROCESSES}
                 </p>
               </div>
             </CardContent>
