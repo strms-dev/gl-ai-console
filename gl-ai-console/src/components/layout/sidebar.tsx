@@ -5,13 +5,15 @@ import { usePathname } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Wrench, RotateCw, Home, Code, AlertCircle, Users, Clock, Folder, ChevronDown, ChevronRight, User, UserX, LucideIcon, Filter, Megaphone, PenTool, Search } from "lucide-react"
+import { Wrench, RotateCw, Home, Code, AlertCircle, Users, Clock, Folder, ChevronDown, ChevronRight, User, UserX, LucideIcon, Filter, Megaphone, PenTool, Search, Calculator, BookOpen, Award, Briefcase, Link2 } from "lucide-react"
 import { useState, useEffect } from "react"
 
 const departments = [
   { name: "STRMS", href: "/strms/home", icon: "strms", active: true },
   { name: "RevOps", href: "/revops/home", icon: "revops", active: true },
   { name: "Marketing", href: "/marketing/home", icon: "marketing", active: true },
+  { name: "Accounting", href: "/accounting/home", icon: "accounting", active: true },
+  { name: "Management", href: "/management/home", icon: "management", active: true },
 ]
 
 interface NavigationItem {
@@ -39,10 +41,17 @@ const departmentNavigation: Record<string, NavigationItem[]> = {
   revops: [
     { name: "Sales Funnel", href: "/revops/sales-funnel", icon: "funnel" },
     { name: "Sales Pipeline", href: "/revops/sales-pipeline", icon: "rotate-cw" },
+    { name: "Ambassador Program", href: "/revops/ambassador-program", icon: "award" },
   ],
   marketing: [
     { name: "Content Engine", href: "/marketing/content-engine", icon: "pen-tool" },
     { name: "Lead Discovery", href: "/marketing/lead-discovery", icon: "search" },
+  ],
+  accounting: [
+    { name: "JEDI", href: "/accounting/jedi", icon: "book-open" },
+  ],
+  management: [
+    { name: "QBO MCP", href: "/management/qbo-mcp", icon: "link2" },
   ],
 }
 
@@ -64,6 +73,11 @@ const getIconComponent = (iconName: string): LucideIcon => {
     'funnel': Filter,
     'pen-tool': PenTool,
     'search': Search,
+    'calculator': Calculator,
+    'book-open': BookOpen,
+    'award': Award,
+    'briefcase': Briefcase,
+    'link2': Link2,
   }
   return iconMap[iconName] || RotateCw
 }
@@ -84,6 +98,8 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
     if (pathname.startsWith('/strms')) return 'strms'
     if (pathname.startsWith('/revops')) return 'revops'
     if (pathname.startsWith('/marketing')) return 'marketing'
+    if (pathname.startsWith('/accounting')) return 'accounting'
+    if (pathname.startsWith('/management')) return 'management'
     return null
   }
 
@@ -259,6 +275,10 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                     )}>
                       {dept.icon === 'marketing' ? (
                         <Megaphone className="w-5 h-5" />
+                      ) : dept.icon === 'accounting' ? (
+                        <Calculator className="w-5 h-5" />
+                      ) : dept.icon === 'management' ? (
+                        <Briefcase className="w-5 h-5" />
                       ) : (
                         <Image
                           src={dept.icon === 'strms' ? '/strms-logo-square.png' : '/tim-cxr-logo.png'}
