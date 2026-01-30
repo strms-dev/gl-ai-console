@@ -286,23 +286,23 @@ export default function ContentEnginePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F9]">
+    <div className="min-h-screen bg-gradient-to-b from-[#FAF9F9] to-white">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        {/* Header - Enhanced with gradient icon and better spacing */}
+        <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[#407B9D]/10 flex items-center justify-center">
-              <PenTool className="w-6 h-6 text-[#407B9D]" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#407B9D] to-[#407B9D]/80 flex items-center justify-center shadow-lg shadow-[#407B9D]/20">
+              <PenTool className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1
-                className="text-2xl font-bold text-[#463939]"
+                className="text-2xl font-bold text-[#463939] tracking-tight"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
                 Content Engine
               </h1>
               <p
-                className="text-muted-foreground"
+                className="text-muted-foreground text-sm"
                 style={{ fontFamily: 'var(--font-body)' }}
               >
                 AI-powered content creation, repurposing, and optimization
@@ -310,8 +310,8 @@ export default function ContentEnginePage() {
             </div>
           </div>
 
-          {/* View Toggle */}
-          <div className="flex items-center gap-1 bg-white border rounded-lg p-1 shadow-sm">
+          {/* View Toggle - Enhanced with better visual feedback */}
+          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1.5 shadow-sm">
             <Button
               size="sm"
               variant={viewMode === 'workflows' ? 'default' : 'ghost'}
@@ -319,7 +319,7 @@ export default function ContentEnginePage() {
                 setViewMode('workflows')
                 setWorkflowContext('dashboard')
               }}
-              className={viewMode === 'workflows' ? 'bg-[#407B9D]' : ''}
+              className={`rounded-lg transition-all ${viewMode === 'workflows' ? 'bg-[#407B9D] shadow-sm' : 'hover:bg-slate-50'}`}
             >
               <LayoutGrid className="w-4 h-4 mr-2" />
               Workflows
@@ -331,12 +331,12 @@ export default function ContentEnginePage() {
                 setViewMode('final_drafts')
                 setWorkflowContext('dashboard')
               }}
-              className={viewMode === 'final_drafts' ? 'bg-[#407B9D]' : ''}
+              className={`rounded-lg transition-all ${viewMode === 'final_drafts' ? 'bg-[#407B9D] shadow-sm' : 'hover:bg-slate-50'}`}
             >
               <FileCheck className="w-4 h-4 mr-2" />
               Final Drafts
               {finalDraftsReady > 0 && (
-                <span className="ml-1 text-xs bg-[#C8E4BB] text-[#463939] px-1.5 py-0.5 rounded-full">
+                <span className="ml-1.5 text-xs bg-[#C8E4BB] text-[#463939] px-2 py-0.5 rounded-full font-medium">
                   {finalDraftsReady}
                 </span>
               )}
@@ -348,44 +348,51 @@ export default function ContentEnginePage() {
                 setViewMode('library')
                 setWorkflowContext('library')
               }}
-              className={viewMode === 'library' ? 'bg-[#407B9D]' : ''}
+              className={`rounded-lg transition-all ${viewMode === 'library' ? 'bg-[#407B9D] shadow-sm' : 'hover:bg-slate-50'}`}
             >
               <Library className="w-4 h-4 mr-2" />
               Library
-              <span className="ml-1 text-xs opacity-70">({staticStats.totalContent})</span>
+              <span className="ml-1.5 text-xs opacity-60 font-medium">({staticStats.totalContent})</span>
             </Button>
           </div>
         </div>
 
-        {/* Content Lifecycle Pipeline (only on workflows view) */}
+        {/* Content Lifecycle Pipeline - Enhanced with better visual hierarchy */}
         {viewMode === 'workflows' && (
-          <div className="mb-6 flex items-center justify-center">
-            <div className="inline-flex items-center bg-gradient-to-r from-slate-50 to-white rounded-full border border-slate-200/80 shadow-sm px-2 py-1.5">
+          <div className="mb-8 flex items-center justify-center">
+            <div className="inline-flex items-center bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 gap-1">
               {[
-                { icon: Lightbulb, label: 'Ideate', color: '#407B9D', bgColor: 'bg-[#407B9D]/10', action: () => handleOpenModal('topic') },
-                { icon: FileText, label: 'Brief', color: '#407B9D', bgColor: 'bg-[#95CBD7]/20', action: () => handleOpenModal('brief') },
-                { icon: RefreshCw, label: 'Repurpose', color: '#407B9D', bgColor: 'bg-[#C8E4BB]/30', action: () => handleOpenModal('repurpose') },
-                { icon: TrendingUp, label: 'Refresh', color: '#407B9D', bgColor: 'bg-amber-100', action: () => handleOpenModal('refresh') },
+                { icon: Lightbulb, label: 'Ideate', sublabel: 'Topic Radar', bgColor: 'bg-[#407B9D]/10', hoverBg: 'hover:bg-[#407B9D]/15', action: () => handleOpenModal('topic') },
+                { icon: FileText, label: 'Brief', sublabel: 'Brief Builder', bgColor: 'bg-[#95CBD7]/20', hoverBg: 'hover:bg-[#95CBD7]/30', action: () => handleOpenModal('brief') },
+                { icon: RefreshCw, label: 'Repurpose', sublabel: 'Multi-format', bgColor: 'bg-[#C8E4BB]/30', hoverBg: 'hover:bg-[#C8E4BB]/40', action: () => handleOpenModal('repurpose') },
+                { icon: TrendingUp, label: 'Refresh', sublabel: 'Optimization', bgColor: 'bg-amber-50', hoverBg: 'hover:bg-amber-100', action: () => handleOpenModal('refresh') },
               ].map((step, index, arr) => (
                 <div key={step.label} className="flex items-center">
                   <button
                     onClick={step.action}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-[#407B9D]/10 transition-all duration-200 group"
+                    className={`flex items-center gap-3 px-4 py-2 rounded-xl ${step.hoverBg} transition-all duration-200 group`}
                   >
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center ${step.bgColor} transition-all duration-200 group-hover:scale-110 group-hover:shadow-sm`}>
-                      <step.icon className="w-3.5 h-3.5 text-[#407B9D]" />
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${step.bgColor} transition-all duration-200 group-hover:scale-105 group-hover:shadow-sm`}>
+                      <step.icon className="w-4 h-4 text-[#407B9D]" />
                     </div>
-                    <span
-                      className="text-sm font-medium text-slate-600 group-hover:text-[#407B9D] transition-colors"
-                      style={{ fontFamily: 'var(--font-body)' }}
-                    >
-                      {step.label}
-                    </span>
+                    <div className="text-left hidden sm:block">
+                      <p
+                        className="text-sm font-medium text-[#463939] group-hover:text-[#407B9D] transition-colors"
+                        style={{ fontFamily: 'var(--font-heading)' }}
+                      >
+                        {step.label}
+                      </p>
+                      <p
+                        className="text-xs text-[#999999]"
+                        style={{ fontFamily: 'var(--font-body)' }}
+                      >
+                        {step.sublabel}
+                      </p>
+                    </div>
                   </button>
                   {index < arr.length - 1 && (
-                    <div className="flex items-center mx-1">
-                      <div className="w-4 h-px bg-gradient-to-r from-slate-300 to-slate-200" />
-                      <div className="w-1 h-1 rounded-full bg-slate-300" />
+                    <div className="flex items-center mx-2">
+                      <ArrowRight className="w-4 h-4 text-slate-300" />
                     </div>
                   )}
                 </div>

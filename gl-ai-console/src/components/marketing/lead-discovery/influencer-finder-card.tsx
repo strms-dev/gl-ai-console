@@ -47,11 +47,13 @@ export function InfluencerFinderCard({
   }
 
   return (
-    <Card className="bg-white border-none shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-[1.02]">
-      <CardHeader className="pb-4">
+    <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-[#407B9D]/20 transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden group">
+      {/* Decorative gradient */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#407B9D]/5 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <CardHeader className="pb-4 relative">
         <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-lg bg-[#407B9D]/10 flex items-center justify-center flex-shrink-0">
-            <Search className="w-7 h-7 text-[#407B9D]" />
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#407B9D] to-[#407B9D]/80 flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#407B9D]/20 group-hover:scale-105 transition-transform">
+            <Search className="w-7 h-7 text-white" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -62,28 +64,28 @@ export function InfluencerFinderCard({
                 Influencer Finder
               </CardTitle>
               {newDiscoveriesCount > 0 && (
-                <Badge className="bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]">
+                <Badge className="bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB] border-none animate-pulse">
                   {newDiscoveriesCount} New
                 </Badge>
               )}
             </div>
-            <CardDescription style={{ fontFamily: 'var(--font-body)' }}>
+            <CardDescription className="leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
               Discover LinkedIn influencers whose audience matches your ICP. Find thought leaders in finance, SaaS, and business growth.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        {/* Stats Row */}
-        <div className="flex items-center gap-4 mb-4 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
+        {/* Stats Row - Enhanced */}
+        <div className="flex items-center gap-3 mb-4 text-sm">
+          <div className="flex items-center gap-2 text-muted-foreground bg-[#0A66C2]/5 px-3 py-1.5 rounded-full">
             <Linkedin className="w-4 h-4 text-[#0A66C2]" />
             <span style={{ fontFamily: 'var(--font-body)' }}>
               LinkedIn Only
             </span>
           </div>
           {approvedCount > 0 && (
-            <div className="flex items-center gap-1.5 text-[#463939]">
+            <div className="flex items-center gap-1.5 text-[#463939] bg-green-50 px-3 py-1.5 rounded-full">
               <CheckCircle className="w-4 h-4 text-green-600" />
               <span style={{ fontFamily: 'var(--font-body)' }}>
                 {approvedCount} Approved
@@ -92,11 +94,13 @@ export function InfluencerFinderCard({
           )}
         </div>
 
-        {/* Generating State */}
+        {/* Generating State - Enhanced animation */}
         {isDiscovering && (
-          <div className="mb-4 p-4 bg-[#407B9D]/5 rounded-lg border border-[#407B9D]/20">
+          <div className="mb-4 p-4 bg-gradient-to-r from-[#407B9D]/5 to-[#95CBD7]/5 rounded-xl border border-[#407B9D]/20 animate-pulse">
             <div className="flex items-center gap-3">
-              <Loader2 className="w-5 h-5 text-[#407B9D] animate-spin" />
+              <div className="w-10 h-10 rounded-lg bg-[#407B9D]/10 flex items-center justify-center">
+                <Loader2 className="w-5 h-5 text-[#407B9D] animate-spin" />
+              </div>
               <div>
                 <p className="text-sm font-medium text-[#463939]" style={{ fontFamily: 'var(--font-heading)' }}>
                   Discovering Influencers...
@@ -109,26 +113,26 @@ export function InfluencerFinderCard({
           </div>
         )}
 
-        {/* Custom Prompt Input (shown when custom is selected) */}
+        {/* Custom Prompt Input - Enhanced styling */}
         {showCustomInput && !isDiscovering && (
-          <div className="mb-4 p-3 bg-slate-50 rounded-lg border">
-            <p className="text-sm font-medium text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+          <div className="mb-4 p-4 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-200">
+            <p className="text-sm font-medium text-[#463939] mb-3" style={{ fontFamily: 'var(--font-heading)' }}>
               What type of influencers are you looking for?
             </p>
             <textarea
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
               placeholder="e.g., Looking for influencers targeting CPG industry startups, or fractional CFOs for e-commerce brands..."
-              className="w-full p-2 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-[#407B9D] focus:border-transparent"
+              className="w-full p-3 text-sm border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#407B9D] focus:border-transparent transition-all"
               rows={2}
               style={{ fontFamily: 'var(--font-body)' }}
             />
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-3">
               <Button
                 size="sm"
                 onClick={handleSubmitCustom}
                 disabled={!customPrompt.trim()}
-                className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                className="bg-[#407B9D] hover:bg-[#407B9D]/90 shadow-sm"
               >
                 <Sparkles className="w-3.5 h-3.5 mr-1" />
                 Run Discovery
@@ -140,6 +144,7 @@ export function InfluencerFinderCard({
                   setShowCustomInput(false)
                   setCustomPrompt('')
                 }}
+                className="hover:bg-slate-100"
               >
                 Cancel
               </Button>
@@ -148,7 +153,7 @@ export function InfluencerFinderCard({
         )}
 
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-slate-50 px-3 py-1.5 rounded-full">
             <Sparkles className="w-4 h-4 text-[#407B9D]" />
             <span style={{ fontFamily: 'var(--font-body)' }}>
               AI-powered ICP matching
@@ -161,7 +166,7 @@ export function InfluencerFinderCard({
                   variant="outline"
                   size="sm"
                   disabled={isDiscovering}
-                  className="border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D]/10"
+                  className="border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D] hover:text-white transition-colors"
                 >
                   {isDiscovering ? (
                     <>
@@ -176,21 +181,31 @@ export function InfluencerFinderCard({
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={handleRunGeneral} className="cursor-pointer">
-                  <div className="flex flex-col">
-                    <span className="font-medium">General</span>
-                    <span className="text-xs text-muted-foreground">
-                      Auto-discover based on your ICP
-                    </span>
+              <DropdownMenuContent align="end" className="w-64 p-2">
+                <DropdownMenuItem onClick={handleRunGeneral} className="cursor-pointer p-3 rounded-lg hover:bg-[#407B9D]/5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-[#407B9D]/10 flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="w-4 h-4 text-[#407B9D]" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-[#463939]">General</span>
+                      <span className="text-xs text-muted-foreground">
+                        Auto-discover based on your ICP
+                      </span>
+                    </div>
                   </div>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleRunCustom} className="cursor-pointer">
-                  <div className="flex flex-col">
-                    <span className="font-medium">Custom</span>
-                    <span className="text-xs text-muted-foreground">
-                      Specify campaign or audience type
-                    </span>
+                <DropdownMenuItem onClick={handleRunCustom} className="cursor-pointer p-3 rounded-lg hover:bg-[#407B9D]/5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-[#95CBD7]/20 flex items-center justify-center flex-shrink-0">
+                      <Search className="w-4 h-4 text-[#407B9D]" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-[#463939]">Custom</span>
+                      <span className="text-xs text-muted-foreground">
+                        Specify campaign or audience type
+                      </span>
+                    </div>
                   </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -198,7 +213,7 @@ export function InfluencerFinderCard({
             <Button
               size="sm"
               onClick={onOpenModal}
-              className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+              className="bg-[#407B9D] hover:bg-[#407B9D]/90 shadow-sm hover:shadow-md transition-all"
             >
               View All
               <ArrowRight className="w-4 h-4 ml-1" />

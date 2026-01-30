@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Search } from "lucide-react"
+import { Search, Users, FlaskConical, ArrowRight } from "lucide-react"
 
 // Components
 import { InfluencerFinderCard } from "@/components/marketing/lead-discovery/influencer-finder-card"
@@ -134,28 +134,81 @@ export default function LeadDiscoveryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F9]">
+    <div className="min-h-screen bg-gradient-to-b from-[#FAF9F9] to-white">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        {/* Header - Enhanced with gradient icon */}
+        <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-[#407B9D]/10 flex items-center justify-center">
-              <Search className="w-6 h-6 text-[#407B9D]" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#95CBD7] to-[#407B9D] flex items-center justify-center shadow-lg shadow-[#95CBD7]/20">
+              <Search className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1
-                className="text-2xl font-bold text-[#463939]"
+                className="text-2xl font-bold text-[#463939] tracking-tight"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
                 Lead Discovery
               </h1>
               <p
-                className="text-muted-foreground"
+                className="text-muted-foreground text-sm"
                 style={{ fontFamily: 'var(--font-body)' }}
               >
                 Find influencers and generate lead hypotheses
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Discovery Pipeline - Quick Navigation */}
+        <div className="mb-8 flex items-center justify-center">
+          <div className="inline-flex items-center bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 gap-1">
+            <button
+              onClick={() => handleOpenModal('influencer')}
+              className="flex items-center gap-3 px-4 py-2 rounded-xl hover:bg-[#407B9D]/5 transition-all duration-200 group"
+            >
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#407B9D]/10 group-hover:scale-105 transition-transform">
+                <Users className="w-4 h-4 text-[#407B9D]" />
+              </div>
+              <div className="text-left hidden sm:block">
+                <p
+                  className="text-sm font-medium text-[#463939] group-hover:text-[#407B9D] transition-colors"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  Find Influencers
+                </p>
+                <p
+                  className="text-xs text-[#999999]"
+                  style={{ fontFamily: 'var(--font-body)' }}
+                >
+                  LinkedIn discovery
+                </p>
+              </div>
+            </button>
+            <div className="flex items-center mx-2">
+              <ArrowRight className="w-4 h-4 text-slate-300" />
+            </div>
+            <button
+              onClick={() => handleOpenModal('hypothesis')}
+              className="flex items-center gap-3 px-4 py-2 rounded-xl hover:bg-[#C8E4BB]/10 transition-all duration-200 group"
+            >
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#C8E4BB]/30 group-hover:scale-105 transition-transform">
+                <FlaskConical className="w-4 h-4 text-[#407B9D]" />
+              </div>
+              <div className="text-left hidden sm:block">
+                <p
+                  className="text-sm font-medium text-[#463939] group-hover:text-[#407B9D] transition-colors"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  Hypothesis Lab
+                </p>
+                <p
+                  className="text-xs text-[#999999]"
+                  style={{ fontFamily: 'var(--font-body)' }}
+                >
+                  Generate & validate
+                </p>
+              </div>
+            </button>
           </div>
         </div>
 

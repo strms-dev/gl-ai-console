@@ -43,11 +43,13 @@ export function TopicRadarCard({ newIdeasCount, onOpenModal, onRunAnalysis }: To
   }
 
   return (
-    <Card className="bg-white border-none shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-[1.02] relative">
-      <CardHeader className="pb-4">
+    <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-[#407B9D]/20 transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden group">
+      {/* Decorative gradient */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#407B9D]/5 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <CardHeader className="pb-4 relative">
         <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-lg bg-[#407B9D]/10 flex items-center justify-center flex-shrink-0">
-            <Lightbulb className="w-7 h-7 text-[#407B9D]" />
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#407B9D] to-[#407B9D]/80 flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#407B9D]/20 group-hover:scale-105 transition-transform">
+            <Lightbulb className="w-7 h-7 text-white" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -58,20 +60,20 @@ export function TopicRadarCard({ newIdeasCount, onOpenModal, onRunAnalysis }: To
                 Topic Radar
               </CardTitle>
               {newIdeasCount > 0 && (
-                <Badge className="bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB]">
+                <Badge className="bg-[#C8E4BB] text-[#463939] hover:bg-[#C8E4BB] border-none animate-pulse">
                   {newIdeasCount} New
                 </Badge>
               )}
             </div>
-            <CardDescription style={{ fontFamily: 'var(--font-body)' }}>
-              Discover content gaps and generate new topic ideas based on your existing content library and market trends.
+            <CardDescription className="leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
+              Discover content gaps and generate new topic ideas based on your content library and market trends.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-slate-50 px-3 py-1.5 rounded-full">
             <Sparkles className="w-4 h-4 text-[#407B9D]" />
             <span style={{ fontFamily: 'var(--font-body)' }}>
               AI-powered gap analysis
@@ -83,22 +85,22 @@ export function TopicRadarCard({ newIdeasCount, onOpenModal, onRunAnalysis }: To
                 variant="outline"
                 size="sm"
                 onClick={() => setShowCategorySelect(!showCategorySelect)}
-                className="border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D]/10"
+                className="border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D] hover:text-white transition-colors"
               >
                 Run Analysis
                 <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${showCategorySelect ? 'rotate-180' : ''}`} />
               </Button>
 
-              {/* Category Selection Dropdown */}
+              {/* Category Selection Dropdown - Enhanced */}
               {showCategorySelect && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-lg shadow-xl border border-slate-200 z-50 overflow-hidden">
-                  <div className="p-3 border-b border-slate-100 flex items-center justify-between">
-                    <span className="text-sm font-medium text-[#463939]" style={{ fontFamily: 'var(--font-heading)' }}>
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-[#407B9D]/5 to-transparent flex items-center justify-between">
+                    <span className="text-sm font-semibold text-[#463939]" style={{ fontFamily: 'var(--font-heading)' }}>
                       Select Analysis Type
                     </span>
                     <button
                       onClick={() => setShowCategorySelect(false)}
-                      className="p-1 hover:bg-slate-100 rounded"
+                      className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
                     >
                       <X className="w-4 h-4 text-slate-400" />
                     </button>
@@ -108,22 +110,22 @@ export function TopicRadarCard({ newIdeasCount, onOpenModal, onRunAnalysis }: To
                       <button
                         key={category.value}
                         onClick={() => handleCategorySelect(category.value)}
-                        className="w-full p-3 text-left rounded-lg hover:bg-slate-50 transition-colors flex items-start gap-3 group"
+                        className="w-full p-3 text-left rounded-lg hover:bg-[#407B9D]/5 transition-all flex items-start gap-3 group"
                       >
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${topicCategoryColors[category.value].replace('text-', 'bg-').split(' ')[0]}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${topicCategoryColors[category.value].replace('text-', 'bg-').split(' ')[0]} group-hover:scale-105 transition-transform`}>
                           <span className={topicCategoryColors[category.value].split(' ')[1]}>
                             {category.icon}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-[#463939] group-hover:text-[#407B9D]" style={{ fontFamily: 'var(--font-heading)' }}>
+                          <div className="font-medium text-sm text-[#463939] group-hover:text-[#407B9D] transition-colors" style={{ fontFamily: 'var(--font-heading)' }}>
                             {category.label}
                           </div>
-                          <div className="text-xs text-muted-foreground mt-0.5" style={{ fontFamily: 'var(--font-body)' }}>
+                          <div className="text-xs text-muted-foreground mt-0.5 leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
                             {category.description}
                           </div>
                         </div>
-                        <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#407B9D] mt-1 flex-shrink-0" />
+                        <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#407B9D] group-hover:translate-x-0.5 mt-1 flex-shrink-0 transition-all" />
                       </button>
                     ))}
                   </div>
@@ -133,7 +135,7 @@ export function TopicRadarCard({ newIdeasCount, onOpenModal, onRunAnalysis }: To
             <Button
               size="sm"
               onClick={onOpenModal}
-              className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+              className="bg-[#407B9D] hover:bg-[#407B9D]/90 shadow-sm hover:shadow-md transition-all"
             >
               View Ideas
               <ArrowRight className="w-4 h-4 ml-1" />
