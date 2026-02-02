@@ -1959,10 +1959,15 @@ No pitch, just happy to connect with fellow CPG folks. Open to a quick chat?`,
                   )}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <Lightbulb className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                    No hypotheses yet. Use the &quot;New Hypothesis&quot; button on the card to get started.
+                <div className="text-center py-16">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#C8E4BB]/30 to-[#407B9D]/10 flex items-center justify-center">
+                    <Lightbulb className="w-10 h-10 text-[#407B9D]" />
+                  </div>
+                  <p className="text-lg font-semibold text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                    No hypotheses yet
+                  </p>
+                  <p className="text-muted-foreground max-w-sm mx-auto" style={{ fontFamily: 'var(--font-body)' }}>
+                    Use the &quot;New Hypothesis&quot; button on the card to get started.
                   </p>
                 </div>
               )}

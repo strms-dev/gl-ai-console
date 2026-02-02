@@ -255,10 +255,15 @@ export function InfluencerFinderModal({
               ))}
 
               {discoveredInfluencers.length === 0 && (
-                <div className="text-center py-12">
-                  <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
-                    No influencers discovered yet. Run a discovery to find matches.
+                <div className="text-center py-16">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#407B9D]/10 to-[#95CBD7]/10 flex items-center justify-center">
+                    <Search className="w-10 h-10 text-[#407B9D]" />
+                  </div>
+                  <p className="text-lg font-semibold text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                    No influencers discovered yet
+                  </p>
+                  <p className="text-muted-foreground max-w-sm mx-auto" style={{ fontFamily: 'var(--font-body)' }}>
+                    Run a discovery from the Influencer Finder card to find LinkedIn influencers matching your ICP.
                   </p>
                 </div>
               )}

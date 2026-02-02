@@ -165,23 +165,23 @@ export function TopicRadarModal({
         </div>
 
         <div className="flex-1 overflow-y-auto py-4">
-          {/* Loading State */}
+          {/* Loading State - Enhanced with gradient icon */}
           {isLoading && (
             <div className="text-center py-16">
-              <div className="relative w-16 h-16 mx-auto mb-6">
-                <div className="absolute inset-0 rounded-full bg-[#407B9D]/20 animate-ping" />
-                <div className="relative w-16 h-16 rounded-full bg-[#407B9D]/10 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-[#407B9D] animate-spin" />
+              <div className="relative w-20 h-20 mx-auto mb-6">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#407B9D]/20 to-[#95CBD7]/20 animate-ping" />
+                <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-[#407B9D] to-[#407B9D]/80 flex items-center justify-center shadow-lg shadow-[#407B9D]/30">
+                  <Loader2 className="w-10 h-10 text-white animate-spin" />
                 </div>
               </div>
-              <p className="text-lg font-medium text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+              <p className="text-xl font-semibold text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
                 Analyzing Content Gaps...
               </p>
               <p className="text-muted-foreground" style={{ fontFamily: 'var(--font-body)' }}>
                 {lastAnalysisCategory && (
                   <>
                     Running{' '}
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${topicCategoryColors[lastAnalysisCategory]}`}>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${topicCategoryColors[lastAnalysisCategory]}`}>
                       {getCategoryIcon(lastAnalysisCategory)}
                       {topicCategoryLabels[lastAnalysisCategory]}
                     </span>{' '}
@@ -189,9 +189,9 @@ export function TopicRadarModal({
                   </>
                 )}
               </p>
-              <div className="mt-6 max-w-xs mx-auto">
-                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#407B9D] rounded-full animate-pulse" style={{ width: '60%' }} />
+              <div className="mt-8 max-w-sm mx-auto">
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-[#407B9D] to-[#95CBD7] rounded-full animate-pulse" style={{ width: '65%' }} />
                 </div>
               </div>
             </div>
@@ -309,16 +309,24 @@ export function TopicRadarModal({
               ))}
 
               {filteredIdeas.length === 0 && !isLoading && (
-                <div className="text-center py-12">
-                  <Lightbulb className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-lg font-medium text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                <div className="text-center py-16">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#407B9D]/10 to-[#95CBD7]/10 flex items-center justify-center">
+                    <Lightbulb className="w-10 h-10 text-[#407B9D]" />
+                  </div>
+                  <p className="text-xl font-semibold text-[#463939] mb-3" style={{ fontFamily: 'var(--font-heading)' }}>
                     {ideas.length === 0 ? 'No Ideas Yet' : 'No Ideas in This Category'}
                   </p>
-                  <p className="text-muted-foreground max-w-md mx-auto" style={{ fontFamily: 'var(--font-body)' }}>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-6 leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
                     {ideas.length === 0
                       ? 'Run an analysis from the Topic Radar card to discover content gaps and generate new topic ideas.'
                       : `No ideas in the "${topicCategoryLabels[categoryFilter as TopicCategory]}" category. Try selecting a different filter or run a new analysis.`}
                   </p>
+                  {ideas.length === 0 && (
+                    <div className="inline-flex items-center gap-2 text-sm text-[#407B9D] bg-[#407B9D]/5 px-4 py-2 rounded-full">
+                      <Sparkles className="w-4 h-4" />
+                      <span style={{ fontFamily: 'var(--font-body)' }}>AI-powered content gap analysis</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

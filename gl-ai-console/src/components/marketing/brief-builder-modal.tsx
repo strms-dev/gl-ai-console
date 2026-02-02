@@ -1792,17 +1792,19 @@ export function BriefBuilderModal({
               ))}
 
               {briefs.filter(b => b.status !== 'completed' && b.currentStep !== 'published' && !completedBriefIds.has(b.id)).length === 0 && (
-                <div className="text-center py-12">
-                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-lg font-medium text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                <div className="text-center py-16">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#95CBD7]/20 to-[#407B9D]/10 flex items-center justify-center">
+                    <FileText className="w-10 h-10 text-[#407B9D]" />
+                  </div>
+                  <p className="text-xl font-semibold text-[#463939] mb-3" style={{ fontFamily: 'var(--font-heading)' }}>
                     No Active Briefs
                   </p>
-                  <p className="text-muted-foreground mb-4" style={{ fontFamily: 'var(--font-body)' }}>
+                  <p className="text-muted-foreground mb-6 max-w-sm mx-auto leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
                     Create a content brief to get started, or check Final Drafts for completed content.
                   </p>
                   <Button
                     onClick={handleStartNewBrief}
-                    className="bg-[#407B9D] hover:bg-[#407B9D]/90"
+                    className="bg-[#407B9D] hover:bg-[#407B9D]/90 shadow-md hover:shadow-lg transition-all"
                   >
                     <Plus className="w-4 h-4 mr-1" />
                     Create Brief

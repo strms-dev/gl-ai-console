@@ -2263,12 +2263,14 @@ export function RepurposeModal({
                   ))}
 
                   {inProgressItems.length === 0 && (
-                    <div className="text-center py-12">
-                      <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground mb-2" style={{ fontFamily: 'var(--font-body)' }}>
+                    <div className="text-center py-16">
+                      <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#C8E4BB]/30 to-[#407B9D]/10 flex items-center justify-center">
+                        <Clock className="w-10 h-10 text-[#407B9D]" />
+                      </div>
+                      <p className="text-lg font-semibold text-[#463939] mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
                         No content currently being repurposed.
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-muted-foreground max-w-sm mx-auto" style={{ fontFamily: 'var(--font-body)' }}>
                         Start a repurpose workflow to track your progress here.
                       </p>
                     </div>
