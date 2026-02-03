@@ -19,6 +19,8 @@ const departmentTitles = {
   "/accounting": "Accounting",
   "/management/home": "Management Home",
   "/management/qbo-mcp": "QBO MCP",
+  "/management/team-capacity": "Team Capacity",
+  "/management/computer-use-agent": "Computer Use Agent",
   "/management": "Management",
   "/home": "Home"
 }
@@ -37,7 +39,7 @@ export function Header() {
 
   const renderTitle = () => {
     const title = getPageTitle()
-    if (title === "STRMS" || title === "Home" || title === "STRMS Home" || title === "Sales Pipeline" || title === "RevOps" || title === "RevOps Home" || title === "Sales Funnel" || title === "Ambassador Program" || title === "Marketing" || title === "Marketing Home" || title === "Accounting" || title === "Accounting Home" || title === "JEDI" || title === "Management" || title === "Management Home" || title === "QBO MCP") {
+    if (title === "STRMS" || title === "Home" || title === "STRMS Home" || title === "Sales Pipeline" || title === "RevOps" || title === "RevOps Home" || title === "Sales Funnel" || title === "Ambassador Program" || title === "Marketing" || title === "Marketing Home" || title === "Accounting" || title === "Accounting Home" || title === "JEDI" || title === "Management" || title === "Management Home" || title === "QBO MCP" || title === "Team Capacity" || title === "Computer Use Agent") {
       return null // Don't render anything for department pages or Home page
     }
     return title
@@ -45,7 +47,7 @@ export function Header() {
 
   // Don't render header for department pages or Home page
   const title = getPageTitle()
-  if (title === "STRMS" || title === "Home" || title === "STRMS Home" || title === "Sales Pipeline" || title === "RevOps" || title === "RevOps Home" || title === "Sales Funnel" || title === "Ambassador Program" || title === "Marketing" || title === "Marketing Home" || title === "Accounting" || title === "Accounting Home" || title === "JEDI" || title === "Management" || title === "Management Home" || title === "QBO MCP") {
+  if (title === "STRMS" || title === "Home" || title === "STRMS Home" || title === "Sales Pipeline" || title === "RevOps" || title === "RevOps Home" || title === "Sales Funnel" || title === "Ambassador Program" || title === "Marketing" || title === "Marketing Home" || title === "Accounting" || title === "Accounting Home" || title === "JEDI" || title === "Management" || title === "Management Home" || title === "QBO MCP" || title === "Team Capacity" || title === "Computer Use Agent") {
     return null
   }
 

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Wrench, RotateCw, Home, Code, AlertCircle, Users, Clock, Folder, ChevronDown, ChevronRight, User, UserX, LucideIcon, Filter, Megaphone, PenTool, Search, Calculator, BookOpen, Award, Briefcase, Link2 } from "lucide-react"
+import { Wrench, RotateCw, Home, Code, AlertCircle, Users, Clock, Folder, ChevronDown, ChevronRight, User, UserX, LucideIcon, Filter, Megaphone, PenTool, Search, Calculator, BookOpen, Award, Briefcase, Link2, BarChart3, Monitor } from "lucide-react"
 import { useState, useEffect } from "react"
 
 const departments = [
@@ -52,6 +52,8 @@ const departmentNavigation: Record<string, NavigationItem[]> = {
   ],
   management: [
     { name: "QBO MCP", href: "/management/qbo-mcp", icon: "link2" },
+    { name: "Team Capacity", href: "/management/team-capacity", icon: "bar-chart" },
+    { name: "Computer Use Agent", href: "/management/computer-use-agent", icon: "monitor" },
   ],
 }
 
@@ -78,6 +80,8 @@ const getIconComponent = (iconName: string): LucideIcon => {
     'award': Award,
     'briefcase': Briefcase,
     'link2': Link2,
+    'bar-chart': BarChart3,
+    'monitor': Monitor,
   }
   return iconMap[iconName] || RotateCw
 }
