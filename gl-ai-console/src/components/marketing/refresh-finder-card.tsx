@@ -13,7 +13,7 @@ interface RefreshFinderCardProps {
 
 export function RefreshFinderCard({ needsRefreshCount, onOpenModal, onRunAnalysis }: RefreshFinderCardProps) {
   return (
-    <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-amber-200 transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden group">
+    <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-amber-200 transition-all duration-300 hover:-translate-y-0.5 relative group">
       {/* Decorative gradient */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-100/30 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
       <CardHeader className="pb-4 relative">

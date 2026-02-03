@@ -94,8 +94,9 @@ export default function MarketingHomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Content Engine - Active */}
             <Link href="/marketing/content-engine" className="block group">
-              <Card className="h-full bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-[#407B9D]/20 transition-all duration-300 hover:-translate-y-1 cursor-pointer overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#407B9D]/5 to-transparent rounded-bl-full" />
+              <Card className="h-full bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-[#407B9D]/20 transition-all duration-300 hover:-translate-y-0.5 cursor-pointer relative">
+                {/* Decorative gradient */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#407B9D]/5 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
                 <CardHeader className="pb-4 relative">
                   <div className="flex items-start gap-4">
                     <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#407B9D] to-[#407B9D]/80 flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#407B9D]/20 group-hover:scale-105 transition-transform">
@@ -157,8 +158,9 @@ export default function MarketingHomePage() {
 
             {/* Lead Discovery - Active */}
             <Link href="/marketing/lead-discovery" className="block group">
-              <Card className="h-full bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-[#407B9D]/20 transition-all duration-300 hover:-translate-y-1 cursor-pointer overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#95CBD7]/10 to-transparent rounded-bl-full" />
+              <Card className="h-full bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-[#95CBD7]/30 transition-all duration-300 hover:-translate-y-0.5 cursor-pointer relative">
+                {/* Decorative gradient */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#95CBD7]/15 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
                 <CardHeader className="pb-4 relative">
                   <div className="flex items-start gap-4">
                     <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#95CBD7] to-[#407B9D] flex items-center justify-center flex-shrink-0 shadow-lg shadow-[#95CBD7]/20 group-hover:scale-105 transition-transform">

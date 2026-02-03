@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +16,25 @@ interface TopicRadarCardProps {
 
 export function TopicRadarCard({ newIdeasCount, onOpenModal, onRunAnalysis }: TopicRadarCardProps) {
   const [showCategorySelect, setShowCategorySelect] = useState(false)
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const handleToggleDropdown = () => {
+    if (!showCategorySelect && buttonRef.current) {
+      // Calculate position before showing
+      const rect = buttonRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.right - 320, // 320px is the dropdown width (w-80)
+      })
+    }
+    setShowCategorySelect(!showCategorySelect)
+  }
 
   const categories: { value: TopicCategory; label: string; icon: React.ReactNode; description: string }[] = [
     {
@@ -43,7 +63,7 @@ export function TopicRadarCard({ newIdeasCount, onOpenModal, onRunAnalysis }: To
   }
 
   return (
-    <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-[#407B9D]/20 transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden group">
+    <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-[#407B9D]/20 transition-all duration-300 hover:-translate-y-0.5 relative group">
       {/* Decorative gradient */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#407B9D]/5 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
       <CardHeader className="pb-4 relative">
@@ -80,20 +100,30 @@ export function TopicRadarCard({ newIdeasCount, onOpenModal, onRunAnalysis }: To
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowCategorySelect(!showCategorySelect)}
-                className="border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D] hover:text-white transition-colors"
-              >
-                Run Analysis
-                <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${showCategorySelect ? 'rotate-180' : ''}`} />
-              </Button>
+            <Button
+              ref={buttonRef}
+              variant="outline"
+              size="sm"
+              onClick={handleToggleDropdown}
+              className="border-[#407B9D] text-[#407B9D] hover:bg-[#407B9D] hover:text-white transition-colors"
+            >
+              Run Analysis
+              <ChevronDown className={`w-4 h-4 ml-1 transition-transform ${showCategorySelect ? 'rotate-180' : ''}`} />
+            </Button>
 
-              {/* Category Selection Dropdown - Enhanced */}
-              {showCategorySelect && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Category Selection Dropdown - Portal to body */}
+            {mounted && showCategorySelect && dropdownPosition && createPortal(
+              <>
+                {/* Backdrop */}
+                <div
+                  className="fixed inset-0 z-[9998]"
+                  onClick={() => setShowCategorySelect(false)}
+                />
+                {/* Dropdown */}
+                <div
+                  className="fixed w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-[9999] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                  style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+                >
                   <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-[#407B9D]/5 to-transparent flex items-center justify-between">
                     <span className="text-sm font-semibold text-[#463939]" style={{ fontFamily: 'var(--font-heading)' }}>
                       Select Analysis Type
@@ -110,28 +140,29 @@ export function TopicRadarCard({ newIdeasCount, onOpenModal, onRunAnalysis }: To
                       <button
                         key={category.value}
                         onClick={() => handleCategorySelect(category.value)}
-                        className="w-full p-3 text-left rounded-lg hover:bg-[#407B9D]/5 transition-all flex items-start gap-3 group"
+                        className="w-full p-3 text-left rounded-lg hover:bg-[#407B9D]/5 transition-all flex items-start gap-3 group/item"
                       >
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${topicCategoryColors[category.value].replace('text-', 'bg-').split(' ')[0]} group-hover:scale-105 transition-transform`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${topicCategoryColors[category.value].replace('text-', 'bg-').split(' ')[0]} group-hover/item:scale-105 transition-transform`}>
                           <span className={topicCategoryColors[category.value].split(' ')[1]}>
                             {category.icon}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-[#463939] group-hover:text-[#407B9D] transition-colors" style={{ fontFamily: 'var(--font-heading)' }}>
+                          <div className="font-medium text-sm text-[#463939] group-hover/item:text-[#407B9D] transition-colors" style={{ fontFamily: 'var(--font-heading)' }}>
                             {category.label}
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5 leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
                             {category.description}
                           </div>
                         </div>
-                        <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#407B9D] group-hover:translate-x-0.5 mt-1 flex-shrink-0 transition-all" />
+                        <ArrowRight className="w-4 h-4 text-slate-300 group-hover/item:text-[#407B9D] group-hover/item:translate-x-0.5 mt-1 flex-shrink-0 transition-all" />
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
+              </>,
+              document.body
+            )}
             <Button
               size="sm"
               onClick={onOpenModal}
@@ -143,14 +174,6 @@ export function TopicRadarCard({ newIdeasCount, onOpenModal, onRunAnalysis }: To
           </div>
         </div>
       </CardContent>
-
-      {/* Backdrop for dropdown */}
-      {showCategorySelect && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setShowCategorySelect(false)}
-        />
-      )}
     </Card>
   )
 }

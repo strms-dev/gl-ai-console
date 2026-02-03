@@ -14,7 +14,7 @@ interface RepurposeFactoryCardProps {
 
 export function RepurposeFactoryCard({ readyToRepurposeCount, inProgressCount = 0, onOpenModal, onStartRepurposing }: RepurposeFactoryCardProps) {
   return (
-    <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-[#C8E4BB]/30 transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden group">
+    <Card className="bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-[#C8E4BB]/30 transition-all duration-300 hover:-translate-y-0.5 relative group">
       {/* Decorative gradient */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-[#C8E4BB]/15 to-transparent rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity" />
       <CardHeader className="pb-4 relative">

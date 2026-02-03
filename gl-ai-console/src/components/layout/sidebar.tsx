@@ -237,8 +237,12 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
           )}
           <ul className="space-y-1">
             {departments.map((dept) => {
-              // Only highlight department button when on department home, not sub-pages
-              const isActive = pathname === dept.href
+              // Extract base path from dept.href (e.g., "/strms/home" -> "/strms")
+              const deptBasePath = dept.href.replace('/home', '')
+              // Highlight fully when on department home page
+              const isOnDeptHome = pathname === dept.href
+              // Show "in department" state when on any sub-page of this department
+              const isInDepartment = pathname.startsWith(deptBasePath) && !isOnDeptHome
               return (
                 <li key={dept.name}>
                   <Link
@@ -246,9 +250,11 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                     className={cn(
                       "flex items-center text-sm font-semibold rounded-lg transition-all duration-200",
                       isCollapsed ? "justify-center p-2" : "px-3 py-2.5",
-                      isActive
+                      isOnDeptHome
                         ? "bg-[#407B9D] text-white shadow-md"
-                        : "text-[#463939] hover:bg-[#95CBD7]/20 hover:text-[#407B9D]"
+                        : isInDepartment
+                          ? "bg-[#95CBD7]/30 text-[#407B9D] border border-[#407B9D]/20"
+                          : "text-[#463939] hover:bg-[#95CBD7]/20 hover:text-[#407B9D]"
                     )}
                     style={{fontFamily: 'var(--font-heading)'}}
                     title={isCollapsed ? dept.name : undefined}
@@ -431,8 +437,8 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
                 }
 
                 // Regular item without children
-                const isActive = pathname === item.href ||
-                  (item.href === '/strms/sales-pipeline' && pathname.startsWith('/strms/sales-pipeline/projects/'))
+                // Match exact path OR any sub-routes (e.g., /strms/offboarding matches /strms/offboarding/[customerId])
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                 const IconComponent = getIconComponent(item.icon)
 
                 return (
