@@ -26,33 +26,36 @@ import { RefreshModal } from "@/components/marketing/refresh-modal"
 import { ContentLibrary } from "@/components/marketing/content-library"
 import { FinalDraftsSection } from "@/components/marketing/final-drafts-section"
 
-// Test Data (for static content)
+// Test Data (for static content - repurpose items only)
 import {
-  testContentLibrary,
   testRepurposeItems,
-  testRefreshRecommendations,
   getDashboardStats,
 } from "@/lib/marketing-content-data"
 
-// localStorage Store
+// Supabase
 import {
-  getTopicIdeas,
-  saveTopicIdeas,
-  removeTopicIdea,
-  updateTopicIdea,
+  fetchContentLibraryForUI,
+  fetchNewTopicIdeas,
+  fetchApprovedTopicIdeas,
+  addTopicIdeasToSupabase,
+  approveTopicIdeaInSupabase,
+  rejectTopicIdeaInSupabase,
+  removeTopicIdeaFromSupabase,
+  markTopicIdeaInProgress,
+  fetchBriefsForUI,
+  fetchBriefByIdForUI,
+  saveBriefToSupabase,
+  fetchFinalDraftsForUI,
+  addFinalDraftToSupabase,
+  publishFinalDraftInSupabase,
+  fetchPendingRefreshRecommendations,
+  startRefreshInSupabase,
+  dismissRefreshInSupabase,
+} from "@/lib/supabase/marketing-content"
+
+// localStorage Store (utility functions only)
+import {
   generateTopicIdeasForCategory,
-  getApprovedIdeas,
-  addApprovedIdea,
-  removeApprovedIdea,
-  getBriefs,
-  saveBriefs,
-  addBrief,
-  updateBrief,
-  removeBrief,
-  getBriefById,
-  getFinalDrafts,
-  addFinalDraft,
-  updateFinalDraft,
   createBriefFromTopicIdea,
   createFinalDraftFromBrief,
   getMarketingStats,
@@ -64,6 +67,8 @@ import {
   TopicIdea,
   ContentBrief,
   FinalDraft,
+  ContentItem,
+  RefreshRecommendation,
 } from "@/lib/marketing-content-types"
 
 type ViewMode = 'workflows' | 'library' | 'final_drafts'
@@ -79,11 +84,16 @@ export default function ContentEnginePage() {
   const [repurposeOpen, setRepurposeOpen] = useState(false)
   const [refreshOpen, setRefreshOpen] = useState(false)
 
-  // Data states (from localStorage)
+  // Data states (from Supabase)
   const [topicIdeas, setTopicIdeas] = useState<TopicIdea[]>([])
   const [approvedIdeas, setApprovedIdeas] = useState<TopicIdea[]>([])
   const [briefs, setBriefs] = useState<ContentBrief[]>([])
   const [finalDrafts, setFinalDrafts] = useState<FinalDraft[]>([])
+  const [refreshRecommendations, setRefreshRecommendations] = useState<RefreshRecommendation[]>([])
+
+  // Content Library state (from Supabase)
+  const [contentLibrary, setContentLibrary] = useState<ContentItem[]>([])
+  const [contentLibraryLoading, setContentLibraryLoading] = useState(false)
 
   // Analysis states
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -99,12 +109,43 @@ export default function ContentEnginePage() {
   // Refresh modal state
   const [triggerRefreshReport, setTriggerRefreshReport] = useState(false)
 
-  // Load data from localStorage on mount
+  // Load all data from Supabase on mount
   useEffect(() => {
-    setTopicIdeas(getTopicIdeas())
-    setApprovedIdeas(getApprovedIdeas())
-    setBriefs(getBriefs())
-    setFinalDrafts(getFinalDrafts())
+    const loadData = async () => {
+      try {
+        const [newIdeas, approved, briefsData, draftsData, refreshData] = await Promise.all([
+          fetchNewTopicIdeas(),
+          fetchApprovedTopicIdeas(),
+          fetchBriefsForUI(),
+          fetchFinalDraftsForUI(),
+          fetchPendingRefreshRecommendations(),
+        ])
+        setTopicIdeas(newIdeas)
+        setApprovedIdeas(approved)
+        setBriefs(briefsData)
+        setFinalDrafts(draftsData)
+        setRefreshRecommendations(refreshData)
+      } catch (error) {
+        console.error('Failed to load data from Supabase:', error)
+      }
+    }
+    loadData()
+  }, [])
+
+  // Load content library from Supabase
+  useEffect(() => {
+    const loadContentLibrary = async () => {
+      setContentLibraryLoading(true)
+      try {
+        const content = await fetchContentLibraryForUI()
+        setContentLibrary(content)
+      } catch (error) {
+        console.error('Failed to load content library:', error)
+      } finally {
+        setContentLibraryLoading(false)
+      }
+    }
+    loadContentLibrary()
   }, [])
 
   // Get stats - combine localStorage with static test data
@@ -155,7 +196,7 @@ export default function ContentEnginePage() {
     setWorkflowContext('dashboard')
   }
 
-  const handleRunAnalysis = (category: TopicCategory) => {
+  const handleRunAnalysis = async (category: TopicCategory) => {
     console.log('Running topic analysis for category:', category)
 
     // Open modal first and show loading state
@@ -164,46 +205,57 @@ export default function ContentEnginePage() {
     setIsAnalyzing(true)
     setLastAnalysisCategory(category)
 
-    // Simulate analysis delay, then generate ideas
-    setTimeout(() => {
-      const newIdeas = generateTopicIdeasForCategory(category)
+    // Simulate analysis delay (this will be replaced by n8n webhook later)
+    setTimeout(async () => {
+      try {
+        // Generate ideas locally (will be replaced by AI generation via n8n)
+        const newIdeas = generateTopicIdeasForCategory(category)
 
-      // Add to existing ideas (don't replace)
-      const currentIdeas = getTopicIdeas()
-      const allIdeas = [...currentIdeas, ...newIdeas]
-      saveTopicIdeas(allIdeas)
-      setTopicIdeas(allIdeas)
-
-      setIsAnalyzing(false)
+        // Save to Supabase and update state
+        const savedIdeas = await addTopicIdeasToSupabase(newIdeas)
+        setTopicIdeas(prev => [...prev, ...savedIdeas])
+      } catch (error) {
+        console.error('Failed to save topic ideas:', error)
+      } finally {
+        setIsAnalyzing(false)
+      }
     }, 2500)
   }
 
-  const handleApproveIdea = (ideaId: string) => {
+  const handleApproveIdea = async (ideaId: string) => {
     console.log('Approving idea:', ideaId)
 
     // Get the idea from topicIdeas
     const idea = topicIdeas.find(i => i.id === ideaId)
     if (!idea) return
 
-    // Move idea from Topic Radar to Approved Ideas list
-    // 1. Add to approved ideas (stores with status 'approved')
-    const updatedApproved = addApprovedIdea(idea)
-    setApprovedIdeas(updatedApproved)
+    try {
+      // Update status in Supabase
+      await approveTopicIdeaInSupabase(ideaId)
 
-    // 2. Remove from topic radar ideas
-    const updatedTopicIdeas = removeTopicIdea(ideaId)
-    setTopicIdeas(updatedTopicIdeas)
+      // Update local state - move from topicIdeas to approvedIdeas
+      setTopicIdeas(prev => prev.filter(i => i.id !== ideaId))
+      setApprovedIdeas(prev => [...prev, { ...idea, status: 'approved' }])
+    } catch (error) {
+      console.error('Failed to approve idea:', error)
+    }
   }
 
-  const handleRejectIdea = (ideaId: string) => {
+  const handleRejectIdea = async (ideaId: string) => {
     console.log('Rejecting idea:', ideaId)
 
-    // Simply remove from the list
-    const updatedIdeas = removeTopicIdea(ideaId)
-    setTopicIdeas(updatedIdeas)
+    try {
+      // Update status in Supabase (soft delete)
+      await rejectTopicIdeaInSupabase(ideaId)
+
+      // Remove from local state
+      setTopicIdeas(prev => prev.filter(i => i.id !== ideaId))
+    } catch (error) {
+      console.error('Failed to reject idea:', error)
+    }
   }
 
-  const handleCreateBriefFromIdea = (ideaId: string) => {
+  const handleCreateBriefFromIdea = async (ideaId: string) => {
     console.log('Creating brief from idea:', ideaId)
 
     // This is called when user clicks "Create Brief" on an approved idea in Topic Radar
@@ -214,21 +266,24 @@ export default function ContentEnginePage() {
     }
 
     if (idea) {
-      // Create brief from idea
-      const newBrief = createBriefFromTopicIdea(idea)
-      const updatedBriefs = addBrief(newBrief)
-      setBriefs(updatedBriefs)
+      try {
+        // Mark topic idea as in_progress in Supabase
+        await markTopicIdeaInProgress(ideaId)
 
-      // Remove from approved ideas (primary storage for approved)
-      const updatedApproved = removeApprovedIdea(ideaId)
-      setApprovedIdeas(updatedApproved)
+        // Create brief from idea and save to Supabase
+        const newBrief = createBriefFromTopicIdea(idea)
+        const savedBrief = await saveBriefToSupabase(newBrief)
+        setBriefs(prev => [...prev, savedBrief])
 
-      // Also try to remove from topic ideas (in case it was there)
-      const updatedTopicIdeas = removeTopicIdea(ideaId)
-      setTopicIdeas(updatedTopicIdeas)
+        // Remove from local state
+        setApprovedIdeas(prev => prev.filter(i => i.id !== ideaId))
+        setTopicIdeas(prev => prev.filter(i => i.id !== ideaId))
 
-      // Open brief builder with this brief
-      setInitialBriefId(newBrief.id)
+        // Open brief builder with this brief
+        setInitialBriefId(savedBrief.id)
+      } catch (error) {
+        console.error('Failed to create brief from idea:', error)
+      }
     }
 
     // Close topic radar, open brief builder
@@ -237,52 +292,78 @@ export default function ContentEnginePage() {
     setWorkflowContext('brief_builder')
   }
 
-  const handleSaveBrief = (brief: ContentBrief) => {
+  const handleSaveBrief = async (brief: ContentBrief) => {
     console.log('Saving brief:', brief.id, 'status:', brief.status)
 
-    // Always use addBrief which now handles duplicates safely
-    // This prevents race conditions between state and localStorage
-    const updatedBriefs = addBrief(brief)
-    setBriefs(updatedBriefs)
+    try {
+      // Save to Supabase (handles create/update)
+      const savedBrief = await saveBriefToSupabase(brief)
+
+      // Update local state
+      setBriefs(prev => {
+        const existingIndex = prev.findIndex(b => b.id === savedBrief.id)
+        if (existingIndex >= 0) {
+          // Update existing
+          const updated = [...prev]
+          updated[existingIndex] = savedBrief
+          return updated
+        } else {
+          // Add new
+          return [...prev, savedBrief]
+        }
+      })
+    } catch (error) {
+      console.error('Failed to save brief:', error)
+    }
   }
 
-  const handleApproveFinalDraft = (briefId: string) => {
+  const handleApproveFinalDraft = async (briefId: string) => {
     console.log('Approving final draft for brief:', briefId)
 
-    // Get the brief from localStorage (more reliable than React state during async updates)
-    const brief = getBriefById(briefId)
-    if (!brief) {
-      // Fallback to React state if not in localStorage yet
-      const stateBrief = briefs.find(b => b.id === briefId)
-      if (!stateBrief) {
+    try {
+      // Try to get brief from Supabase first
+      let brief = await fetchBriefByIdForUI(briefId)
+
+      // Fallback to React state if not found in Supabase
+      if (!brief) {
+        brief = briefs.find(b => b.id === briefId) || null
+      }
+
+      if (!brief) {
         console.error('Brief not found:', briefId)
         return
       }
-      // Create final draft from state brief
-      const authorName = stateBrief.assignedTo || 'Unknown Author'
-      const newFinalDraft = createFinalDraftFromBrief(stateBrief, authorName)
-      const updatedFinalDrafts = addFinalDraft(newFinalDraft)
-      setFinalDrafts(updatedFinalDrafts)
-    } else {
-      // Create final draft from localStorage brief
+
+      // Create final draft from brief using utility function
       const authorName = brief.assignedTo || 'Unknown Author'
       const newFinalDraft = createFinalDraftFromBrief(brief, authorName)
-      const updatedFinalDrafts = addFinalDraft(newFinalDraft)
-      setFinalDrafts(updatedFinalDrafts)
-    }
 
-    // Refresh briefs from localStorage to ensure sync
-    setBriefs(getBriefs())
+      // Save to Supabase
+      const savedDraft = await addFinalDraftToSupabase(newFinalDraft)
+      setFinalDrafts(prev => [...prev, savedDraft])
+
+      // Refresh briefs from Supabase to ensure sync
+      const refreshedBriefs = await fetchBriefsForUI()
+      setBriefs(refreshedBriefs)
+    } catch (error) {
+      console.error('Failed to approve final draft:', error)
+    }
   }
 
-  const handlePublishDraft = (draftId: string) => {
+  const handlePublishDraft = async (draftId: string) => {
     console.log('Publishing draft:', draftId)
 
-    // Update final draft with published date
-    const updatedFinalDrafts = updateFinalDraft(draftId, {
-      publishedAt: new Date().toISOString().split('T')[0],
-    })
-    setFinalDrafts(updatedFinalDrafts)
+    try {
+      // Update final draft with published date in Supabase
+      const publishedDraft = await publishFinalDraftInSupabase(draftId)
+
+      // Update local state
+      setFinalDrafts(prev =>
+        prev.map(d => d.id === draftId ? publishedDraft : d)
+      )
+    } catch (error) {
+      console.error('Failed to publish draft:', error)
+    }
   }
 
   return (
@@ -352,7 +433,7 @@ export default function ContentEnginePage() {
             >
               <Library className="w-4 h-4 mr-2" />
               Library
-              <span className="ml-1.5 text-xs opacity-60 font-medium">({staticStats.totalContent})</span>
+              <span className="ml-1.5 text-xs opacity-60 font-medium">({contentLibrary.length})</span>
             </Button>
           </div>
         </div>
@@ -429,7 +510,7 @@ export default function ContentEnginePage() {
                 }}
               />
               <RefreshFinderCard
-                needsRefreshCount={staticStats.needsRefresh}
+                needsRefreshCount={refreshRecommendations.length}
                 onOpenModal={() => handleOpenModal('refresh')}
                 onRunAnalysis={() => {
                   setTriggerRefreshReport(true)
@@ -448,7 +529,16 @@ export default function ContentEnginePage() {
         ) : (
           /* Content Library View */
           <div className="bg-white rounded-xl border shadow-sm p-6">
-            <ContentLibrary content={testContentLibrary} />
+            {contentLibraryLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex items-center gap-3">
+                  <RefreshCw className="w-5 h-5 animate-spin text-[#407B9D]" />
+                  <span className="text-muted-foreground">Loading content library...</span>
+                </div>
+              </div>
+            ) : (
+              <ContentLibrary content={contentLibrary} />
+            )}
           </div>
         )}
 
@@ -473,10 +563,14 @@ export default function ContentEnginePage() {
           onEditBrief={(briefId) => console.log('Editing brief:', briefId)}
           onViewBrief={(briefId) => console.log('Viewing brief:', briefId)}
           onCreateNew={() => console.log('Creating new brief')}
-          onCreateFromIdea={(ideaId) => {
-            // Remove from approved ideas when creating a brief
-            const updatedApproved = removeApprovedIdea(ideaId)
-            setApprovedIdeas(updatedApproved)
+          onCreateFromIdea={async (ideaId) => {
+            // Mark topic idea as in_progress in Supabase and remove from local state
+            try {
+              await markTopicIdeaInProgress(ideaId)
+              setApprovedIdeas(prev => prev.filter(i => i.id !== ideaId))
+            } catch (error) {
+              console.error('Failed to update topic idea:', error)
+            }
           }}
           onApproveFinalDraft={handleApproveFinalDraft}
           onNavigateToFinalDrafts={() => {
@@ -491,7 +585,7 @@ export default function ContentEnginePage() {
           open={repurposeOpen}
           onOpenChange={(open) => !open && handleCloseModal('repurpose')}
           items={[]}
-          libraryContent={testContentLibrary}
+          libraryContent={contentLibrary}
           readyToRepurpose={finalDrafts.filter(d => d.publishedAt)}
           onRepurpose={(itemId, format) =>
             console.log('Repurposing item:', itemId, 'to format:', format)
@@ -503,9 +597,29 @@ export default function ContentEnginePage() {
         <RefreshModal
           open={refreshOpen}
           onOpenChange={(open) => !open && handleCloseModal('refresh')}
-          recommendations={testRefreshRecommendations}
-          onStartRefresh={(recId) => console.log('Starting refresh:', recId)}
-          onDismiss={(recId) => console.log('Dismissing:', recId)}
+          recommendations={refreshRecommendations}
+          onStartRefresh={async (recId) => {
+            console.log('Starting refresh:', recId)
+            try {
+              const updated = await startRefreshInSupabase(recId)
+              setRefreshRecommendations(prev =>
+                prev.map(r => r.id === recId ? updated : r)
+              )
+            } catch (error) {
+              console.error('Failed to start refresh:', error)
+            }
+          }}
+          onDismiss={async (recId) => {
+            console.log('Dismissing:', recId)
+            try {
+              await dismissRefreshInSupabase(recId)
+              setRefreshRecommendations(prev =>
+                prev.filter(r => r.id !== recId)
+              )
+            } catch (error) {
+              console.error('Failed to dismiss refresh:', error)
+            }
+          }}
           triggerReport={triggerRefreshReport}
           onReportTriggered={() => setTriggerRefreshReport(false)}
         />

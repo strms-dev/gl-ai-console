@@ -1,0 +1,276 @@
+{
+  "name": "Marketing - Topic Radar Competitor Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/topic-radar/competitor",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "webhook-competitor",
+      "name": "Receive Competitor Analysis Request",
+      "webhookId": "topic-radar-competitor-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "marketing_competitor_domains",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "is_active",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 0],
+      "id": "fetch-competitors",
+      "name": "Fetch Competitor Domains",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "marketing_content_items",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 200],
+      "id": "fetch-our-content",
+      "name": "Fetch Our Content Library",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare competitor and content data for analysis\nconst competitors = $('Fetch Competitor Domains').all();\nconst ourContent = $('Fetch Our Content Library').all();\n\n// Extract our content titles and topics for comparison\nconst ourTopics = ourContent.map(item => ({\n  title: item.json.title,\n  contentType: item.json.content_type,\n  keywords: item.json.keywords || []\n}));\n\n// Format competitor list\nconst competitorList = competitors.map(c => ({\n  domain: c.json.domain,\n  companyName: c.json.company_name || c.json.domain\n}));\n\nreturn [{\n  json: {\n    competitors: competitorList,\n    ourContentSummary: {\n      totalPieces: ourTopics.length,\n      topics: ourTopics.slice(0, 30) // Limit for token management\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 100],
+      "id": "prepare-data",
+      "name": "Prepare Analysis Data"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 300],
+      "id": "anthropic-llm",
+      "name": "Anthropic Claude",
+      "credentials": {
+        "anthropicApi": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a competitive content analyst for GrowthLab, an accounting firm that specializes in serving marketing agencies.\n\n## Task: Analyze Competitors and Identify Content Opportunities\n\n## Our Competitors:\n{{ JSON.stringify($json.competitors) }}\n\n## Our Current Content Library Summary:\n{{ JSON.stringify($json.ourContentSummary) }}\n\n## Instructions:\nBased on these competitors (who likely serve similar audiences - marketing agencies, creative agencies, digital agencies), identify content topics we should create to compete effectively.\n\nConsider:\n1. Topics competitors are likely covering that we haven't addressed\n2. Keywords and themes common in agency accounting/finance space\n3. Pain points that agency owners and finance leaders face\n4. Seasonal/timely topics (tax season, year-end planning, budgeting cycles)\n\nFor each topic suggestion, provide:\n1. topic: A clear, compelling topic title\n2. gapScore: A score from 0-100 indicating competitive opportunity (higher = more important)\n3. rationale: 2-3 sentences explaining why this topic matters competitively\n4. suggestedFormat: Best format (blog, case_study, youtube, linkedin, newsletter)\n5. competitorInsight: Which competitor(s) likely cover this, or why it's a gap\n\n## Response Format:\nRespond ONLY with a valid JSON array of 3-5 topic ideas:\n[\n  {\n    \"topic\": \"Topic title here\",\n    \"gapScore\": 85,\n    \"rationale\": \"Explanation of competitive opportunity\",\n    \"suggestedFormat\": \"blog\",\n    \"competitorInsight\": \"Competitor X likely covers this; we can differentiate by...\"\n  }\n]"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 100],
+      "id": "analyze-competitors",
+      "name": "Analyze Competitor Opportunities"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the AI response and format for Supabase insert\nconst aiResponse = $input.first().json.text;\n\nlet ideas;\ntry {\n  ideas = JSON.parse(aiResponse);\n} catch (e) {\n  const jsonMatch = aiResponse.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (jsonMatch) {\n    ideas = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('Failed to parse AI response as JSON');\n  }\n}\n\nconst timestamp = new Date().toISOString();\n\n// Format for Supabase insert\nconst formattedIdeas = ideas.map((idea, index) => ({\n  json: {\n    topic: idea.topic,\n    gap_score: idea.gapScore,\n    rationale: idea.rationale + (idea.competitorInsight ? ' Competitor insight: ' + idea.competitorInsight : ''),\n    suggested_format: idea.suggestedFormat,\n    status: 'new',\n    category: 'competitor',\n    generation_context: { competitorInsight: idea.competitorInsight },\n    created_by: 'ai',\n    created_at: timestamp\n  }\n}));\n\nreturn formattedIdeas;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 100],
+      "id": "format-ideas",
+      "name": "Format Ideas for DB"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "marketing_topic_ideas",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 100],
+      "id": "save-ideas",
+      "name": "Save Ideas to Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format response for webhook\nconst savedIdeas = $input.all();\n\nreturn [{\n  json: {\n    success: true,\n    category: 'competitor',\n    ideas: savedIdeas.map(item => ({\n      id: item.json.id,\n      topic: item.json.topic,\n      gapScore: item.json.gap_score,\n      rationale: item.json.rationale,\n      suggestedFormat: item.json.suggested_format\n    }))\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 100],
+      "id": "format-response",
+      "name": "Format Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1540, 100],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Receive Competitor Analysis Request": {
+      "main": [
+        [
+          {
+            "node": "Fetch Competitor Domains",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Our Content Library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Competitor Domains": {
+      "main": [
+        [
+          {
+            "node": "Prepare Analysis Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Our Content Library": {
+      "main": [
+        [
+          {
+            "node": "Prepare Analysis Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Prepare Analysis Data": {
+      "main": [
+        [
+          {
+            "node": "Analyze Competitor Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyze Competitor Opportunities",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Competitor Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Format Ideas for DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Ideas for DB": {
+      "main": [
+        [
+          {
+            "node": "Save Ideas to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Ideas to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Topic Radar",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

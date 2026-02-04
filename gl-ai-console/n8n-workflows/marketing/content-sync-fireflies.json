@@ -1,0 +1,395 @@
+{
+  "name": "Marketing - Sync Fireflies Transcripts",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 4 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "id": "schedule-trigger",
+      "name": "Daily 4AM Trigger"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/content-sync/fireflies",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 200],
+      "id": "webhook-trigger",
+      "name": "Manual Sync Trigger",
+      "webhookId": "content-sync-fireflies-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "marketing_sync_logs",
+        "fieldsToSend": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sync_type": "fireflies",
+            "status": "running",
+            "started_at": "={{ $now.toISO() }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 100],
+      "id": "create-sync-log",
+      "name": "Create Sync Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.fireflies.ai/graphql",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"query { transcripts { id title date organizer_email participants duration transcript_url } }\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 100],
+      "id": "fetch-transcripts-list",
+      "name": "Fetch Transcripts List",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_FIREFLIES_CREDENTIAL_ID",
+          "name": "Fireflies API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter transcripts to only include GrowthLab demos\nconst response = $input.first().json;\nconst transcripts = response.data?.transcripts || [];\n\n// Filter for demo calls (adjust filter as needed)\nconst filteredTranscripts = transcripts.filter(t => {\n  const title = (t.title || '').toLowerCase();\n  return title.includes('growth lab') || \n         title.includes('growthlab') || \n         title.includes('demo') ||\n         title.includes('sales call');\n});\n\nif (filteredTranscripts.length === 0) {\n  return [{\n    json: {\n      message: 'No matching transcripts found',\n      itemsProcessed: 0,\n      itemsAdded: 0,\n      itemsUpdated: 0\n    }\n  }];\n}\n\n// Return each transcript as separate item for processing\nreturn filteredTranscripts.map(t => ({ json: t }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 100],
+      "id": "filter-transcripts",
+      "name": "Filter Demo Transcripts"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.fireflies.ai/graphql",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"query GetTranscript($id: String!) { transcript(id: $id) { id title sentences { text speaker_name start_time } summary { overview } } }\",\n  \"variables\": { \"id\": \"{{ $json.id }}\" }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 100],
+      "id": "fetch-full-transcript",
+      "name": "Fetch Full Transcript",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_FIREFLIES_CREDENTIAL_ID",
+          "name": "Fireflies API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format transcript for Supabase\nconst response = $input.first().json;\nconst transcript = response.data?.transcript;\nconst originalItem = $('Filter Demo Transcripts').item.json;\nconst timestamp = new Date().toISOString();\n\nif (!transcript) {\n  return [{ json: { skip: true } }];\n}\n\n// Combine sentences into full transcript text\nconst fullText = (transcript.sentences || []).map(s => \n  `${s.speaker_name}: ${s.text}`\n).join('\\n');\n\nreturn [{\n  json: {\n    title: transcript.title || originalItem.title,\n    content_type: 'meeting_transcript',\n    url: originalItem.transcript_url || `https://app.fireflies.ai/view/${transcript.id}`,\n    source_platform: 'fireflies',\n    source_id: transcript.id,\n    status: 'published',\n    author: originalItem.organizer_email || 'GrowthLab',\n    description: transcript.summary?.overview?.substring(0, 500) || '',\n    full_content: fullText.substring(0, 50000), // Truncate very long transcripts\n    word_count: fullText.split(/\\s+/).length,\n    date_created: originalItem.date || timestamp,\n    synced_at: timestamp\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100],
+      "id": "format-transcript",
+      "name": "Format Transcript for DB"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-skip",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [1320, 100],
+      "id": "filter-valid",
+      "name": "Filter Valid Items"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "marketing_content_items",
+        "conflictColumns": "source_platform, source_id",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1540, 100],
+      "id": "upsert-transcripts",
+      "name": "Upsert Transcripts to DB",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Count results for sync log\nconst items = $input.all();\n\nreturn [{\n  json: {\n    itemsProcessed: items.length,\n    itemsAdded: items.length,\n    itemsUpdated: 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 100],
+      "id": "count-results",
+      "name": "Count Results"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "marketing_sync_logs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Create Sync Log').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsToSend": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "completed",
+            "completed_at": "={{ $now.toISO() }}",
+            "items_processed": "={{ $json.itemsProcessed }}",
+            "items_added": "={{ $json.itemsAdded }}",
+            "items_updated": "={{ $json.itemsUpdated }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1980, 100],
+      "id": "update-sync-log",
+      "name": "Update Sync Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"syncType\": \"fireflies\",\n  \"itemsProcessed\": {{ $('Count Results').item.json.itemsProcessed }},\n  \"itemsAdded\": {{ $('Count Results').item.json.itemsAdded }},\n  \"itemsUpdated\": {{ $('Count Results').item.json.itemsUpdated }}\n}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2200, 200],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Daily 4AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Sync Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Fetch Transcripts List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Transcripts List": {
+      "main": [
+        [
+          {
+            "node": "Filter Demo Transcripts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Demo Transcripts": {
+      "main": [
+        [
+          {
+            "node": "Fetch Full Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Full Transcript": {
+      "main": [
+        [
+          {
+            "node": "Format Transcript for DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Transcript for DB": {
+      "main": [
+        [
+          {
+            "node": "Filter Valid Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Valid Items": {
+      "main": [
+        [
+          {
+            "node": "Upsert Transcripts to DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Transcripts to DB": {
+      "main": [
+        [
+          {
+            "node": "Count Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Results": {
+      "main": [
+        [
+          {
+            "node": "Update Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Content Sync",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

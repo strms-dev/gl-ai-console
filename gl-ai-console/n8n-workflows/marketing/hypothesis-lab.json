@@ -1,0 +1,345 @@
+{
+  "name": "Marketing - Hypothesis Lab",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/hypothesis-generate",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "webhook-hypothesis",
+      "name": "Receive Hypothesis Request",
+      "webhookId": "hypothesis-generate-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-step",
+              "leftValue": "={{ $json.body.step }}",
+              "rightValue": "who_where",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [220, 0],
+      "id": "switch-step",
+      "name": "Route by Step",
+      "outputs": ["who_where", "how_what", "email_copy", "linkedin_copy"]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [440, 400],
+      "id": "anthropic-llm",
+      "name": "Anthropic Claude",
+      "credentials": {
+        "anthropicApi": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a B2B marketing strategist for GrowthLab, an accounting firm that serves marketing agencies.\n\n## Task: Generate Target Audience Hypothesis (Who & Where)\n\nEntry Mode: {{ $json.body.context.entryMode || 'general' }}\nLead Source: {{ $json.body.context.leadSource || 'clay' }}\n\n## Instructions:\nGenerate a hypothesis for who we should target and where to find them.\n\nFor 'general' entry mode:\n- Suggest a specific target persona within marketing agencies\n- Identify where they can be found (LinkedIn, conferences, communities)\n- Consider job titles, company size, and pain points\n\nFor 'specific' entry mode:\n- Use the provided target description: {{ $json.body.context.targetDescription }}\n- Expand on the hypothesis with additional targeting criteria\n\n## Response Format:\nRespond ONLY with valid JSON:\n{\n  \"targetDescription\": \"Detailed description of the target persona\",\n  \"suggestedLeadSource\": \"clay\",\n  \"targetCriteria\": {\n    \"jobTitles\": [\"CFO\", \"Finance Director\", \"Controller\"],\n    \"industries\": [\"Marketing Agency\", \"Digital Agency\", \"Creative Agency\"],\n    \"companySize\": \"10-100 employees\",\n    \"signals\": [\"Recently raised funding\", \"Hiring for finance roles\"]\n  },\n  \"hypothesisRationale\": \"Why this target makes sense for GrowthLab\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [440, -200],
+      "id": "generate-who-where",
+      "name": "Generate Who & Where"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a B2B marketing strategist for GrowthLab, an accounting firm that serves marketing agencies.\n\n## Task: Generate Search & Enrichment Criteria (How & What)\n\nWorkflow ID: {{ $json.body.workflowId }}\nTarget Description: {{ $json.body.context.targetDescription }}\nLead Source: {{ $json.body.context.leadSource }}\n\n## Instructions:\nGenerate specific criteria for finding and qualifying leads in Clay or Trigify.\n\n## Response Format:\nRespond ONLY with valid JSON:\n{\n  \"searchCriteria\": [\n    {\n      \"field\": \"job_title\",\n      \"operator\": \"contains\",\n      \"value\": \"CFO\"\n    },\n    {\n      \"field\": \"company_industry\",\n      \"operator\": \"equals\",\n      \"value\": \"Marketing Agency\"\n    }\n  ],\n  \"enrichmentFields\": [\n    {\n      \"field\": \"company_revenue\",\n      \"source\": \"clearbit\",\n      \"priority\": \"high\"\n    },\n    {\n      \"field\": \"recent_funding\",\n      \"source\": \"crunchbase\",\n      \"priority\": \"medium\"\n    }\n  ],\n  \"filterCriteria\": [\n    {\n      \"field\": \"company_size\",\n      \"operator\": \"between\",\n      \"minValue\": 10,\n      \"maxValue\": 200\n    }\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [440, -50],
+      "id": "generate-how-what",
+      "name": "Generate How & What"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a B2B email copywriter for GrowthLab, an accounting firm that serves marketing agencies. Write in a professional, direct tone.\n\n## Task: Generate 4-Email Outbound Sequence\n\nTarget Description: {{ $json.body.context.targetDescription }}\n\n## Instructions:\nGenerate a 4-email sequence for cold outreach. Each email should:\n- Be concise (under 100 words for email body)\n- Have a compelling subject line\n- Include personalization placeholders: {{first_name}}, {{company_name}}\n- Progress logically from introduction to value to social proof to urgency\n\n## Sequence Structure:\n1. Email 1: Introduction & hook\n2. Email 2: Value proposition & case study mention\n3. Email 3: Address common objection\n4. Email 4: Final touch with urgency\n\n## Response Format:\nRespond ONLY with valid JSON:\n{\n  \"emails\": [\n    {\n      \"sequence\": 1,\n      \"name\": \"Introduction\",\n      \"subject\": \"Subject line here\",\n      \"body\": \"Hi {{first_name}},\\n\\nEmail body here...\\n\\nBest,\\nDan\",\n      \"waitDays\": 0\n    },\n    {\n      \"sequence\": 2,\n      \"name\": \"Value Proposition\",\n      \"subject\": \"Re: Subject line here\",\n      \"body\": \"Email body...\",\n      \"waitDays\": 3\n    },\n    {\n      \"sequence\": 3,\n      \"name\": \"Objection Handler\",\n      \"subject\": \"Quick question about {{company_name}}\",\n      \"body\": \"Email body...\",\n      \"waitDays\": 4\n    },\n    {\n      \"sequence\": 4,\n      \"name\": \"Final Touch\",\n      \"subject\": \"Last note from me\",\n      \"body\": \"Email body...\",\n      \"waitDays\": 5\n    }\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [440, 100],
+      "id": "generate-email-copy",
+      "name": "Generate Email Copy"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a LinkedIn outreach specialist for GrowthLab, an accounting firm that serves marketing agencies.\n\n## Task: Generate LinkedIn Message Sequence\n\nTarget Description: {{ $json.body.context.targetDescription }}\n\n## Instructions:\nGenerate 2 LinkedIn messages:\n1. Connection request message (must be under 300 characters)\n2. Follow-up message after connection (under 500 characters)\n\nBoth should:\n- Be conversational but professional\n- Include personalization placeholders: {{first_name}}, {{company_name}}\n- Focus on starting a conversation, not hard selling\n\n## Response Format:\nRespond ONLY with valid JSON:\n{\n  \"messages\": [\n    {\n      \"sequence\": 1,\n      \"name\": \"Connection Request\",\n      \"message\": \"Hi {{first_name}}, I noticed you're leading finance at {{company_name}}. Would love to connect with fellow agency finance folks. - Dan\",\n      \"characterCount\": 147\n    },\n    {\n      \"sequence\": 2,\n      \"name\": \"Follow-up Message\",\n      \"message\": \"Thanks for connecting, {{first_name}}! I work with marketing agencies on their financial operations...\\n\\nWould you be open to a quick chat about what's working (or not) with your current setup?\",\n      \"waitDays\": 2\n    }\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [440, 250],
+      "id": "generate-linkedin-copy",
+      "name": "Generate LinkedIn Copy"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response based on the step\nconst step = $('Receive Hypothesis Request').item.json.body.step;\nconst workflowId = $('Receive Hypothesis Request').item.json.body.workflowId;\nconst aiResponse = $input.first().json.text;\n\nlet parsedContent;\ntry {\n  parsedContent = JSON.parse(aiResponse);\n} catch (e) {\n  const jsonMatch = aiResponse.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    parsedContent = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('Failed to parse AI response as JSON');\n  }\n}\n\n// Build update object based on step\nconst updates = {};\nswitch (step) {\n  case 'who_where':\n    updates.target_description = parsedContent.targetDescription;\n    updates.lead_source = parsedContent.suggestedLeadSource;\n    updates.current_step = 'how_what';\n    break;\n  case 'how_what':\n    updates.search_criteria = parsedContent.searchCriteria;\n    updates.enrichment_fields = parsedContent.enrichmentFields;\n    updates.filter_criteria = parsedContent.filterCriteria;\n    updates.current_step = 'email_copy';\n    break;\n  case 'email_copy':\n    updates.email_copies = parsedContent.emails;\n    updates.current_step = 'linkedin_copy';\n    break;\n  case 'linkedin_copy':\n    updates.linkedin_copies = parsedContent.messages;\n    updates.current_step = 'review';\n    break;\n}\n\nreturn [{\n  json: {\n    workflowId,\n    step,\n    updates,\n    generatedContent: parsedContent\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0],
+      "id": "parse-response",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "marketing_hypothesis_workflows",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.workflowId }}"
+            }
+          ]
+        },
+        "fieldsToSend": {
+          "mappingMode": "autoMapInputData"
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [880, 0],
+      "id": "update-workflow",
+      "name": "Update Workflow in DB",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format response for webhook\nconst workflowId = $('Parse AI Response').item.json.workflowId;\nconst step = $('Parse AI Response').item.json.step;\nconst generatedContent = $('Parse AI Response').item.json.generatedContent;\n\nreturn [{\n  json: {\n    success: true,\n    workflowId,\n    step,\n    generatedContent\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 0],
+      "id": "format-response",
+      "name": "Format Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 0],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Receive Hypothesis Request": {
+      "main": [
+        [
+          {
+            "node": "Route by Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Step": {
+      "main": [
+        [
+          {
+            "node": "Generate Who & Where",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate How & What",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Email Copy",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate LinkedIn Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Who & Where",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate How & What",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Email Copy",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate LinkedIn Copy",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Who & Where": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate How & What": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email Copy": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate LinkedIn Copy": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Update Workflow in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Workflow in DB": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Hypothesis Lab",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

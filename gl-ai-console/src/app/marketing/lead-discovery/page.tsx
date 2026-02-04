@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Search, Users, FlaskConical, ArrowRight } from "lucide-react"
 
 // Components
@@ -9,10 +9,24 @@ import { HypothesisLabCard } from "@/components/marketing/lead-discovery/hypothe
 import { InfluencerFinderModal } from "@/components/marketing/lead-discovery/influencer-finder-modal"
 import { HypothesisLabModal } from "@/components/marketing/lead-discovery/hypothesis-lab-modal"
 
-// Test Data
+// Test Data (for generating mock discoveries - will be replaced by n8n)
 import {
   testInfluencers,
 } from "@/lib/lead-discovery-data"
+
+// Supabase
+import {
+  fetchInfluencersForUI,
+  addInfluencersToSupabase,
+  approveInfluencerInSupabase,
+  rejectInfluencerInSupabase,
+  addInfluencerToTrigifyInSupabase,
+  removeInfluencerFromTrigifyInSupabase,
+  fetchActiveHypotheses,
+  approveHypothesisInSupabase,
+  rejectHypothesisInSupabase,
+  moveToPendingInSupabase,
+} from "@/lib/supabase/marketing-leads"
 
 import { Influencer, LeadHypothesis, HypothesisEntryMode } from "@/lib/lead-discovery-types"
 
@@ -21,13 +35,30 @@ export default function LeadDiscoveryPage() {
   const [influencerFinderOpen, setInfluencerFinderOpen] = useState(false)
   const [hypothesisLabOpen, setHypothesisLabOpen] = useState(false)
 
-  // Influencer state - start with empty array
+  // Influencer state - loaded from Supabase
   const [influencers, setInfluencers] = useState<Influencer[]>([])
   const [isDiscovering, setIsDiscovering] = useState(false)
 
-  // Hypothesis state - start with empty array
+  // Hypothesis state - loaded from Supabase
   const [hypotheses, setHypotheses] = useState<LeadHypothesis[]>([])
   const [hypothesisEntryMode, setHypothesisEntryMode] = useState<HypothesisEntryMode | null>(null)
+
+  // Load data from Supabase on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [influencerData, hypothesisData] = await Promise.all([
+          fetchInfluencersForUI(),
+          fetchActiveHypotheses(),
+        ])
+        setInfluencers(influencerData)
+        setHypotheses(hypothesisData)
+      } catch (error) {
+        console.error('Failed to load data from Supabase:', error)
+      }
+    }
+    loadData()
+  }, [])
 
   // Calculate stats from state
   const stats = {
@@ -61,46 +92,74 @@ export default function LeadDiscoveryPage() {
   }
 
   // Influencer discovery handler
-  const handleRunDiscovery = (type: 'general' | 'custom', customPrompt?: string) => {
+  const handleRunDiscovery = async (type: 'general' | 'custom', customPrompt?: string) => {
     console.log('Running influencer discovery:', type, customPrompt)
     setIsDiscovering(true)
 
-    // Simulate discovery delay (3 seconds)
-    setTimeout(() => {
-      // Add discovered influencers from test data with unique IDs
-      const timestamp = Date.now()
-      const newInfluencers = testInfluencers.map((inf, index) => ({
-        ...inf,
-        id: `${inf.id}-${timestamp}-${index}`, // Unique ID for each discovery run
-        status: 'discovered' as const,
-        discoveredAt: new Date().toISOString(),
-      }))
-      setInfluencers(prev => [...prev, ...newInfluencers])
-      setIsDiscovering(false)
+    // Simulate discovery delay (will be replaced by n8n webhook)
+    setTimeout(async () => {
+      try {
+        // Generate discovered influencers from test data with unique IDs
+        const timestamp = Date.now()
+        const newInfluencers: Influencer[] = testInfluencers.map((inf, index) => ({
+          ...inf,
+          id: `${inf.id}-${timestamp}-${index}`, // Unique ID for each discovery run
+          status: 'discovered' as const,
+          discoveredAt: new Date().toISOString(),
+        }))
+
+        // Save to Supabase
+        const savedInfluencers = await addInfluencersToSupabase(newInfluencers)
+        setInfluencers(prev => [...prev, ...savedInfluencers])
+      } catch (error) {
+        console.error('Failed to save discovered influencers:', error)
+      } finally {
+        setIsDiscovering(false)
+      }
     }, 3000)
   }
 
   // Influencer action handlers
-  const handleApproveInfluencer = (id: string) => {
-    setInfluencers(prev => prev.map(inf =>
-      inf.id === id ? { ...inf, status: 'approved' as const } : inf
-    ))
+  const handleApproveInfluencer = async (id: string) => {
+    try {
+      const updated = await approveInfluencerInSupabase(id)
+      setInfluencers(prev => prev.map(inf =>
+        inf.id === id ? updated : inf
+      ))
+    } catch (error) {
+      console.error('Failed to approve influencer:', error)
+    }
   }
 
-  const handleRejectInfluencer = (id: string) => {
-    setInfluencers(prev => prev.filter(inf => inf.id !== id))
+  const handleRejectInfluencer = async (id: string) => {
+    try {
+      await rejectInfluencerInSupabase(id)
+      setInfluencers(prev => prev.filter(inf => inf.id !== id))
+    } catch (error) {
+      console.error('Failed to reject influencer:', error)
+    }
   }
 
-  const handleAddToTrigify = (id: string) => {
-    setInfluencers(prev => prev.map(inf =>
-      inf.id === id ? { ...inf, status: 'added_to_trigify' as const, addedToTrigifyAt: new Date().toISOString() } : inf
-    ))
+  const handleAddToTrigify = async (id: string) => {
+    try {
+      const updated = await addInfluencerToTrigifyInSupabase(id)
+      setInfluencers(prev => prev.map(inf =>
+        inf.id === id ? updated : inf
+      ))
+    } catch (error) {
+      console.error('Failed to add to Trigify:', error)
+    }
   }
 
-  const handleRemoveFromTrigify = (id: string) => {
-    setInfluencers(prev => prev.map(inf =>
-      inf.id === id ? { ...inf, status: 'approved' as const, addedToTrigifyAt: undefined } : inf
-    ))
+  const handleRemoveFromTrigify = async (id: string) => {
+    try {
+      const updated = await removeInfluencerFromTrigifyInSupabase(id)
+      setInfluencers(prev => prev.map(inf =>
+        inf.id === id ? updated : inf
+      ))
+    } catch (error) {
+      console.error('Failed to remove from Trigify:', error)
+    }
   }
 
   // Hypothesis workflow handler - opens modal and starts workflow
@@ -117,20 +176,35 @@ export default function LeadDiscoveryPage() {
   }
 
   // Hypothesis action handlers
-  const handleApproveHypothesis = (id: string) => {
-    setHypotheses(prev => prev.map(hyp =>
-      hyp.id === id ? { ...hyp, status: 'approved' as const, validatedAt: new Date().toISOString() } : hyp
-    ))
+  const handleApproveHypothesis = async (id: string) => {
+    try {
+      const updated = await approveHypothesisInSupabase(id)
+      setHypotheses(prev => prev.map(hyp =>
+        hyp.id === id ? updated : hyp
+      ))
+    } catch (error) {
+      console.error('Failed to approve hypothesis:', error)
+    }
   }
 
-  const handleRejectHypothesis = (id: string) => {
-    setHypotheses(prev => prev.filter(hyp => hyp.id !== id))
+  const handleRejectHypothesis = async (id: string) => {
+    try {
+      await rejectHypothesisInSupabase(id)
+      setHypotheses(prev => prev.filter(hyp => hyp.id !== id))
+    } catch (error) {
+      console.error('Failed to reject hypothesis:', error)
+    }
   }
 
-  const handleMoveToPending = (id: string) => {
-    setHypotheses(prev => prev.map(hyp =>
-      hyp.id === id ? { ...hyp, status: 'draft' as const, validatedAt: undefined } : hyp
-    ))
+  const handleMoveToPending = async (id: string) => {
+    try {
+      const updated = await moveToPendingInSupabase(id)
+      setHypotheses(prev => prev.map(hyp =>
+        hyp.id === id ? updated : hyp
+      ))
+    } catch (error) {
+      console.error('Failed to move to pending:', error)
+    }
   }
 
   return (

@@ -1,0 +1,298 @@
+{
+  "name": "Marketing - Influencer Discovery",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/influencer-discovery",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "webhook-influencer",
+      "name": "Receive Discovery Request",
+      "webhookId": "influencer-discovery-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-type",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "general",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [220, 0],
+      "id": "check-discovery-type",
+      "name": "General or Custom?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Define ICP criteria for general discovery\nconst icpCriteria = {\n  industries: ['Marketing Agency', 'Advertising', 'Digital Marketing', 'Creative Agency'],\n  roles: ['CFO', 'Finance Director', 'Controller', 'VP Finance', 'CEO', 'Founder'],\n  topics: ['agency finance', 'agency growth', 'marketing agency profitability', 'agency operations'],\n  platforms: ['linkedin'],\n  minFollowers: 1000\n};\n\nreturn [{\n  json: {\n    searchPrompt: `Find LinkedIn influencers who:\n- Work in or serve marketing agencies\n- Discuss topics like: ${icpCriteria.topics.join(', ')}\n- Have roles like: ${icpCriteria.roles.join(', ')}\n- Have at least ${icpCriteria.minFollowers} followers\n- Regularly post about agency operations, finance, or growth`,\n    criteria: icpCriteria\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, -100],
+      "id": "build-general-prompt",
+      "name": "Build General Search Prompt"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Use custom prompt from request\nconst customPrompt = $('Receive Discovery Request').item.json.body.customPrompt;\n\nreturn [{\n  json: {\n    searchPrompt: customPrompt,\n    criteria: {\n      custom: true,\n      prompt: customPrompt\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 100],
+      "id": "use-custom-prompt",
+      "name": "Use Custom Prompt"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "mergeByFields": {
+          "values": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [660, 0],
+      "id": "merge-prompts",
+      "name": "Merge Prompts"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [880, 200],
+      "id": "anthropic-llm",
+      "name": "Anthropic Claude",
+      "credentials": {
+        "anthropicApi": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a LinkedIn influencer researcher for GrowthLab, an accounting firm that serves marketing agencies.\n\n## Search Criteria:\n{{ $json.searchPrompt }}\n\n## Task:\nGenerate 5 realistic LinkedIn influencer profiles that match these criteria. These should be plausible profiles (not real people) that represent the type of influencers we should target.\n\nFor each influencer, provide:\n1. name: A realistic professional name\n2. platform: Always \"linkedin\"\n3. profileUrl: A realistic LinkedIn URL format (use linkedin.com/in/firstname-lastname-random)\n4. followerCount: A realistic follower count (1000-50000)\n5. averageEngagement: Engagement rate as percentage (1.0-8.0)\n6. niche: Array of 2-4 topics they cover\n7. icpMatch: \"high\", \"medium\", or \"low\" based on fit with marketing agency finance audience\n8. icpMatchReason: 1-2 sentences explaining the ICP match score\n\n## Response Format:\nRespond ONLY with a valid JSON array. No markdown, no explanation:\n[\n  {\n    \"name\": \"Sarah Chen\",\n    \"platform\": \"linkedin\",\n    \"profileUrl\": \"https://linkedin.com/in/sarah-chen-12345\",\n    \"followerCount\": 15000,\n    \"averageEngagement\": 4.2,\n    \"niche\": [\"agency finance\", \"marketing ops\"],\n    \"icpMatch\": \"high\",\n    \"icpMatchReason\": \"CFO at a digital agency, regularly discusses agency profitability\"\n  }\n]"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [880, 0],
+      "id": "generate-influencers",
+      "name": "Generate Influencer Profiles"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the AI response and format for Supabase insert\nconst aiResponse = $input.first().json.text;\n\nlet influencers;\ntry {\n  influencers = JSON.parse(aiResponse);\n} catch (e) {\n  const jsonMatch = aiResponse.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (jsonMatch) {\n    influencers = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('Failed to parse AI response as JSON');\n  }\n}\n\nconst timestamp = new Date().toISOString();\n\n// Format for Supabase insert\nconst formattedInfluencers = influencers.map((inf, index) => ({\n  json: {\n    name: inf.name,\n    platform: inf.platform || 'linkedin',\n    profile_url: inf.profileUrl,\n    follower_count: inf.followerCount,\n    average_engagement: inf.averageEngagement,\n    niche: inf.niche,\n    icp_match: inf.icpMatch,\n    icp_match_reason: inf.icpMatchReason,\n    status: 'discovered',\n    discovered_by: 'ai',\n    discovered_at: timestamp\n  }\n}));\n\nreturn formattedInfluencers;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 0],
+      "id": "format-influencers",
+      "name": "Format for Database"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "marketing_influencers",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1320, 0],
+      "id": "save-influencers",
+      "name": "Save Influencers",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format response for webhook\nconst savedInfluencers = $input.all();\n\nreturn [{\n  json: {\n    success: true,\n    influencers: savedInfluencers.map(item => ({\n      id: item.json.id,\n      name: item.json.name,\n      platform: item.json.platform,\n      profileUrl: item.json.profile_url,\n      followerCount: item.json.follower_count,\n      averageEngagement: item.json.average_engagement,\n      niche: item.json.niche,\n      icpMatch: item.json.icp_match,\n      icpMatchReason: item.json.icp_match_reason\n    }))\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 0],
+      "id": "format-response",
+      "name": "Format Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1760, 0],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Receive Discovery Request": {
+      "main": [
+        [
+          {
+            "node": "General or Custom?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "General or Custom?": {
+      "main": [
+        [
+          {
+            "node": "Build General Search Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Custom Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build General Search Prompt": {
+      "main": [
+        [
+          {
+            "node": "Merge Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Custom Prompt": {
+      "main": [
+        [
+          {
+            "node": "Merge Prompts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Prompts": {
+      "main": [
+        [
+          {
+            "node": "Generate Influencer Profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Influencer Profiles",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Influencer Profiles": {
+      "main": [
+        [
+          {
+            "node": "Format for Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format for Database": {
+      "main": [
+        [
+          {
+            "node": "Save Influencers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Influencers": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Lead Discovery",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

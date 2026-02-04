@@ -1,0 +1,302 @@
+{
+  "name": "Marketing - Refresh Finder Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "id": "schedule-trigger",
+      "name": "Weekly Monday 6AM"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/refresh-analysis",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 200],
+      "id": "webhook-trigger",
+      "name": "Manual Analysis Trigger",
+      "webhookId": "refresh-analysis-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "marketing_content_items",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "published"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 100],
+      "id": "fetch-published-content",
+      "name": "Fetch Published Content",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare content for analysis\nconst items = $input.all();\nconst analysisType = $('Manual Analysis Trigger').item?.json?.body?.analysisType || 'both';\n\n// Map to simplified structure for AI analysis\nconst contentForAnalysis = items.map(item => ({\n  id: item.json.id,\n  title: item.json.title,\n  contentType: item.json.content_type,\n  url: item.json.url,\n  dateCreated: item.json.date_created,\n  lastUpdated: item.json.last_updated,\n  fullContent: item.json.full_content?.substring(0, 2000) || '', // Truncate for token limits\n  keywords: item.json.keywords || []\n}));\n\nreturn [{\n  json: {\n    analysisType,\n    contentCount: contentForAnalysis.length,\n    content: contentForAnalysis\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 100],
+      "id": "prepare-content",
+      "name": "Prepare Content for Analysis"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 300],
+      "id": "anthropic-llm",
+      "name": "Anthropic Claude",
+      "credentials": {
+        "anthropicApi": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a content refresh analyst for GrowthLab, an accounting firm that serves marketing agencies.\n\n## Task: Analyze Content for Refresh Needs\n\nAnalyze the following content library and identify pieces that need refreshing:\n\n{{ JSON.stringify($json.content) }}\n\nAnalysis Type: {{ $json.analysisType }}\n\n## Analysis Criteria:\n\n### Time-Sensitive Content (if analysisType is 'time_sensitive' or 'both'):\n- Content with year references (\"2024\", \"2025\", \"this year\")\n- Statistics or data that may be outdated\n- Tax rates or regulatory information that changes annually\n- Industry benchmarks that need updating\n\n### Analytics Decay (if analysisType is 'analytics_decay' or 'both'):\n- Content older than 12 months that hasn't been updated\n- Topics that may have evolved in the industry\n- Content that could benefit from new examples or case studies\n\n## Instructions:\nFor each piece of content that needs refreshing, provide:\n1. The content ID and title\n2. Priority level (high, medium, low)\n3. The trigger type (analytics_decay or time_sensitive)\n4. Specific recommended actions\n5. For time-sensitive: the specific date reference or statistic found\n\n## Response Format:\nRespond ONLY with a valid JSON array of recommendations (max 10):\n[\n  {\n    \"contentId\": \"uuid-here\",\n    \"title\": \"Content Title\",\n    \"contentType\": \"blog\",\n    \"priority\": \"high\",\n    \"refreshTrigger\": \"time_sensitive\",\n    \"recommendedActions\": [\"Update year references from 2024 to 2025\", \"Refresh statistics with latest data\"],\n    \"timeSensitiveDate\": \"2024\",\n    \"trafficChange\": null\n  }\n]"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 100],
+      "id": "analyze-content",
+      "name": "Analyze Content for Refresh"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and format for Supabase\nconst aiResponse = $input.first().json.text;\n\nlet recommendations;\ntry {\n  recommendations = JSON.parse(aiResponse);\n} catch (e) {\n  const jsonMatch = aiResponse.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (jsonMatch) {\n    recommendations = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('Failed to parse AI response as JSON');\n  }\n}\n\nconst timestamp = new Date().toISOString();\n\n// Format for Supabase insert\nconst formattedRecommendations = recommendations.map(rec => ({\n  json: {\n    content_id: rec.contentId,\n    title: rec.title,\n    content_type: rec.contentType,\n    priority: rec.priority,\n    refresh_trigger: rec.refreshTrigger,\n    recommended_actions: rec.recommendedActions,\n    time_sensitive_date: rec.timeSensitiveDate || null,\n    traffic_change: rec.trafficChange || null,\n    status: 'pending',\n    last_analyzed_at: timestamp\n  }\n}));\n\nreturn formattedRecommendations;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 100],
+      "id": "format-recommendations",
+      "name": "Format Recommendations"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "marketing_refresh_recommendations",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 100],
+      "id": "save-recommendations",
+      "name": "Save Recommendations",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format response for webhook\nconst savedRecs = $input.all();\n\nreturn [{\n  json: {\n    success: true,\n    recommendations: savedRecs.map(item => ({\n      id: item.json.id,\n      contentId: item.json.content_id,\n      title: item.json.title,\n      contentType: item.json.content_type,\n      priority: item.json.priority,\n      refreshTrigger: item.json.refresh_trigger,\n      recommendedActions: item.json.recommended_actions,\n      timeSensitiveDate: item.json.time_sensitive_date,\n      trafficChange: item.json.traffic_change\n    }))\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 100],
+      "id": "format-response",
+      "name": "Format Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1540, 200],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "marketing_sync_logs",
+        "fieldsToSend": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sync_type": "refresh_analysis",
+            "status": "completed",
+            "items_processed": "={{ $('Prepare Content for Analysis').item.json.contentCount }}",
+            "items_added": "={{ $('Save Recommendations').all().length }}",
+            "completed_at": "={{ $now.toISO() }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1540, 0],
+      "id": "log-analysis",
+      "name": "Log Analysis",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekly Monday 6AM": {
+      "main": [
+        [
+          {
+            "node": "Fetch Published Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Analysis Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Published Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Published Content": {
+      "main": [
+        [
+          {
+            "node": "Prepare Content for Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Content for Analysis": {
+      "main": [
+        [
+          {
+            "node": "Analyze Content for Refresh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyze Content for Refresh",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Content for Refresh": {
+      "main": [
+        [
+          {
+            "node": "Format Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Save Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Refresh Finder",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

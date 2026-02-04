@@ -1,0 +1,382 @@
+{
+  "name": "Marketing - Brief Builder",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/brief-builder",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "webhook-brief-builder",
+      "name": "Receive Brief Request",
+      "webhookId": "brief-builder-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "marketing_content_briefs",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.body.briefId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 0],
+      "id": "fetch-brief",
+      "name": "Fetch Brief Details",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-step-outline",
+              "leftValue": "={{ $('Receive Brief Request').item.json.body.step }}",
+              "rightValue": "outline",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [440, 0],
+      "id": "switch-step",
+      "name": "Route by Step",
+      "outputs": ["outline", "first_draft", "faqs_links", "author_recommendation"]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 300],
+      "id": "anthropic-llm",
+      "name": "Anthropic Claude",
+      "credentials": {
+        "anthropicApi": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a content strategist for GrowthLab, an accounting firm that serves marketing agencies.\n\n## Task: Generate Content Outline\n\nCreate a detailed outline for the following content piece:\n\nTitle: {{ $('Fetch Brief Details').item.json.title }}\nFormat: {{ $('Fetch Brief Details').item.json.target_format }}\nTarget Keywords: {{ $('Fetch Brief Details').item.json.target_keywords }}\n\n## Instructions:\nGenerate a structured outline with 4-6 main sections. Each section should have:\n1. A clear heading\n2. 2-4 bullet points of key topics to cover\n3. Suggested word count for that section\n\n## Response Format:\nRespond ONLY with a valid JSON array of outline sections:\n[\n  {\n    \"heading\": \"Introduction\",\n    \"bullets\": [\"Hook with agency pain point\", \"Brief overview of solution\"],\n    \"wordCount\": 150\n  },\n  {\n    \"heading\": \"Section Title\",\n    \"bullets\": [\"Key point 1\", \"Key point 2\", \"Key point 3\"],\n    \"wordCount\": 300\n  }\n]"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, -200],
+      "id": "generate-outline",
+      "name": "Generate Outline"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a content writer for GrowthLab, an accounting firm that serves marketing agencies. Write in a professional yet approachable tone.\n\n## Task: Write First Draft\n\nWrite a complete first draft based on the following outline:\n\nTitle: {{ $('Fetch Brief Details').item.json.title }}\nFormat: {{ $('Fetch Brief Details').item.json.target_format }}\nOutline: {{ JSON.stringify($('Fetch Brief Details').item.json.outline) }}\n\n## Writing Guidelines:\n- Use clear, concise language\n- Include relevant examples for marketing agencies\n- Focus on actionable insights\n- Maintain consistent tone throughout\n- Target word count: 800-1200 words for blogs, 1500-2000 for case studies\n\n## Response Format:\nReturn the complete draft as plain text with markdown formatting for headings and lists."
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, -50],
+      "id": "generate-draft",
+      "name": "Generate First Draft"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a content strategist for GrowthLab, an accounting firm that serves marketing agencies.\n\n## Task: Generate FAQs and Link Suggestions\n\nBased on this content:\n\nTitle: {{ $('Fetch Brief Details').item.json.title }}\nDraft: {{ $('Fetch Brief Details').item.json.first_draft }}\n\n## Instructions:\n1. Generate 3-5 relevant FAQs that readers might have after reading this content\n2. Suggest 2-3 internal link opportunities (topics we should link to from our content library)\n3. Suggest 2-3 external authoritative sources to reference\n\n## Response Format:\nRespond ONLY with valid JSON:\n{\n  \"faqs\": [\n    {\n      \"question\": \"FAQ question here?\",\n      \"answer\": \"Concise answer here.\"\n    }\n  ],\n  \"internalLinks\": [\n    {\n      \"topic\": \"Related topic title\",\n      \"reason\": \"Why this link is relevant\"\n    }\n  ],\n  \"externalLinks\": [\n    {\n      \"source\": \"Source name (e.g., IRS, AICPA)\",\n      \"topic\": \"What to link to\",\n      \"reason\": \"Why this source adds credibility\"\n    }\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 100],
+      "id": "generate-faqs-links",
+      "name": "Generate FAQs & Links"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a content assignment specialist for GrowthLab.\n\n## Task: Recommend Author\n\nBased on the following content, recommend the best author from our team:\n\nTitle: {{ $('Fetch Brief Details').item.json.title }}\nFormat: {{ $('Fetch Brief Details').item.json.target_format }}\nKeywords: {{ $('Fetch Brief Details').item.json.target_keywords }}\n\n## Available Authors:\n1. **Dan** - CEO, expertise in agency finance, leadership, strategic growth, profitability\n2. **Alison** - Marketing Director, expertise in marketing strategy, content marketing, brand building\n3. **Abigail** - HR Director, expertise in HR compliance, employee management, agency culture\n4. **Ryan** - Operations Manager, expertise in agency operations, workflow optimization, processes\n\n## Instructions:\nAnalyze the content topic and recommend the most appropriate author based on their expertise.\n\n## Response Format:\nRespond ONLY with valid JSON:\n{\n  \"recommendedAuthor\": \"Dan\",\n  \"reason\": \"This content focuses on agency profitability and financial management, which aligns with Dan's expertise as CEO and finance specialist.\",\n  \"alternateAuthor\": \"Ryan\",\n  \"alternateReason\": \"Ryan could also contribute given the operational aspects of the topic.\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 250],
+      "id": "generate-author",
+      "name": "Recommend Author"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response based on the step\nconst step = $('Receive Brief Request').item.json.body.step;\nconst briefId = $('Receive Brief Request').item.json.body.briefId;\nconst aiResponse = $input.first().json.text;\n\nlet parsedContent;\ntry {\n  // Try to parse as JSON\n  parsedContent = JSON.parse(aiResponse);\n} catch (e) {\n  // If not JSON (like first_draft), use as-is\n  parsedContent = aiResponse;\n}\n\n// Build update object based on step\nconst updates = {};\nswitch (step) {\n  case 'outline':\n    updates.outline = parsedContent;\n    updates.current_step = 'outline_review';\n    break;\n  case 'first_draft':\n    updates.first_draft = parsedContent;\n    updates.current_step = 'draft_review';\n    break;\n  case 'faqs_links':\n    updates.faqs = parsedContent.faqs || [];\n    updates.internal_links = parsedContent.internalLinks || [];\n    updates.external_links = parsedContent.externalLinks || [];\n    updates.current_step = 'links_review';\n    break;\n  case 'author_recommendation':\n    updates.recommended_author = parsedContent.recommendedAuthor;\n    updates.current_step = 'author_review';\n    break;\n}\n\nreturn [{\n  json: {\n    briefId,\n    step,\n    updates,\n    generatedContent: parsedContent\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0],
+      "id": "parse-response",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "marketing_content_briefs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.briefId }}"
+            }
+          ]
+        },
+        "fieldsToSend": {
+          "mappingMode": "autoMapInputData"
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "id": "update-brief",
+      "name": "Update Brief in DB",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format response for webhook\nconst briefId = $('Parse AI Response').item.json.briefId;\nconst step = $('Parse AI Response').item.json.step;\nconst generatedContent = $('Parse AI Response').item.json.generatedContent;\n\nreturn [{\n  json: {\n    success: true,\n    briefId,\n    step,\n    generatedContent\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 0],
+      "id": "format-response",
+      "name": "Format Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1540, 0],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Receive Brief Request": {
+      "main": [
+        [
+          {
+            "node": "Fetch Brief Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Brief Details": {
+      "main": [
+        [
+          {
+            "node": "Route by Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Step": {
+      "main": [
+        [
+          {
+            "node": "Generate Outline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate First Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate FAQs & Links",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recommend Author",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Outline",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate First Draft",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate FAQs & Links",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recommend Author",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Outline": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate First Draft": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate FAQs & Links": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recommend Author": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Update Brief in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Brief in DB": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Brief Builder",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

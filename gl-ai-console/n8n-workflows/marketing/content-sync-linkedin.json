@@ -1,0 +1,373 @@
+{
+  "name": "Marketing - Sync LinkedIn Posts",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 3 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "id": "schedule-trigger",
+      "name": "Daily 3:30AM Trigger"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/content-sync/linkedin",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 200],
+      "id": "webhook-trigger",
+      "name": "Manual Sync Trigger",
+      "webhookId": "content-sync-linkedin-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "marketing_sync_logs",
+        "fieldsToSend": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sync_type": "linkedin",
+            "status": "running",
+            "started_at": "={{ $now.toISO() }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 100],
+      "id": "create-sync-log",
+      "name": "Create Sync Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.phantombuster.com/api/v2/agents/fetch-output",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Phantombuster-Key",
+              "value": "={{ $credentials.apiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "YOUR_PHANTOMBUSTER_AGENT_ID"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "id": "fetch-company-posts",
+      "name": "Fetch Company Posts (Phantombuster)",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_PHANTOMBUSTER_CREDENTIAL_ID",
+          "name": "Phantombuster API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.phantombuster.com/api/v2/agents/fetch-output",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Phantombuster-Key",
+              "value": "={{ $credentials.apiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "YOUR_PHANTOMBUSTER_DAN_AGENT_ID"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 200],
+      "id": "fetch-dan-posts",
+      "name": "Fetch Dan's Posts (Phantombuster)",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_PHANTOMBUSTER_CREDENTIAL_ID",
+          "name": "Phantombuster API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "mergeByFields": {
+          "values": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [660, 100],
+      "id": "merge-posts",
+      "name": "Merge All Posts"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process LinkedIn posts and format for Supabase\nconst items = $input.all();\nconst timestamp = new Date().toISOString();\n\n// Flatten and deduplicate posts\nconst allPosts = [];\nconst seenIds = new Set();\n\nfor (const item of items) {\n  // Phantombuster returns posts in different formats\n  // Adjust based on actual output structure\n  const posts = item.json.output?.posts || item.json.posts || [item.json];\n  \n  for (const post of posts) {\n    const postId = post.postUrl || post.url || post.id;\n    if (postId && !seenIds.has(postId)) {\n      seenIds.add(postId);\n      allPosts.push({\n        json: {\n          title: (post.text || post.content || '').substring(0, 100) + '...',\n          content_type: 'linkedin',\n          url: post.postUrl || post.url,\n          source_platform: 'linkedin',\n          source_id: postId,\n          status: 'published',\n          author: post.authorName || post.author || 'GrowthLab',\n          description: (post.text || post.content || '').substring(0, 500),\n          full_content: post.text || post.content || '',\n          date_created: post.date || post.publishedAt || timestamp,\n          synced_at: timestamp\n        }\n      });\n    }\n  }\n}\n\nif (allPosts.length === 0) {\n  return [{\n    json: {\n      message: 'No posts found - check Phantombuster agent configuration',\n      itemsProcessed: 0,\n      itemsAdded: 0,\n      itemsUpdated: 0\n    }\n  }];\n}\n\nreturn allPosts;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 100],
+      "id": "format-posts",
+      "name": "Format Posts for DB"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "marketing_content_items",
+        "conflictColumns": "source_platform, source_id",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 100],
+      "id": "upsert-posts",
+      "name": "Upsert Posts to DB",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Count results for sync log\nconst items = $input.all();\n\nreturn [{\n  json: {\n    itemsProcessed: items.length,\n    itemsAdded: items.length,\n    itemsUpdated: 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 100],
+      "id": "count-results",
+      "name": "Count Results"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "marketing_sync_logs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Create Sync Log').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsToSend": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "completed",
+            "completed_at": "={{ $now.toISO() }}",
+            "items_processed": "={{ $json.itemsProcessed }}",
+            "items_added": "={{ $json.itemsAdded }}",
+            "items_updated": "={{ $json.itemsUpdated }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1540, 100],
+      "id": "update-sync-log",
+      "name": "Update Sync Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"syncType\": \"linkedin\",\n  \"itemsProcessed\": {{ $('Count Results').item.json.itemsProcessed }},\n  \"itemsAdded\": {{ $('Count Results').item.json.itemsAdded }},\n  \"itemsUpdated\": {{ $('Count Results').item.json.itemsUpdated }}\n}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1760, 200],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Daily 3:30AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Sync Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Fetch Company Posts (Phantombuster)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Dan's Posts (Phantombuster)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Company Posts (Phantombuster)": {
+      "main": [
+        [
+          {
+            "node": "Merge All Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Dan's Posts (Phantombuster)": {
+      "main": [
+        [
+          {
+            "node": "Merge All Posts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge All Posts": {
+      "main": [
+        [
+          {
+            "node": "Format Posts for DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Posts for DB": {
+      "main": [
+        [
+          {
+            "node": "Upsert Posts to DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Posts to DB": {
+      "main": [
+        [
+          {
+            "node": "Count Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Results": {
+      "main": [
+        [
+          {
+            "node": "Update Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Content Sync",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

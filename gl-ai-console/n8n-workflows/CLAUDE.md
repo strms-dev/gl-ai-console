@@ -37,3 +37,30 @@ When errors occur:
 - Clear and rebuild node-research.md with fresh MCP tool queries
 - Re-validate all configurations
 - Delete and recreate the workflow (never update)
+
+## Supabase Node Limitations
+
+**IMPORTANT**: The n8n Supabase node does NOT have an "upsert" operation. Available operations are:
+- **Create** - Create a new row
+- **Delete** - Delete a row
+- **Get** - Get a row
+- **Get Many** - Get many rows
+- **Update** - Update a row
+- **Custom API Call** - For advanced operations
+
+**For upsert functionality**, you have two options:
+
+1. **Custom API Call** - Use the Supabase REST API with upsert:
+   ```
+   Method: POST
+   URL: /rest/v1/table_name
+   Headers: Prefer: resolution=merge-duplicates
+   Body: Your data as JSON
+   ```
+
+2. **Logic-based approach** - Check if row exists, then Create or Update:
+   ```
+   Get row by unique key → IF exists → Update, ELSE → Create
+   ```
+
+Option 1 (Custom API Call) is cleaner for bulk operations. Option 2 is simpler for single-row operations.

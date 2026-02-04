@@ -1,0 +1,227 @@
+{
+  "name": "Marketing - Repurpose Factory",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/repurpose",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "webhook-repurpose",
+      "name": "Receive Repurpose Request",
+      "webhookId": "repurpose-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract request data\nconst body = $input.first().json.body;\n\nreturn [{\n  json: {\n    sourceContentId: body.sourceContentId,\n    sourceContent: body.sourceContent,\n    sourceFormat: body.sourceFormat,\n    targetFormats: body.targetFormats\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "id": "extract-request",
+      "name": "Extract Request Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split target formats into individual items for processing\nconst data = $input.first().json;\nconst targetFormats = data.targetFormats || [];\n\nreturn targetFormats.map(format => ({\n  json: {\n    sourceContentId: data.sourceContentId,\n    sourceContent: data.sourceContent,\n    sourceFormat: data.sourceFormat,\n    targetFormat: format\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0],
+      "id": "split-formats",
+      "name": "Split Target Formats"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 200],
+      "id": "anthropic-llm",
+      "name": "Anthropic Claude",
+      "credentials": {
+        "anthropicApi": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a content repurposing specialist for GrowthLab, an accounting firm that serves marketing agencies.\n\n## Task: Repurpose Content to {{ $json.targetFormat }}\n\n## Source Content:\nFormat: {{ $json.sourceFormat }}\nContent:\n{{ $json.sourceContent }}\n\n## Target Format: {{ $json.targetFormat }}\n\n## Format-Specific Instructions:\n\n### If targeting 'linkedin':\nGenerate 5 LinkedIn post variations. Each should:\n- Be under 1300 characters (optimal engagement length)\n- Include a strong hook in the first line\n- Use line breaks for readability\n- End with a call-to-action or question\n- Include 3-5 relevant hashtags\n\n### If targeting 'instagram':\nGenerate 5 Instagram caption variations. Each should:\n- Start with an attention-grabbing opener\n- Be conversational and engaging\n- Include 5-10 relevant hashtags at the end\n- End with a call-to-action\n\n### If targeting 'youtube':\nGenerate a video script including:\n- Hook/intro (15-30 seconds)\n- Main content sections with timestamps\n- Key talking points for each section\n- Outro with CTA\n- Suggested video title and description\n\n### If targeting 'blog':\nGenerate a full blog post including:\n- SEO-optimized title\n- Meta description (150 chars)\n- Full article body (800-1200 words)\n- 3-5 FAQs at the end\n\n### If targeting 'case_study':\nGenerate a case study including:\n- Client profile (anonymized)\n- Challenge section\n- Solution section\n- Results with metrics\n- Key takeaways\n\n### If targeting 'newsletter':\nGenerate a newsletter section including:\n- Engaging subject line options (3)\n- Preview text\n- Main content (300-500 words)\n- CTA button text\n\n## Response Format:\nRespond ONLY with valid JSON:\n{\n  \"format\": \"{{ $json.targetFormat }}\",\n  \"variations\": [\n    {\n      \"title\": \"Variation title or identifier\",\n      \"content\": \"The repurposed content here...\"\n    }\n  ]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 0],
+      "id": "generate-repurposed",
+      "name": "Generate Repurposed Content"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response\nconst aiResponse = $input.first().json.text;\nconst sourceContentId = $('Split Target Formats').item.json.sourceContentId;\nconst targetFormat = $('Split Target Formats').item.json.targetFormat;\n\nlet parsedContent;\ntry {\n  parsedContent = JSON.parse(aiResponse);\n} catch (e) {\n  const jsonMatch = aiResponse.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    parsedContent = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('Failed to parse AI response as JSON');\n  }\n}\n\nreturn [{\n  json: {\n    sourceContentId,\n    format: targetFormat,\n    variations: parsedContent.variations || []\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0],
+      "id": "parse-response",
+      "name": "Parse AI Response"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "mergeByFields": {
+          "values": []
+        },
+        "options": {
+          "clashHandling": {
+            "values": {
+              "mergeMode": "addSuffix"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1100, 0],
+      "id": "merge-results",
+      "name": "Merge All Formats"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine all repurposed content into final response\nconst items = $input.all();\nconst sourceContentId = items[0]?.json?.sourceContentId;\n\nconst variations = items.map(item => ({\n  format: item.json.format,\n  content: item.json.variations[0]?.content || '',\n  title: item.json.variations[0]?.title || item.json.format,\n  allVariations: item.json.variations\n}));\n\nreturn [{\n  json: {\n    success: true,\n    sourceContentId,\n    variations\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 0],
+      "id": "format-response",
+      "name": "Format Final Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1540, 0],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Receive Repurpose Request": {
+      "main": [
+        [
+          {
+            "node": "Extract Request Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Request Data": {
+      "main": [
+        [
+          {
+            "node": "Split Target Formats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Target Formats": {
+      "main": [
+        [
+          {
+            "node": "Generate Repurposed Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Repurposed Content",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Repurposed Content": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Merge All Formats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge All Formats": {
+      "main": [
+        [
+          {
+            "node": "Format Final Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Final Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Repurpose Factory",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

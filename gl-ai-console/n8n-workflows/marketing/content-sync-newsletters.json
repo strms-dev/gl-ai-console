@@ -1,0 +1,329 @@
+{
+  "name": "Marketing - Sync Newsletters from HubSpot",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 4 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "id": "schedule-trigger",
+      "name": "Daily 4:30AM Trigger"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/content-sync/newsletters",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 200],
+      "id": "webhook-trigger",
+      "name": "Manual Sync Trigger",
+      "webhookId": "content-sync-newsletters-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "marketing_sync_logs",
+        "fieldsToSend": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sync_type": "newsletters",
+            "status": "running",
+            "started_at": "={{ $now.toISO() }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 100],
+      "id": "create-sync-log",
+      "name": "Create Sync Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "marketingEmail",
+        "operation": "getAll",
+        "returnAll": true,
+        "additionalFields": {
+          "state": "PUBLISHED"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2,
+      "position": [440, 100],
+      "id": "fetch-emails",
+      "name": "Fetch Marketing Emails",
+      "credentials": {
+        "hubSpotOAuth2Api": {
+          "id": "YOUR_HUBSPOT_CREDENTIAL_ID",
+          "name": "HubSpot OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter for newsletters only\nconst emails = $input.all();\n\n// Filter for HR Happenings and A Raw Take newsletters\nconst newsletters = emails.filter(email => {\n  const subject = (email.json.subject || email.json.name || '').toLowerCase();\n  return subject.includes('hr happenings') || \n         subject.includes('a raw take') ||\n         subject.includes('newsletter');\n});\n\nif (newsletters.length === 0) {\n  return [{\n    json: {\n      message: 'No newsletters found matching filter criteria',\n      itemsProcessed: 0,\n      itemsAdded: 0,\n      itemsUpdated: 0\n    }\n  }];\n}\n\nreturn newsletters;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 100],
+      "id": "filter-newsletters",
+      "name": "Filter Newsletters"
+    },
+    {
+      "parameters": {
+        "resource": "marketingEmail",
+        "operation": "get",
+        "emailId": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2,
+      "position": [880, 100],
+      "id": "fetch-email-content",
+      "name": "Fetch Email Content",
+      "credentials": {
+        "hubSpotOAuth2Api": {
+          "id": "YOUR_HUBSPOT_CREDENTIAL_ID",
+          "name": "HubSpot OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format newsletter for Supabase\nconst email = $input.first().json;\nconst timestamp = new Date().toISOString();\n\n// Extract text content from HTML\nconst htmlContent = email.htmlBody || email.body || '';\nconst textContent = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n\nreturn [{\n  json: {\n    title: email.subject || email.name,\n    content_type: 'newsletter',\n    url: email.webVersionUrl || email.publicUrl || null,\n    source_platform: 'hubspot',\n    source_id: String(email.id),\n    status: 'published',\n    author: email.authorName || 'GrowthLab',\n    description: textContent.substring(0, 500),\n    full_content: textContent.substring(0, 50000),\n    word_count: textContent.split(/\\s+/).length,\n    date_created: email.publishDate || email.created || timestamp,\n    synced_at: timestamp\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100],
+      "id": "format-newsletter",
+      "name": "Format Newsletter for DB"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "marketing_content_items",
+        "conflictColumns": "source_platform, source_id",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1320, 100],
+      "id": "upsert-newsletters",
+      "name": "Upsert Newsletters to DB",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Count results for sync log\nconst items = $input.all();\n\nreturn [{\n  json: {\n    itemsProcessed: items.length,\n    itemsAdded: items.length,\n    itemsUpdated: 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 100],
+      "id": "count-results",
+      "name": "Count Results"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "marketing_sync_logs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Create Sync Log').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsToSend": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "completed",
+            "completed_at": "={{ $now.toISO() }}",
+            "items_processed": "={{ $json.itemsProcessed }}",
+            "items_added": "={{ $json.itemsAdded }}",
+            "items_updated": "={{ $json.itemsUpdated }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1760, 100],
+      "id": "update-sync-log",
+      "name": "Update Sync Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"syncType\": \"newsletters\",\n  \"itemsProcessed\": {{ $('Count Results').item.json.itemsProcessed }},\n  \"itemsAdded\": {{ $('Count Results').item.json.itemsAdded }},\n  \"itemsUpdated\": {{ $('Count Results').item.json.itemsUpdated }}\n}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1980, 200],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Daily 4:30AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Sync Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Fetch Marketing Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Marketing Emails": {
+      "main": [
+        [
+          {
+            "node": "Filter Newsletters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Newsletters": {
+      "main": [
+        [
+          {
+            "node": "Fetch Email Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Email Content": {
+      "main": [
+        [
+          {
+            "node": "Format Newsletter for DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Newsletter for DB": {
+      "main": [
+        [
+          {
+            "node": "Upsert Newsletters to DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Newsletters to DB": {
+      "main": [
+        [
+          {
+            "node": "Count Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Results": {
+      "main": [
+        [
+          {
+            "node": "Update Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Content Sync",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

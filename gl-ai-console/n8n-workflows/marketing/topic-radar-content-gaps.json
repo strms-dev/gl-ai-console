@@ -1,0 +1,228 @@
+{
+  "name": "Marketing - Topic Radar Content Gaps",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/topic-radar",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "webhook-topic-radar",
+      "name": "Receive Topic Radar Request",
+      "webhookId": "topic-radar-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "marketing_content_items",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 0],
+      "id": "fetch-content-library",
+      "name": "Fetch Content Library",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate content by type and extract key topics\nconst items = $input.all();\n\nconst contentByType = {};\nconst allKeywords = [];\nconst allTopics = [];\n\nfor (const item of items) {\n  const type = item.json.content_type;\n  const keywords = item.json.keywords || [];\n  const title = item.json.title;\n  \n  if (!contentByType[type]) {\n    contentByType[type] = [];\n  }\n  contentByType[type].push(title);\n  allKeywords.push(...keywords);\n  allTopics.push(title);\n}\n\n// Count keyword frequency\nconst keywordFrequency = {};\nfor (const keyword of allKeywords) {\n  keywordFrequency[keyword] = (keywordFrequency[keyword] || 0) + 1;\n}\n\nreturn [{\n  json: {\n    contentByType,\n    totalContent: items.length,\n    topKeywords: Object.entries(keywordFrequency)\n      .sort((a, b) => b[1] - a[1])\n      .slice(0, 20)\n      .map(([keyword, count]) => ({ keyword, count })),\n    contentTitles: allTopics\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0],
+      "id": "analyze-content",
+      "name": "Analyze Content Library"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 200],
+      "id": "anthropic-llm",
+      "name": "Anthropic Claude",
+      "credentials": {
+        "anthropicApi": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a content strategist for GrowthLab, an accounting firm that specializes in serving marketing agencies. Your task is to identify content gaps and suggest new topics.\n\n## Current Content Library Analysis:\n- Total pieces of content: {{ $json.totalContent }}\n- Content by type: {{ JSON.stringify($json.contentByType) }}\n- Top keywords: {{ JSON.stringify($json.topKeywords) }}\n\n## Category: {{ $('Receive Topic Radar Request').item.json.body.category }}\n\n## Instructions:\nBased on the category, generate 3-5 topic ideas that would fill gaps in the content library.\n\nFor each topic idea, provide:\n1. topic: A clear, compelling topic title\n2. gapScore: A score from 0-100 indicating how significant this content gap is (higher = more important)\n3. rationale: 2-3 sentences explaining why this topic is valuable and what gap it fills\n4. suggestedFormat: The best format for this content (blog, case_study, youtube, linkedin, newsletter)\n\n## Response Format:\nRespond ONLY with a valid JSON array. No markdown, no explanation, just the JSON array:\n[\n  {\n    \"topic\": \"Topic title here\",\n    \"gapScore\": 85,\n    \"rationale\": \"Explanation here\",\n    \"suggestedFormat\": \"blog\"\n  }\n]"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 0],
+      "id": "generate-ideas",
+      "name": "Generate Topic Ideas"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the AI response and format for Supabase insert\nconst aiResponse = $input.first().json.text;\n\nlet ideas;\ntry {\n  // Try to parse the JSON response\n  ideas = JSON.parse(aiResponse);\n} catch (e) {\n  // If parsing fails, try to extract JSON from the response\n  const jsonMatch = aiResponse.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (jsonMatch) {\n    ideas = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('Failed to parse AI response as JSON');\n  }\n}\n\nconst category = $('Receive Topic Radar Request').item.json.body.category || 'generalized';\nconst timestamp = new Date().toISOString();\n\n// Format for Supabase insert\nconst formattedIdeas = ideas.map((idea, index) => ({\n  json: {\n    topic: idea.topic,\n    gap_score: idea.gapScore,\n    rationale: idea.rationale,\n    suggested_format: idea.suggestedFormat,\n    status: 'new',\n    category: category,\n    created_by: 'ai',\n    created_at: timestamp\n  }\n}));\n\nreturn formattedIdeas;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0],
+      "id": "format-ideas",
+      "name": "Format Ideas for DB"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "marketing_topic_ideas",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "id": "save-ideas",
+      "name": "Save Ideas to Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format response for webhook\nconst savedIdeas = $input.all();\n\nreturn [{\n  json: {\n    success: true,\n    ideas: savedIdeas.map(item => ({\n      id: item.json.id,\n      topic: item.json.topic,\n      gapScore: item.json.gap_score,\n      rationale: item.json.rationale,\n      suggestedFormat: item.json.suggested_format,\n      category: item.json.category\n    }))\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 0],
+      "id": "format-response",
+      "name": "Format Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1540, 0],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Receive Topic Radar Request": {
+      "main": [
+        [
+          {
+            "node": "Fetch Content Library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Content Library": {
+      "main": [
+        [
+          {
+            "node": "Analyze Content Library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Content Library": {
+      "main": [
+        [
+          {
+            "node": "Generate Topic Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Topic Ideas",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Topic Ideas": {
+      "main": [
+        [
+          {
+            "node": "Format Ideas for DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Ideas for DB": {
+      "main": [
+        [
+          {
+            "node": "Save Ideas to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Ideas to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

@@ -1,0 +1,355 @@
+{
+  "name": "Marketing - Sync Website Pages",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 2 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "id": "schedule-trigger",
+      "name": "Daily 2:30AM Trigger"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/content-sync/website-pages",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 200],
+      "id": "webhook-trigger",
+      "name": "Manual Sync Trigger",
+      "webhookId": "content-sync-website-pages-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "marketing_sync_logs",
+        "fieldsToSend": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sync_type": "website_pages",
+            "status": "running",
+            "started_at": "={{ $now.toISO() }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 100],
+      "id": "create-sync-log",
+      "name": "Create Sync Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://growthlab.com/sitemap.xml",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 100],
+      "id": "fetch-sitemap",
+      "name": "Fetch Sitemap"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse sitemap XML and extract page URLs\nconst sitemapXml = $input.first().json.data || $input.first().json;\n\n// Simple regex extraction of URLs from sitemap\n// This is a placeholder - real implementation depends on sitemap structure\nconst urlMatches = String(sitemapXml).match(/<loc>([^<]+)<\\/loc>/g) || [];\nconst allUrls = urlMatches.map(match => match.replace(/<\\/?loc>/g, ''));\n\n// Filter out blog and case study pages (those are handled by other workflows)\nconst pageUrls = allUrls.filter(url => {\n  const path = new URL(url).pathname.toLowerCase();\n  return !path.includes('/blog') && \n         !path.includes('/case-stud') &&\n         !path.includes('/resource-center/blog') &&\n         !path.includes('/resource-center/case-studies');\n});\n\nif (pageUrls.length === 0) {\n  return [{\n    json: {\n      message: 'No website pages found in sitemap (excluding blogs/case studies)',\n      itemsProcessed: 0,\n      itemsAdded: 0,\n      itemsUpdated: 0\n    }\n  }];\n}\n\n// Return each URL as separate item for processing\nreturn pageUrls.slice(0, 50).map(url => ({ json: { url } })); // Limit to 50 pages per run"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 100],
+      "id": "parse-sitemap",
+      "name": "Parse Sitemap URLs"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 100],
+      "id": "fetch-page",
+      "name": "Fetch Page Content"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": "title, h1",
+              "returnArray": false
+            },
+            {
+              "key": "content",
+              "cssSelector": "main, article, .content, .page-content, body",
+              "returnArray": false
+            },
+            {
+              "key": "metaDescription",
+              "cssSelector": "meta[name='description']",
+              "returnArray": false,
+              "returnValue": "attribute",
+              "attribute": "content"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [1100, 100],
+      "id": "extract-content",
+      "name": "Extract Page Content"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format page for Supabase\nconst pageData = $input.first().json;\nconst originalUrl = $('Parse Sitemap URLs').item.json.url;\nconst timestamp = new Date().toISOString();\n\n// Extract text content\nconst title = pageData.title || 'Untitled Page';\nconst content = (pageData.content || '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst description = pageData.metaDescription || content.substring(0, 200);\n\n// Generate source_id from URL path\nconst urlPath = new URL(originalUrl).pathname;\nconst sourceId = urlPath.replace(/\\//g, '-').replace(/^-|-$/g, '') || 'homepage';\n\nreturn [{\n  json: {\n    title: title.substring(0, 255),\n    content_type: 'website_page',\n    url: originalUrl,\n    source_platform: 'duda',\n    source_id: sourceId,\n    status: 'published',\n    author: 'GrowthLab',\n    description: description.substring(0, 500),\n    full_content: content.substring(0, 50000),\n    word_count: content.split(/\\s+/).length,\n    date_created: timestamp,\n    synced_at: timestamp\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 100],
+      "id": "format-page",
+      "name": "Format Page for DB"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "marketing_content_items",
+        "conflictColumns": "source_platform, source_id",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1540, 100],
+      "id": "upsert-pages",
+      "name": "Upsert Pages to DB",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Count results for sync log\nconst items = $input.all();\n\nreturn [{\n  json: {\n    itemsProcessed: items.length,\n    itemsAdded: items.length,\n    itemsUpdated: 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 100],
+      "id": "count-results",
+      "name": "Count Results"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "marketing_sync_logs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Create Sync Log').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsToSend": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "completed",
+            "completed_at": "={{ $now.toISO() }}",
+            "items_processed": "={{ $json.itemsProcessed }}",
+            "items_added": "={{ $json.itemsAdded }}",
+            "items_updated": "={{ $json.itemsUpdated }}"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1980, 100],
+      "id": "update-sync-log",
+      "name": "Update Sync Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"syncType\": \"website_pages\",\n  \"itemsProcessed\": {{ $('Count Results').item.json.itemsProcessed }},\n  \"itemsAdded\": {{ $('Count Results').item.json.itemsAdded }},\n  \"itemsUpdated\": {{ $('Count Results').item.json.itemsUpdated }}\n}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2200, 200],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Daily 2:30AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Sync Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sitemap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sitemap": {
+      "main": [
+        [
+          {
+            "node": "Parse Sitemap URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Sitemap URLs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Page Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Page Content": {
+      "main": [
+        [
+          {
+            "node": "Extract Page Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Page Content": {
+      "main": [
+        [
+          {
+            "node": "Format Page for DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Page for DB": {
+      "main": [
+        [
+          {
+            "node": "Upsert Pages to DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Pages to DB": {
+      "main": [
+        [
+          {
+            "node": "Count Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Results": {
+      "main": [
+        [
+          {
+            "node": "Update Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Content Sync",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

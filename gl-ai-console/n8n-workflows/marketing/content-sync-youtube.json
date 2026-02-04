@@ -1,0 +1,429 @@
+{
+  "name": "Marketing - Sync YouTube Videos",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        2080,
+        -96
+      ],
+      "id": "62a85f1a-98e5-4900-b805-3dbf172e3e38",
+      "name": "Daily 3AM Trigger"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/content-sync/youtube",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        2080,
+        96
+      ],
+      "id": "13e772fe-4012-4a08-a440-9df4b5360b2e",
+      "name": "Manual Sync Trigger",
+      "webhookId": "content-sync-youtube-webhook"
+    },
+    {
+      "parameters": {
+        "tableId": "marketing_sync_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "sync_type",
+              "fieldValue": "youtube"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "running"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2304,
+        0
+      ],
+      "id": "232fc642-ed39-419a-bcf7-8bb92909e75d",
+      "name": "Create Sync Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "playlistItem",
+        "operation": "getAll",
+        "playlistId": "=UUCmQ-QPTsHeDz9VeouXPy5Q",
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        2528,
+        0
+      ],
+      "id": "54c62d93-81d1-4357-ae42-c56cee38b2ff",
+      "name": "Fetch Channel Videos",
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "9JYQ24N8LsnQyb1k",
+          "name": "Google App For n8n - Youtube"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process YouTube videos and format for Supabase\nconst videos = $input.all();\n\n// Handle case where no videos were returned\nif (!videos || videos.length === 0) {\n  return [{\n    json: {\n      _noVideos: true,\n      itemsProcessed: 0\n    }\n  }];\n}\n\nconst timestamp = new Date().toISOString();\n\nconst formattedVideos = videos.map(video => {\n  const snippet = video.json.snippet || {};\n  const contentDetails = video.json.contentDetails || {};\n  const resourceId = snippet.resourceId || {};\n  \n  // Get video ID from multiple possible locations\n  const videoId = contentDetails.videoId || resourceId.videoId || '';\n  \n  return {\n    json: {\n      title: snippet.title || 'Untitled Video',\n      content_type: 'youtube',\n      url: videoId ? `https://www.youtube.com/watch?v=${videoId}` : '',\n      source_platform: 'youtube',\n      source_id: videoId,\n      status: 'published',\n      author: snippet.channelTitle || 'GrowthLab',\n      description: (snippet.description || '').substring(0, 500),\n      full_content: snippet.description || '',\n      date_created: snippet.publishedAt || timestamp,\n      synced_at: timestamp\n    }\n  };\n}).filter(v => v.json.source_id); // Filter out any without valid video IDs\n\n// If all videos were filtered out (no valid IDs), return no-videos marker\nreturn formattedVideos.length > 0 ? formattedVideos : [{ json: { _noVideos: true, itemsProcessed: 0 } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        0
+      ],
+      "id": "d832676a-7478-4018-a49c-277b15890aee",
+      "name": "Format Videos for DB",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-source-id",
+              "leftValue": "={{ $json.source_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2976,
+        0
+      ],
+      "id": "e3603188-076b-4f6c-8911-ce70e0e5fa9a",
+      "name": "Has Videos?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://scahyfdsgpfurpcnwyrb.supabase.co/rest/v1/marketing_content_items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjYWh5ZmRzZ3BmdXJwY253eXJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NjcwNjQsImV4cCI6MjA3MzU0MzA2NH0.cXW6ZfijLsA4fTkb-Zyptxp2TkUBBrADVONFvtopAPc"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 50,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3200,
+        -96
+      ],
+      "id": "742f56c8-92c0-4591-80cf-e6e52ebd5c2f",
+      "name": "Upsert Videos to DB",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Count results for sync log\nconst items = $input.all();\n\n// Filter out any error items or skipped items\nconst validItems = items.filter(item => !item.json._skip && !item.json.error);\n\nreturn [{\n  json: {\n    itemsProcessed: validItems.length,\n    itemsAdded: validItems.length,\n    itemsUpdated: 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3424,
+        -96
+      ],
+      "id": "f942f727-13a9-451a-9e4c-64a1a4dce83d",
+      "name": "Count Results",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// No videos case - return zero counts\nreturn [{\n  json: {\n    itemsProcessed: 0,\n    itemsAdded: 0,\n    itemsUpdated: 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3424,
+        96
+      ],
+      "id": "053ab65a-3f74-455d-bd55-5edb1fa592db",
+      "name": "No Videos Count"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3648,
+        0
+      ],
+      "id": "8fd8acc3-022f-450e-81a8-2c7d132ad560",
+      "name": "Merge Counts"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "marketing_sync_logs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Create Sync Log').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3872,
+        0
+      ],
+      "id": "ec09f3a3-b941-4c03-a531-7500d91058a6",
+      "name": "Update Sync Log",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"syncType\": \"youtube\",\n  \"itemsProcessed\": {{ $json.itemsProcessed || 0 }},\n  \"itemsAdded\": {{ $json.itemsAdded || 0 }},\n  \"itemsUpdated\": {{ $json.itemsUpdated || 0 }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        4096,
+        0
+      ],
+      "id": "90746c11-f253-42e8-a458-a9e379509b72",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily 3AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Sync Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Fetch Channel Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Channel Videos": {
+      "main": [
+        [
+          {
+            "node": "Format Videos for DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Videos for DB": {
+      "main": [
+        [
+          {
+            "node": "Has Videos?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Videos?": {
+      "main": [
+        [
+          {
+            "node": "Upsert Videos to DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Videos Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Videos to DB": {
+      "main": [
+        [
+          {
+            "node": "Count Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Results": {
+      "main": [
+        [
+          {
+            "node": "Merge Counts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Videos Count": {
+      "main": [
+        [
+          {
+            "node": "Merge Counts",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Counts": {
+      "main": [
+        [
+          {
+            "node": "Update Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "b53685b5-a75e-4e08-8d4d-187b2f032e14",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
+  },
+  "id": "idnY7wm9ITrt1EA1VgTRG",
+  "tags": [
+    {
+      "name": "Marketing",
+      "id": "1wa7NISUpdKEFpM9",
+      "updatedAt": "2026-02-04T21:55:13.753Z",
+      "createdAt": "2026-02-04T21:55:13.753Z"
+    },
+    {
+      "name": "Content Sync",
+      "id": "BqwL4o9obdJJtTme",
+      "updatedAt": "2026-02-04T21:55:13.760Z",
+      "createdAt": "2026-02-04T21:55:13.760Z"
+    }
+  ]
+}

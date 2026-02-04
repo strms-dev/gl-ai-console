@@ -1,0 +1,233 @@
+{
+  "name": "Marketing - Topic Radar Market Trends",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing/topic-radar/trends",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "webhook-trends",
+      "name": "Receive Trends Analysis Request",
+      "webhookId": "topic-radar-trends-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "marketing_content_items",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [220, 0],
+      "id": "fetch-content-library",
+      "name": "Fetch Content Library",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare content library summary for trend analysis\nconst items = $input.all();\n\nconst contentSummary = {\n  totalPieces: items.length,\n  byType: {},\n  recentTopics: []\n};\n\n// Count by type\nfor (const item of items) {\n  const type = item.json.content_type;\n  contentSummary.byType[type] = (contentSummary.byType[type] || 0) + 1;\n}\n\n// Get recent topics (last 20 items by date)\nconst sortedItems = [...items].sort((a, b) => \n  new Date(b.json.date_created || 0) - new Date(a.json.date_created || 0)\n);\ncontentSummary.recentTopics = sortedItems.slice(0, 20).map(item => item.json.title);\n\nreturn [{ json: contentSummary }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0],
+      "id": "prepare-summary",
+      "name": "Prepare Content Summary"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 200],
+      "id": "anthropic-llm",
+      "name": "Anthropic Claude",
+      "credentials": {
+        "anthropicApi": {
+          "id": "YOUR_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a market trends analyst for GrowthLab, an accounting firm that specializes in serving marketing agencies.\n\n## Task: Identify Trending Topics for Content Creation\n\n## Our Current Content Summary:\n{{ JSON.stringify($json) }}\n\n## Instructions:\nBased on your knowledge of current trends in:\n- Accounting and finance for service businesses\n- Marketing agency operations and growth\n- CFO/finance leadership challenges\n- Small business financial management\n- Tax planning and compliance\n- Technology in accounting (AI, automation)\n\nIdentify 3-5 trending topics we should create content about. Focus on:\n1. Current year trends and challenges (2025-2026)\n2. Emerging technologies affecting agency finance\n3. Economic factors impacting marketing agencies\n4. Regulatory changes affecting small businesses\n5. Seasonal opportunities (tax season, budget planning, year-end)\n\nFor each topic suggestion, provide:\n1. topic: A clear, compelling topic title\n2. gapScore: A score from 0-100 indicating trend relevance (higher = more timely)\n3. rationale: 2-3 sentences explaining why this trend matters now\n4. suggestedFormat: Best format (blog, case_study, youtube, linkedin, newsletter)\n5. trendSource: What's driving this trend (economic, regulatory, technology, seasonal)\n\n## Response Format:\nRespond ONLY with a valid JSON array of 3-5 topic ideas:\n[\n  {\n    \"topic\": \"Topic title here\",\n    \"gapScore\": 90,\n    \"rationale\": \"Explanation of why this trend matters now\",\n    \"suggestedFormat\": \"blog\",\n    \"trendSource\": \"technology\"\n  }\n]"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 0],
+      "id": "analyze-trends",
+      "name": "Analyze Market Trends"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the AI response and format for Supabase insert\nconst aiResponse = $input.first().json.text;\n\nlet ideas;\ntry {\n  ideas = JSON.parse(aiResponse);\n} catch (e) {\n  const jsonMatch = aiResponse.match(/\\[\\s*\\{[\\s\\S]*\\}\\s*\\]/);\n  if (jsonMatch) {\n    ideas = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('Failed to parse AI response as JSON');\n  }\n}\n\nconst timestamp = new Date().toISOString();\n\n// Format for Supabase insert\nconst formattedIdeas = ideas.map((idea, index) => ({\n  json: {\n    topic: idea.topic,\n    gap_score: idea.gapScore,\n    rationale: idea.rationale,\n    suggested_format: idea.suggestedFormat,\n    status: 'new',\n    category: 'market_trends',\n    generation_context: { trendSource: idea.trendSource },\n    created_by: 'ai',\n    created_at: timestamp\n  }\n}));\n\nreturn formattedIdeas;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0],
+      "id": "format-ideas",
+      "name": "Format Ideas for DB"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "marketing_topic_ideas",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "id": "save-ideas",
+      "name": "Save Ideas to Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "YOUR_SUPABASE_CREDENTIAL_ID",
+          "name": "GL AI Console Supabase Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format response for webhook\nconst savedIdeas = $input.all();\n\nreturn [{\n  json: {\n    success: true,\n    category: 'market_trends',\n    ideas: savedIdeas.map(item => ({\n      id: item.json.id,\n      topic: item.json.topic,\n      gapScore: item.json.gap_score,\n      rationale: item.json.rationale,\n      suggestedFormat: item.json.suggested_format\n    }))\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 0],
+      "id": "format-response",
+      "name": "Format Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1540, 0],
+      "id": "respond-webhook",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Receive Trends Analysis Request": {
+      "main": [
+        [
+          {
+            "node": "Fetch Content Library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Content Library": {
+      "main": [
+        [
+          {
+            "node": "Prepare Content Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Content Summary": {
+      "main": [
+        [
+          {
+            "node": "Analyze Market Trends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Claude": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyze Market Trends",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Market Trends": {
+      "main": [
+        [
+          {
+            "node": "Format Ideas for DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Ideas for DB": {
+      "main": [
+        [
+          {
+            "node": "Save Ideas to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Ideas to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "Marketing",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "Topic Radar",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
