@@ -15,28 +15,11 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
-        2080,
-        -96
+        7136,
+        -464
       ],
-      "id": "62a85f1a-98e5-4900-b805-3dbf172e3e38",
+      "id": "ba946640-3486-4ed7-b563-6152ed60f44f",
       "name": "Daily 3AM Trigger"
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "marketing/content-sync/youtube",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
-      "position": [
-        2080,
-        96
-      ],
-      "id": "13e772fe-4012-4a08-a440-9df4b5360b2e",
-      "name": "Manual Sync Trigger",
-      "webhookId": "content-sync-youtube-webhook"
     },
     {
       "parameters": {
@@ -57,10 +40,10 @@
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        2304,
-        0
+        7360,
+        -464
       ],
-      "id": "232fc642-ed39-419a-bcf7-8bb92909e75d",
+      "id": "6dde8287-4da8-42ab-a4b3-00cc7b182500",
       "name": "Create Sync Log",
       "credentials": {
         "supabaseApi": {
@@ -81,10 +64,10 @@
       "type": "n8n-nodes-base.youTube",
       "typeVersion": 1,
       "position": [
-        2528,
-        0
+        7584,
+        -464
       ],
-      "id": "54c62d93-81d1-4357-ae42-c56cee38b2ff",
+      "id": "5f39b01f-1fde-46c5-bb44-ce6c01263ff4",
       "name": "Fetch Channel Videos",
       "credentials": {
         "youTubeOAuth2Api": {
@@ -101,10 +84,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2752,
-        0
+        7808,
+        -464
       ],
-      "id": "d832676a-7478-4018-a49c-277b15890aee",
+      "id": "abbd9435-4d57-4ca5-9349-b9ef5bad8078",
       "name": "Format Videos for DB",
       "onError": "continueRegularOutput"
     },
@@ -114,7 +97,7 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "loose",
+            "typeValidation": "strict",
             "version": 2
           },
           "conditions": [
@@ -135,10 +118,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2976,
-        0
+        8032,
+        -464
       ],
-      "id": "e3603188-076b-4f6c-8911-ce70e0e5fa9a",
+      "id": "32b05374-aafd-4816-9d95-f228caf5e327",
       "name": "Has Videos?"
     },
     {
@@ -165,63 +148,39 @@
         "jsonBody": "={{ $json }}",
         "options": {
           "batching": {
-            "batch": {
-              "batchSize": 50,
-              "batchInterval": 1000
-            }
+            "batch": {}
           }
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3200,
-        -96
+        8256,
+        -560
       ],
-      "id": "742f56c8-92c0-4591-80cf-e6e52ebd5c2f",
+      "id": "64e011c8-6653-4d7f-9ff0-b9fac700f742",
       "name": "Upsert Videos to DB",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "8o7ThfsHa3QWcSYa",
+          "name": "GL AI Console Supabase Service Role Key"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Count results for sync log\nconst items = $input.all();\n\n// Filter out any error items or skipped items\nconst validItems = items.filter(item => !item.json._skip && !item.json.error);\n\nreturn [{\n  json: {\n    itemsProcessed: validItems.length,\n    itemsAdded: validItems.length,\n    itemsUpdated: 0\n  }\n}];"
+        "jsCode": "// Count results for sync log\nconst items = $input.all();\n\n// Filter out any error items or skipped items\nconst validItems = items.filter(item => !item.json._skip && !item.json.error);\n\nreturn [{\n  json: {\n    itemsProcessed: validItems.length,\n    itemsAdded: validItems.length,\n    itemsUpdated: 0,\n    status: 'completed'\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3424,
-        -96
+        8480,
+        -560
       ],
-      "id": "f942f727-13a9-451a-9e4c-64a1a4dce83d",
+      "id": "8d28661c-6b74-43bf-b424-1a04d5faa926",
       "name": "Count Results",
       "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "jsCode": "// No videos case - return zero counts\nreturn [{\n  json: {\n    itemsProcessed: 0,\n    itemsAdded: 0,\n    itemsUpdated: 0\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        3424,
-        96
-      ],
-      "id": "053ab65a-3f74-455d-bd55-5edb1fa592db",
-      "name": "No Videos Count"
-    },
-    {
-      "parameters": {
-        "mode": "combine",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
-      "position": [
-        3648,
-        0
-      ],
-      "id": "8fd8acc3-022f-450e-81a8-2c7d132ad560",
-      "name": "Merge Counts"
     },
     {
       "parameters": {
@@ -236,15 +195,35 @@
               "keyValue": "={{ $('Create Sync Log').item.json.id }}"
             }
           ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "items_processed",
+              "fieldValue": "={{ $json.itemsProcessed }}"
+            },
+            {
+              "fieldId": "items_added",
+              "fieldValue": "={{ $json.itemsAdded }}"
+            },
+            {
+              "fieldId": "items_updated",
+              "fieldValue": "={{ $json.itemsUpdated }}"
+            }
+          ]
         }
       },
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        3872,
-        0
+        8704,
+        -560
       ],
-      "id": "ec09f3a3-b941-4c03-a531-7500d91058a6",
+      "id": "070999fd-f532-4fb9-8568-f46263f7dd65",
       "name": "Update Sync Log",
       "credentials": {
         "supabaseApi": {
@@ -256,34 +235,59 @@
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"syncType\": \"youtube\",\n  \"itemsProcessed\": {{ $json.itemsProcessed || 0 }},\n  \"itemsAdded\": {{ $json.itemsAdded || 0 }},\n  \"itemsUpdated\": {{ $json.itemsUpdated || 0 }}\n}",
-        "options": {}
+        "operation": "update",
+        "tableId": "marketing_sync_logs",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Create Sync Log').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "completed"
+            },
+            {
+              "fieldId": "items_processed",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "items_added",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "items_updated",
+              "fieldValue": "0"
+            }
+          ]
+        }
       },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
       "position": [
-        4096,
-        0
+        8256,
+        -368
       ],
-      "id": "90746c11-f253-42e8-a458-a9e379509b72",
-      "name": "Respond to Webhook"
+      "id": "491d7319-f736-4265-98b9-99073ab4056e",
+      "name": "Update Sync Log (Empty)",
+      "credentials": {
+        "supabaseApi": {
+          "id": "ZHhTrJNxn34MA3CW",
+          "name": "GL AI Console Supabase Key"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
   "connections": {
     "Daily 3AM Trigger": {
-      "main": [
-        [
-          {
-            "node": "Create Sync Log",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Manual Sync Trigger": {
       "main": [
         [
           {
@@ -338,7 +342,7 @@
         ],
         [
           {
-            "node": "No Videos Count",
+            "node": "Update Sync Log (Empty)",
             "type": "main",
             "index": 0
           }
@@ -360,40 +364,7 @@
       "main": [
         [
           {
-            "node": "Merge Counts",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "No Videos Count": {
-      "main": [
-        [
-          {
-            "node": "Merge Counts",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge Counts": {
-      "main": [
-        [
-          {
             "node": "Update Sync Log",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Sync Log": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }
@@ -406,7 +377,7 @@
     "executionOrder": "v1",
     "availableInMCP": false
   },
-  "versionId": "b53685b5-a75e-4e08-8d4d-187b2f032e14",
+  "versionId": "86c60ea5-d90a-4afe-9ccc-26dc601e0782",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "f14113fc770fd9b2549e1172bcc9e56385af927f181d92711cbaa8bf45732284"
@@ -414,16 +385,16 @@
   "id": "idnY7wm9ITrt1EA1VgTRG",
   "tags": [
     {
-      "name": "Marketing",
-      "id": "1wa7NISUpdKEFpM9",
       "updatedAt": "2026-02-04T21:55:13.753Z",
-      "createdAt": "2026-02-04T21:55:13.753Z"
+      "createdAt": "2026-02-04T21:55:13.753Z",
+      "id": "1wa7NISUpdKEFpM9",
+      "name": "Marketing"
     },
     {
-      "name": "Content Sync",
-      "id": "BqwL4o9obdJJtTme",
       "updatedAt": "2026-02-04T21:55:13.760Z",
-      "createdAt": "2026-02-04T21:55:13.760Z"
+      "createdAt": "2026-02-04T21:55:13.760Z",
+      "id": "BqwL4o9obdJJtTme",
+      "name": "Content Sync"
     }
   ]
 }
